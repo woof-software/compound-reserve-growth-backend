@@ -9,7 +9,7 @@ import {
   NetworkCompBalanceRecord,
   NetworkCompBalanceTable,
   RewardRecord,
-} from 'contract/contract.type';
+} from 'modules/contract/contract.type';
 
 @Injectable()
 export class JsonService {
