@@ -12,8 +12,8 @@ import RewardsABI from './abi/RewardsABI.json';
 import LegacyRewardsABI from './abi/LegacyRewardsABI.json';
 import { CollateralInfo, CurveMap, MarketData, RootJson } from './contract.type';
 
-import { ProviderFactory } from 'network/provider.factory';
-import { JsonService } from '@app/json/json.service';
+import { ProviderFactory } from 'modules/network/provider.factory';
+import { JsonService } from 'modules/json/json.service';
 
 @Injectable()
 export class ContractService {

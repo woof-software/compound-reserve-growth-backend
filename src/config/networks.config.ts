@@ -1,6 +1,6 @@
 import { registerAs } from '@nestjs/config';
 
-import { NetworkConfig } from 'network/network.types';
+import { NetworkConfig } from 'modules/network/network.types';
 
 export default registerAs('networks', (): NetworkConfig[] => [
   {

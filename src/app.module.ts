@@ -4,18 +4,24 @@ import { ConfigModule } from '@nestjs/config';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { ScheduleModule } from '@nestjs/schedule';
 
+import { ContractModule } from 'modules/contract/contract.module';
+import { GithubModule } from 'modules/github/github.module';
+import { JsonModule } from 'modules/json/json.module';
+import { NetworkModule } from 'modules/network/network.module';
+import { AssetModule } from 'modules/asset/asset.module';
+import { SourceModule } from 'modules/source/source.module';
+import { HistoryModule } from 'modules/history/history.module';
+import { TreasuryModule } from 'modules/treasury/treasury.module';
+import { RevenueModule } from 'modules/revenue/revenue.module';
+
 import { AppController } from './app.controller';
 
 import appConfig from 'config/app';
 import databaseConfig from 'config/database';
 import networksConfig from 'config/networks.config';
-import { ContractModule } from 'contract/contract.module';
 import { DatabaseModule } from 'database/database.module';
-import { GithubModule } from 'github/github.module';
-import { NetworkModule } from 'network/network.module';
 import { Logger } from 'infrastructure/logger';
 import { ExceptionInterceptor } from 'infrastructure/http/interceptors/exception.interceptor';
-import { JsonModule } from 'json/json.module';
 
 @Module({
   imports: [
@@ -37,6 +43,11 @@ import { JsonModule } from 'json/json.module';
     NetworkModule,
     JsonModule,
     ContractModule,
+    SourceModule,
+    AssetModule,
+    HistoryModule,
+    TreasuryModule,
+    RevenueModule,
   ],
   controllers: [AppController],
   providers: [
