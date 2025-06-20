@@ -18,7 +18,8 @@
     "migration:generate": "npm run typeorm -- -d ./src/database/typeorm.config.ts migration:generate ./src/database/migrations/migration",
     "migration:create": "npm run typeorm -- migration:create ./src/database/migrations/migration",
     "migration:revert": "npm run typeorm -- -d ./src/database/typeorm.config.ts migration:revert",
-    "migration:show": "npm run typeorm -- migration:show -d ./src/database/typeorm.config.ts"
+    "migration:show": "npm run typeorm -- migration:show -d ./src/database/typeorm.config.ts",
+    "cli:source-fill": "nest build && node dist/src/cli.js source:fill"
   },
   "dependencies": {
     "@nestjs/cache-manager": "^3.0.0",

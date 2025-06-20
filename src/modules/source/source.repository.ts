@@ -19,12 +19,16 @@ export class SourceRepository {
     return this.sourceRepository.findOne({ where: { address } });
   }
 
+  async list(): Promise<Source[]> {
+    return this.sourceRepository.find();
+  }
+
   async save(source: Source): Promise<Source> {
     return this.sourceRepository.save(source);
   }
 
   async update(source: Source): Promise<Source> {
-    source.readAt = new Date();
+    source.checkedAt = new Date();
     return this.sourceRepository.save(source);
   }
 }

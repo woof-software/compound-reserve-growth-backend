@@ -12,6 +12,9 @@ export class Source {
   @Column()
   public address: string;
 
+  @Column()
+  public network: string;
+
   @Column({ nullable: true })
   public market: string;
 
@@ -36,8 +39,15 @@ export class Source {
   @OneToMany(() => Revenue, (revenues) => revenues.source)
   public revenues: Revenue[];
 
-  constructor(address: string, algorithm: string, blockNumber: number, market?: string) {
+  constructor(
+    address: string,
+    network: string,
+    algorithm: string,
+    blockNumber: number,
+    market?: string,
+  ) {
     this.address = address;
+    this.network = network;
     this.algorithm = algorithm;
     this.blockNumber = blockNumber;
     this.market = market;

@@ -7,21 +7,26 @@ import { Source } from './source.entity';
 
 @Injectable()
 export class SourceService {
-  constructor(private readonly repository: SourceRepository) {}
+  constructor(private readonly sourceRepository: SourceRepository) {}
 
   async create(dto: CreateSourceDto): Promise<Source> {
-    const source = new Source(dto.address, dto.algorithm, dto.blockNumber, dto.market);
-    return this.repository.save(source);
+    const source = new Source(dto.address, dto.network, dto.algorithm, dto.blockNumber, dto.market);
+    return this.sourceRepository.save(source);
   }
 
   async update(dto: UpdateSourceDto): Promise<Source> {
-    const source = await this.repository.findById(dto.id);
+    const source = await this.sourceRepository.findById(dto.id);
     if (!source) throw new NotFoundException(`Source with id ${dto.id} not found`);
-    Object.assign(source, dto);
-    return this.repository.update(source);
+    if (dto.blockNumber) source.blockNumber = dto.blockNumber;
+    source.checkedAt = dto.checkedAt ? dto.checkedAt : new Date();
+    return this.sourceRepository.update(source);
   }
 
   async findById(id: number): Promise<Source> {
-    return this.repository.findById(id);
+    return this.sourceRepository.findById(id);
+  }
+
+  async listAll(): Promise<Source[]> {
+    return this.sourceRepository.list();
   }
 }

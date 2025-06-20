@@ -19,7 +19,7 @@ export class CreateAssetRequest {
   @ApiProperty({ example: 'ethereum', description: 'Blockchain network' })
   @IsNotEmpty()
   @IsString()
-  public chain: string;
+  public network: string;
 
   @ApiProperty({ example: 'ERC20', description: 'Asset type' })
   @IsNotEmpty()
