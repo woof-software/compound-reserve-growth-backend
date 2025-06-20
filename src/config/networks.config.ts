@@ -16,7 +16,7 @@ export default registerAs('networks', (): NetworkConfig[] => [
   {
     network: 'ronin',
     chainId: 2020,
-    url: 'https://ronin.lgns.net/rpc',
+    url: 'https://ronin.drpc.org',
   },
   {
     network: 'polygon',

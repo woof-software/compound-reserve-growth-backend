@@ -2,6 +2,6 @@ export class CreateAssetDto {
   public address: string;
   public decimals: number;
   public symbol: string;
-  public chain: string;
+  public network: string;
   public type: string;
 }

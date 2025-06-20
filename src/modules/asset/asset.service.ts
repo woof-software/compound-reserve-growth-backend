@@ -11,7 +11,7 @@ export class AssetService {
   async create(dto: CreateAssetDto): Promise<Asset> {
     const existing = await this.repository.findByAddress(dto.address);
     if (existing) throw new BadRequestException(`Asset with address ${dto.address} already exists`);
-    const asset = new Asset(dto.address, dto.decimals, dto.symbol, dto.chain, dto.type);
+    const asset = new Asset(dto.address, dto.decimals, dto.symbol, dto.network, dto.type);
     return this.repository.save(asset);
   }
 

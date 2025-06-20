@@ -7,6 +7,11 @@ export class CreateSourceRequest {
   @IsString()
   public address: string;
 
+  @ApiProperty({ example: 'mainnet', description: 'Network' })
+  @IsNotEmpty()
+  @IsString()
+  public network: string;
+
   @ApiPropertyOptional({ example: 'cUSDCv3', description: 'Market name' })
   @IsOptional()
   @IsString()

@@ -16,7 +16,7 @@ export class AssetResponse {
   public symbol: string;
 
   @ApiProperty({ example: 'ethereum' })
-  public chain: string;
+  public network: string;
 
   @ApiProperty({ example: 'ERC20' })
   public type: string;
@@ -29,7 +29,7 @@ export class AssetResponse {
     this.address = asset.address;
     this.decimals = asset.decimals;
     this.symbol = asset.symbol;
-    this.chain = asset.chain;
+    this.network = asset.network;
     this.type = asset.type;
     this.createdAt = asset.createdAt;
   }

@@ -1,0 +1,32 @@
+{
+  "timestamp": 1750436206218,
+  "data": [
+    "arbitrum/usdc.e/roots.json",
+    "arbitrum/usdc/roots.json",
+    "arbitrum/usdt/roots.json",
+    "arbitrum/weth/roots.json",
+    "base/aero/roots.json",
+    "base/usdbc/roots.json",
+    "base/usdc/roots.json",
+    "base/usds/roots.json",
+    "base/weth/roots.json",
+    "linea/usdc/roots.json",
+    "mainnet/usdc/roots.json",
+    "mainnet/usds/roots.json",
+    "mainnet/usdt/roots.json",
+    "mainnet/wbtc/roots.json",
+    "mainnet/weth/roots.json",
+    "mainnet/wsteth/roots.json",
+    "mantle/usde/roots.json",
+    "optimism/usdc/roots.json",
+    "optimism/usdt/roots.json",
+    "optimism/weth/roots.json",
+    "polygon/usdc/roots.json",
+    "polygon/usdt/roots.json",
+    "ronin/weth/roots.json",
+    "ronin/wron/roots.json",
+    "scroll/usdc/roots.json",
+    "unichain/usdc/roots.json",
+    "unichain/weth/roots.json"
+  ]
+}

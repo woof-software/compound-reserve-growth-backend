@@ -9,6 +9,9 @@ export class SourceResponse {
   @ApiProperty({ example: '0xabc123' })
   public address: string;
 
+  @ApiProperty({ example: 'mainnet' })
+  public network: string;
+
   @ApiProperty({ example: 'cUSDCv3', nullable: true })
   public market: string;
 
@@ -22,15 +25,16 @@ export class SourceResponse {
   public createdAt: Date;
 
   @ApiProperty({ example: '2025-06-17T12:30:00Z', nullable: true })
-  public readAt: Date;
+  public checkedAt: Date;
 
   constructor(source: Source) {
     this.id = source.id;
     this.address = source.address;
+    this.network = source.network;
     this.market = source.market;
     this.algorithm = source.algorithm;
     this.blockNumber = source.blockNumber;
     this.createdAt = source.createdAt;
-    this.readAt = source.readAt;
+    this.checkedAt = source.checkedAt;
   }
 }

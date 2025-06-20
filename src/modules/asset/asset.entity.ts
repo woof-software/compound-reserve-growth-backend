@@ -19,7 +19,7 @@ export class Asset {
   public symbol: string;
 
   @Column()
-  public chain: string;
+  public network: string;
 
   @Column()
   public type: string;
@@ -36,11 +36,11 @@ export class Asset {
   @OneToMany(() => Revenue, (revenues) => revenues.asset)
   public revenues: Revenue[];
 
-  constructor(address: string, decimals: number, symbol: string, chain: string, type: string) {
+  constructor(address: string, decimals: number, symbol: string, network: string, type: string) {
     this.address = address;
     this.decimals = decimals;
     this.symbol = symbol;
-    this.chain = chain;
+    this.network = network;
     this.type = type;
     this.createdAt = new Date();
   }

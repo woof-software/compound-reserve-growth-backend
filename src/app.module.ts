@@ -6,7 +6,6 @@ import { ScheduleModule } from '@nestjs/schedule';
 
 import { ContractModule } from 'modules/contract/contract.module';
 import { GithubModule } from 'modules/github/github.module';
-import { JsonModule } from 'modules/json/json.module';
 import { NetworkModule } from 'modules/network/network.module';
 import { AssetModule } from 'modules/asset/asset.module';
 import { SourceModule } from 'modules/source/source.module';
@@ -41,7 +40,6 @@ import { ExceptionInterceptor } from 'infrastructure/http/interceptors/exception
     DatabaseModule,
     GithubModule,
     NetworkModule,
-    JsonModule,
     ContractModule,
     SourceModule,
     AssetModule,
