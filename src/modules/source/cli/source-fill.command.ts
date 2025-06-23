@@ -5,9 +5,10 @@ import axios from 'axios';
 import { ContractService } from 'modules/contract/contract.service';
 import { GithubService } from 'modules/github/github.service';
 import { SourceService } from 'modules/source/source.service';
-import { Source } from '../source.entity';
+import { Source } from 'modules/source/source.entity';
+import { sources } from 'modules/source/constants/sources';
+
 import { Algorithm } from '@app/common/enum/algorithm.enum';
-import { sources } from '../constants/sources';
 
 @Command({ name: 'source:fill', description: 'Fill source table' })
 export class SourceFillCommand extends CommandRunner {
