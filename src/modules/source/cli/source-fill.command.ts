@@ -30,60 +30,6 @@ export class SourceFillCommand extends CommandRunner {
 
       const dbSources = await this.sourceService.listAll();
 
-      const rootsPaths = await this.githubService.listAllRootsJson();
-      this.logger.log(`Found ${rootsPaths.length} roots.json files in the repository`);
-
-      for (const path of rootsPaths) {
-        const rawUrl = `https://raw.githubusercontent.com/compound-finance/comet/main/deployments/${path}`;
-
-        try {
-          const response = await axios.get(rawUrl, { responseType: 'json' });
-          const rootObj = response.data;
-          const marketData = await this.contractService.readMarketData(rootObj, path);
-          const existingSource = dbSources.find(
-            (source) =>
-              source.address === marketData.cometAddress &&
-              source.network === marketData.network &&
-              source.algorithm === Algorithm.COMET,
-          );
-          if (existingSource) continue;
-          const creationBlockNumber = await this.contractService.getContractCreationBlock(
-            marketData.cometAddress,
-            marketData.network,
-          );
-
-          const token = await this.contractService.getCometBaseToken(
-            marketData.cometAddress,
-            marketData.network,
-          );
-
-          const cometAsset = await this.assetService.findOrCreate({
-            address: token.address,
-            decimals: token.decimals,
-            symbol: token.symbol,
-            network: marketData.network,
-          });
-
-          const newMarketSource = new Source(
-            marketData.cometAddress,
-            marketData.network,
-            Algorithm.COMET,
-            creationBlockNumber,
-            cometAsset,
-            marketData.market,
-          );
-
-          await this.sourceService.createWithAsset(newMarketSource);
-          this.logger.log(`Added new source: ${marketData.network}/${marketData.market}`);
-        } catch (err) {
-          this.logger.error(
-            `Error creating comet market source:`,
-            err instanceof Error ? err.message : String(err),
-          );
-          continue;
-        }
-      }
-
       for (const source of sources) {
         if (source.algorithm === Algorithm.COMPTROLLER) {
           const comptrollerMarkets = await this.contractService.getAllComptrollerMarkets(
@@ -157,6 +103,60 @@ export class SourceFillCommand extends CommandRunner {
 
         await this.sourceService.createWithAsset(newSource);
         this.logger.log(`Added new source: ${source.network}/${source.algorithm}`);
+      }
+
+      const rootsPaths = await this.githubService.listAllRootsJson();
+      this.logger.log(`Found ${rootsPaths.length} roots.json files in the repository`);
+
+      for (const path of rootsPaths) {
+        const rawUrl = `https://raw.githubusercontent.com/compound-finance/comet/main/deployments/${path}`;
+
+        try {
+          const response = await axios.get(rawUrl, { responseType: 'json' });
+          const rootObj = response.data;
+          const marketData = await this.contractService.readMarketData(rootObj, path);
+          const existingSource = dbSources.find(
+            (source) =>
+              source.address === marketData.cometAddress &&
+              source.network === marketData.network &&
+              source.algorithm === Algorithm.COMET,
+          );
+          if (existingSource) continue;
+          const creationBlockNumber = await this.contractService.getContractCreationBlock(
+            marketData.cometAddress,
+            marketData.network,
+          );
+
+          const token = await this.contractService.getCometBaseToken(
+            marketData.cometAddress,
+            marketData.network,
+          );
+
+          const cometAsset = await this.assetService.findOrCreate({
+            address: token.address,
+            decimals: token.decimals,
+            symbol: token.symbol,
+            network: marketData.network,
+          });
+
+          const newMarketSource = new Source(
+            marketData.cometAddress,
+            marketData.network,
+            Algorithm.COMET,
+            creationBlockNumber,
+            cometAsset,
+            marketData.market,
+          );
+
+          await this.sourceService.createWithAsset(newMarketSource);
+          this.logger.log(`Added new source: ${marketData.network}/${marketData.market}`);
+        } catch (err) {
+          this.logger.error(
+            `Error creating comet market source:`,
+            err instanceof Error ? err.message : String(err),
+          );
+          continue;
+        }
       }
 
       this.logger.log('Filling of source table completed.');
