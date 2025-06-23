@@ -7,6 +7,7 @@ import { GithubService } from 'modules/github/github.service';
 import { SourceService } from 'modules/source/source.service';
 import { Source } from 'modules/source/source.entity';
 import { sources } from 'modules/source/constants/sources';
+import { AssetService } from 'modules/asset/asset.service';
 
 import { Algorithm } from '@app/common/enum/algorithm.enum';
 
@@ -18,6 +19,7 @@ export class SourceFillCommand extends CommandRunner {
     private readonly githubService: GithubService,
     private readonly sourceService: SourceService,
     private readonly contractService: ContractService,
+    private readonly assetService: AssetService,
   ) {
     super();
   }
@@ -49,15 +51,29 @@ export class SourceFillCommand extends CommandRunner {
             marketData.cometAddress,
             marketData.network,
           );
+
+          const token = await this.contractService.getCometBaseToken(
+            marketData.cometAddress,
+            marketData.network,
+          );
+
+          const cometAsset = await this.assetService.findOrCreate({
+            address: token.address,
+            decimals: token.decimals,
+            symbol: token.symbol,
+            network: marketData.network,
+          });
+
           const newMarketSource = new Source(
             marketData.cometAddress,
             marketData.network,
             Algorithm.COMET,
             creationBlockNumber,
+            cometAsset,
             marketData.market,
           );
 
-          await this.sourceService.create(newMarketSource);
+          await this.sourceService.createWithAsset(newMarketSource);
           this.logger.log(`Added new source: ${marketData.network}/${marketData.market}`);
         } catch (err) {
           this.logger.error(
@@ -91,15 +107,27 @@ export class SourceFillCommand extends CommandRunner {
               marketAddress,
               source.network,
             );
+            const token = await this.contractService.getMarketV2UnderlyingToken(
+              marketAddress,
+              source.network,
+            );
+            const marketAsset = await this.assetService.findOrCreate({
+              address: token.address,
+              decimals: token.decimals,
+              symbol: token.symbol,
+              network: source.network,
+            });
+
             const newMarketSource = new Source(
               marketAddress,
               source.network,
               Algorithm.MARKET_V2,
               creationBlockNumber,
+              marketAsset,
               symbol,
             );
 
-            await this.sourceService.create(newMarketSource);
+            await this.sourceService.createWithAsset(newMarketSource);
             this.logger.log(`Added new source: ${source.network}/${Algorithm.MARKET_V2}`);
           }
         }
@@ -111,14 +139,23 @@ export class SourceFillCommand extends CommandRunner {
         );
         if (existingSource) continue;
 
+        const assetInDB = await this.assetService.findOrCreate({
+          address: source.asset.address,
+          network: source.network,
+          decimals: source.asset.decimals,
+          symbol: source.asset.symbol,
+          type: source.asset.type,
+        });
+
         const newSource = new Source(
           source.address,
           source.network,
           source.algorithm,
           source.creationBlockNumber,
+          assetInDB,
         );
 
-        await this.sourceService.create(newSource);
+        await this.sourceService.createWithAsset(newSource);
         this.logger.log(`Added new source: ${source.network}/${source.algorithm}`);
       }
 

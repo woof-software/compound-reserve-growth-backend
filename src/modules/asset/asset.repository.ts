@@ -12,8 +12,8 @@ export class AssetRepository {
     return this.repository.findOne({ where: { id } });
   }
 
-  async findByAddress(address: string): Promise<Asset> {
-    return this.repository.findOne({ where: { address } });
+  async findByAddressAndNetwork(address: string, network: string): Promise<Asset> {
+    return this.repository.findOne({ where: { address, network } });
   }
 
   async save(asset: Asset): Promise<Asset> {

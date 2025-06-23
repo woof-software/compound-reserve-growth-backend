@@ -17,13 +17,13 @@ export class TreasuryRepository {
   async findById(id: number): Promise<Treasury> {
     return this.treasuryRepository.findOne({
       where: { id },
-      relations: { asset: true, source: true },
+      relations: { source: true },
     });
   }
 
   async paginate(page: number = 1, perPage: number = 20): Promise<[Treasury[], number]> {
     return this.treasuryRepository.findAndCount({
-      relations: { asset: true, source: true },
+      relations: { source: true },
       order: { createdAt: 'DESC' },
       skip: (page - 1) * perPage,
       take: perPage,

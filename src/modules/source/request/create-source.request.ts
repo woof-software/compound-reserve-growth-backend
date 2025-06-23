@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsNotEmpty, IsString, IsOptional, IsNumber } from 'class-validator';
+import { IsNotEmpty, IsString, IsOptional, IsNumber, IsInt } from 'class-validator';
 
 export class CreateSourceRequest {
   @ApiProperty({ example: '0xabc123', description: 'Source address' })
@@ -7,15 +7,15 @@ export class CreateSourceRequest {
   @IsString()
   public address: string;
 
+  @ApiProperty({ example: 123, description: 'Asset ID' })
+  @IsNotEmpty()
+  @IsInt()
+  public assetId: number;
+
   @ApiProperty({ example: 'mainnet', description: 'Network' })
   @IsNotEmpty()
   @IsString()
   public network: string;
-
-  @ApiPropertyOptional({ example: 'cUSDCv3', description: 'Market name' })
-  @IsOptional()
-  @IsString()
-  public market?: string;
 
   @ApiProperty({ example: 'subgraph', description: 'Algorithm used for reading' })
   @IsNotEmpty()
@@ -26,4 +26,9 @@ export class CreateSourceRequest {
   @IsNotEmpty()
   @IsNumber()
   public blockNumber: number;
+
+  @ApiPropertyOptional({ example: 'cUSDCv3', description: 'Market name' })
+  @IsOptional()
+  @IsString()
+  public market?: string;
 }

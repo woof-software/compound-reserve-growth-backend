@@ -1,8 +1,6 @@
 import { Column, Entity, OneToMany, PrimaryGeneratedColumn } from 'typeorm';
 
-import { History } from 'modules/history/history.entity';
-import { Treasury } from 'modules/treasury/treasury.entity';
-import { Revenue } from 'modules/revenue/revenue.entity';
+import { Source } from 'modules/source/source.entity';
 
 @Entity({ name: 'asset' })
 export class Asset {
@@ -21,22 +19,16 @@ export class Asset {
   @Column()
   public network: string;
 
-  @Column()
+  @Column({ nullable: true })
   public type: string;
 
   @Column()
   public createdAt: Date;
 
-  @OneToMany(() => History, (histories) => histories.asset)
-  public histories: History[];
+  @OneToMany(() => Source, (sources) => sources.asset)
+  public sources: Source[];
 
-  @OneToMany(() => Treasury, (treasuries) => treasuries.asset)
-  public treasuries: Treasury[];
-
-  @OneToMany(() => Revenue, (revenues) => revenues.asset)
-  public revenues: Revenue[];
-
-  constructor(address: string, decimals: number, symbol: string, network: string, type: string) {
+  constructor(address: string, decimals: number, symbol: string, network: string, type?: string) {
     this.address = address;
     this.decimals = decimals;
     this.symbol = symbol;

@@ -15,13 +15,13 @@ export class RevenueRepository {
   async findById(id: number): Promise<Revenue> {
     return this.revenueRepository.findOne({
       where: { id },
-      relations: { asset: true, source: true },
+      relations: { source: true },
     });
   }
 
   async paginate(page: number = 1, perPage: number = 20): Promise<[Revenue[], number]> {
     return this.revenueRepository.findAndCount({
-      relations: { asset: true, source: true },
+      relations: { source: true },
       order: { createdAt: 'DESC' },
       skip: (page - 1) * perPage,
       take: perPage,

@@ -3,5 +3,5 @@ export class CreateAssetDto {
   public decimals: number;
   public symbol: string;
   public network: string;
-  public type: string;
+  public type?: string;
 }

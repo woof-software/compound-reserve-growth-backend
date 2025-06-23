@@ -7,11 +7,6 @@ export class CreateTreasuryRequest {
   @IsInt()
   public sourceId: number;
 
-  @ApiProperty({ example: 2, description: 'Asset ID' })
-  @IsNotEmpty()
-  @IsInt()
-  public assetId: number;
-
   @ApiProperty({ example: 20123456, description: 'Block number' })
   @IsNotEmpty()
   @IsInt()
