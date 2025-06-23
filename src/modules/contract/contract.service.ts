@@ -163,7 +163,7 @@ export class ContractService {
       const rawSymbol = await tokenContract.symbol();
 
       const symbol = bytes32Tokens.includes(tokenAddress)
-        ? Buffer.from(rawSymbol, 'hex').toString('utf8').replace(/\0+$/, '')
+        ? ethers.toUtf8String(rawSymbol).replace(/\u0000/g, '')
         : rawSymbol;
 
       const decimals = await tokenContract.decimals();

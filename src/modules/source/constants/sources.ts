@@ -17,26 +17,13 @@ export const sources = [
     },
   },
   {
-    algorithm: Algorithm.COMPTROLLER,
-    address: '0x3d9819210A31b4961b30EF54bE2aeD79B9c9Cd3B',
-    network: 'mainnet',
-    creationBlockNumber: 7710671,
-    asset: {
-      name: 'Compound',
-      address: '0xc00e94cb662c3520282e6f5717214004a7f26888',
-      decimals: 18,
-      symbol: 'COMP',
-      type: AssetType.COMP,
-    },
-  },
-  {
     algorithm: Algorithm.AVANTGARDE_TREASURY_GROWTH_PROPOSAL,
-    address: '0xfdaf45754f372ce8726b10846809878ea53f8c12',
+    address: '0xFDaF45754F372cE8726b10846809878eA53f8c12',
     network: 'mainnet',
     creationBlockNumber: 22444855,
     asset: {
       name: 'Compound',
-      address: '0xc00e94cb662c3520282e6f5717214004a7f26888',
+      address: '0xc00e94Cb662C3520282E6f5717214004A7f26888',
       decimals: 18,
       symbol: 'COMP',
       type: AssetType.COMP,
@@ -49,7 +36,7 @@ export const sources = [
     creationBlockNumber: 22475559,
     asset: {
       name: 'Compound',
-      address: '0xc00e94cb662c3520282e6f5717214004a7f26888',
+      address: '0xc00e94Cb662C3520282E6f5717214004A7f26888',
       decimals: 18,
       symbol: 'COMP',
       type: AssetType.COMP,
@@ -62,7 +49,7 @@ export const sources = [
     creationBlockNumber: 15331586,
     asset: {
       name: 'USD Coin',
-      address: '0x8624f61cc6e5a86790e173712afdd480fa8b73ba',
+      address: '0x8624f61Cc6e5A86790e173712AfDd480fa8b73Ba',
       decimals: 6,
       symbol: 'USDC',
       type: AssetType.STABLECOIN,
@@ -79,6 +66,19 @@ export const sources = [
       decimals: 18,
       symbol: 'WETH',
       type: AssetType.ETH_CORRELATED,
+    },
+  },
+  {
+    algorithm: Algorithm.COMPTROLLER,
+    address: '0x3d9819210A31b4961b30EF54bE2aeD79B9c9Cd3B',
+    network: 'mainnet',
+    creationBlockNumber: 7710671,
+    asset: {
+      name: 'Compound',
+      address: '0xc00e94Cb662C3520282E6f5717214004A7f26888',
+      decimals: 18,
+      symbol: 'COMP',
+      type: AssetType.COMP,
     },
   },
 ];
