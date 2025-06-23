@@ -1,7 +1,6 @@
 import { Column, Entity, ManyToOne, PrimaryGeneratedColumn } from 'typeorm';
 
 import { Source } from 'modules/source/source.entity';
-import { Asset } from 'modules/asset/asset.entity';
 
 @Entity({ name: 'history' })
 export class History {
@@ -29,12 +28,8 @@ export class History {
   @ManyToOne(() => Source, (source) => source.histories)
   public source: Source;
 
-  @ManyToOne(() => Asset, (asset) => asset.histories)
-  public asset: Asset;
-
   constructor(
     source: Source,
-    asset: Asset,
     blockNumber: number,
     quantity: string,
     price: number,
@@ -42,7 +37,6 @@ export class History {
     date: Date,
   ) {
     this.source = source;
-    this.asset = asset;
     this.blockNumber = blockNumber;
     this.quantity = quantity;
     this.price = price;

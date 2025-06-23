@@ -1,5 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 
+import { AssetResponse } from 'modules/asset/response/asset.response';
 import { Source } from 'modules/source/source.entity';
 
 export class SourceResponse {
@@ -21,6 +22,9 @@ export class SourceResponse {
   @ApiProperty({ example: 19876543 })
   public blockNumber: number;
 
+  @ApiProperty({ type: AssetResponse })
+  public asset: AssetResponse;
+
   @ApiProperty({ example: '2025-06-17T12:00:00Z' })
   public createdAt: Date;
 
@@ -34,6 +38,7 @@ export class SourceResponse {
     this.market = source.market;
     this.algorithm = source.algorithm;
     this.blockNumber = source.blockNumber;
+    this.asset = new AssetResponse(source.asset);
     this.createdAt = source.createdAt;
     this.checkedAt = source.checkedAt;
   }

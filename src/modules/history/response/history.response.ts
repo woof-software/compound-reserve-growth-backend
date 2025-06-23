@@ -1,16 +1,14 @@
 import { ApiProperty } from '@nestjs/swagger';
 
 import { History } from 'modules/history/history.entity';
+import { SourceResponse } from 'modules/source/response/source.response';
 
 export class HistoryResponse {
   @ApiProperty({ example: 1 })
   public id: number;
 
-  @ApiProperty({ example: 1 })
-  public sourceId: number;
-
-  @ApiProperty({ example: 2 })
-  public assetId: number;
+  @ApiProperty({ type: SourceResponse })
+  public source: SourceResponse;
 
   @ApiProperty({ example: 20123456 })
   public blockNumber: number;
@@ -32,8 +30,7 @@ export class HistoryResponse {
 
   constructor(history: History) {
     this.id = history.id;
-    this.sourceId = history.source.id;
-    this.assetId = history.asset.id;
+    this.source = new SourceResponse(history.source);
     this.blockNumber = history.blockNumber;
     this.quantity = history.quantity;
     this.price = history.price;

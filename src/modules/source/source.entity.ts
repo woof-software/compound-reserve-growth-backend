@@ -1,8 +1,9 @@
-import { Column, Entity, OneToMany, PrimaryGeneratedColumn } from 'typeorm';
+import { Column, Entity, ManyToOne, OneToMany, PrimaryGeneratedColumn } from 'typeorm';
 
 import { History } from 'modules/history/history.entity';
 import { Revenue } from 'modules/revenue/revenue.entity';
 import { Treasury } from 'modules/treasury/treasury.entity';
+import { Asset } from 'modules/asset/asset.entity';
 
 @Entity({ name: 'source' })
 export class Source {
@@ -30,6 +31,9 @@ export class Source {
   @Column({ nullable: true })
   public checkedAt?: Date;
 
+  @ManyToOne(() => Asset, (asset) => asset.sources)
+  public asset: Asset;
+
   @OneToMany(() => History, (histories) => histories.source)
   public histories: History[];
 
@@ -44,12 +48,14 @@ export class Source {
     network: string,
     algorithm: string,
     blockNumber: number,
+    asset: Asset,
     market?: string,
   ) {
     this.address = address;
     this.network = network;
     this.algorithm = algorithm;
     this.blockNumber = blockNumber;
+    this.asset = asset;
     this.market = market;
     this.createdAt = new Date();
   }

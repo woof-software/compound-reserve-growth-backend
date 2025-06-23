@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsNotEmpty, IsString, IsInt } from 'class-validator';
+import { IsNotEmpty, IsString, IsInt, IsOptional } from 'class-validator';
 
 export class CreateAssetRequest {
   @ApiProperty({ example: '0xdef456', description: 'Token address' })
@@ -22,7 +22,7 @@ export class CreateAssetRequest {
   public network: string;
 
   @ApiProperty({ example: 'ERC20', description: 'Asset type' })
-  @IsNotEmpty()
+  @IsOptional()
   @IsString()
-  public type: string;
+  public type?: string;
 }

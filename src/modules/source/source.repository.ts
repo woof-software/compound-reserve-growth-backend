@@ -12,7 +12,7 @@ export class SourceRepository {
   ) {}
 
   async findById(id: number): Promise<Source> {
-    return this.sourceRepository.findOne({ where: { id } });
+    return this.sourceRepository.findOne({ where: { id }, relations: { asset: true } });
   }
 
   async findByAddress(address: string): Promise<Source> {
@@ -20,7 +20,9 @@ export class SourceRepository {
   }
 
   async list(): Promise<Source[]> {
-    return this.sourceRepository.find();
+    return this.sourceRepository.find({
+      relations: { asset: true },
+    });
   }
 
   async save(source: Source): Promise<Source> {
