@@ -27,6 +27,9 @@ export class HistoryService {
     );
     return this.historyRepo.save(history);
   }
+  async createWithSource(history: History): Promise<History> {
+    return this.historyRepo.save(history);
+  }
 
   async findById(id: number): Promise<History> {
     return this.historyRepo.findById(id);

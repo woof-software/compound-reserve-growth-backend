@@ -9,6 +9,7 @@ export const INCREASE_GAS = 10000;
 export const COUNT_BLOCKS = 3000;
 export const SEC_IN_MS = 1000;
 export const HOUR_IN_MS = 3600000;
+export const HOUR_IN_SEC = 3600;
 export const DAY_IN_MS = 86400000;
 export const WEEK_IN_MS = DAY_IN_MS * 7;
 export const YEAR_IN_DAYS = 365;

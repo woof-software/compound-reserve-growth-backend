@@ -7,6 +7,7 @@ import { CreateSourceDto } from './dto/create-source.dto';
 import { UpdateSourceDto } from './dto/update-source.dto';
 import { Source } from './source.entity';
 import { CreateSourceWithAssetDto } from './dto/create-source-with-asset.dto';
+import { UpdateWithSourceDto } from './dto/update-with-source.dto';
 
 @Injectable()
 export class SourceService {
@@ -43,6 +44,13 @@ export class SourceService {
   async update(dto: UpdateSourceDto): Promise<Source> {
     const source = await this.sourceRepository.findById(dto.id);
     if (!source) throw new NotFoundException(`Source with id ${dto.id} not found`);
+    if (dto.blockNumber) source.blockNumber = dto.blockNumber;
+    source.checkedAt = dto.checkedAt ? dto.checkedAt : new Date();
+    return this.sourceRepository.update(source);
+  }
+
+  async updateWithSource(dto: UpdateWithSourceDto): Promise<Source> {
+    const source = dto.source;
     if (dto.blockNumber) source.blockNumber = dto.blockNumber;
     source.checkedAt = dto.checkedAt ? dto.checkedAt : new Date();
     return this.sourceRepository.update(source);
