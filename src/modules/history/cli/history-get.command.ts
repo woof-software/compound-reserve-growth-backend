@@ -24,6 +24,10 @@ export class HistoryGetCommand extends CommandRunner {
       const dbSources = await this.sourceService.listAll();
 
       for (const source of dbSources) {
+        const { algorithm } = source;
+        if (algorithm === Algorithm.COMET || algorithm === Algorithm.MARKET_V2) {
+          await this.contractService.getMarketHistory(source);
+        }
       }
 
       this.logger.log('Getting history data completed.');

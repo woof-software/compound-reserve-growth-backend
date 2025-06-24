@@ -19,10 +19,11 @@
     "migration:create": "npm run typeorm -- migration:create ./src/database/migrations/migration",
     "migration:revert": "npm run typeorm -- -d ./src/database/typeorm.config.ts migration:revert",
     "migration:show": "npm run typeorm -- migration:show -d ./src/database/typeorm.config.ts",
-    "cli:source-fill": "nest build && node dist/src/cli.js source:fill"
+    "cli:source-fill": "nest build && node dist/src/cli.js source:fill",
+    "cli:history-get": "nest build && node dist/src/cli.js history:get"
   },
   "dependencies": {
-    "@nestjs/cache-manager": "^3.0.0",
+    "@nestjs/cache-manager": "^3.0.1",
     "@nestjs/common": "^10.0.0",
     "@nestjs/config": "^4.0.1",
     "@nestjs/core": "^10.0.0",
@@ -32,8 +33,10 @@
     "@nestjs/swagger": "^11.0.6",
     "@nestjs/throttler": "^6.4.0",
     "@nestjs/typeorm": "^11.0.0",
+    "@types/cache-manager": "^5.0.0",
     "axios": "^1.8.3",
-    "cache-manager": "^6.4.1",
+    "cache-manager": "^7.0.0",
+    "cache-manager-redis-yet": "^5.1.5",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.1",
     "ethers": "^6.13.5",
