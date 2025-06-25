@@ -4,9 +4,11 @@ import { ethers, JsonRpcProvider } from 'ethers';
 
 import { ProviderFactory } from 'modules/network/provider.factory';
 import { HistoryService } from 'modules/history/history.service';
+import { History } from 'modules/history/history.entity';
 import { Source } from 'modules/source/source.entity';
 import { SourceService } from 'modules/source/source.service';
 import { PriceService } from 'modules/price/price.service';
+import { STABLECOIN_PRICES } from 'modules/price/constants';
 
 import CometABI from './abi/CometABI.json';
 import CometExtensionABI from './abi/CometExtensionABI.json';
@@ -17,6 +19,7 @@ import Bytes32TokenABI from './abi/Bytes32TokenABI.json';
 import { MarketData, RootJson } from './contract.type';
 
 import { DAY_IN_SEC, SEC_IN_MS } from '@app/common/constants';
+import { Algorithm } from '@app/common/enum/algorithm.enum';
 
 interface CachedBlock {
   blockNumber: number;
@@ -460,7 +463,7 @@ export class ContractService {
 
     const provider = this.providerFactory.get(network);
 
-    const ABI = algorithm === 'COMET' ? CometABI : MarketV2ABI;
+    const ABI = algorithm === Algorithm.COMET ? CometABI : MarketV2ABI;
     const contract = new ethers.Contract(contractAddress, ABI, provider) as any;
 
     let lastBlock = source.blockNumber;
@@ -471,15 +474,55 @@ export class ContractService {
     const now = Math.floor(Date.now() / SEC_IN_MS);
     const todayMidnightUTC = Math.floor(now / DAY_IN_SEC) * DAY_IN_SEC;
 
+    // Check if we have any days to process
+    if (firstMidnightUTC > todayMidnightUTC) {
+      this.logger.log(`No historical data needed - source is already up to date`);
+
+      // Update the source with current timestamp
+      await this.sourceService.updateWithSource({
+        source,
+        blockNumber: lastBlock,
+        checkedAt: new Date(),
+      });
+
+      return;
+    }
+
     const dailyTs: number[] = [];
     for (let ts = firstMidnightUTC; ts <= todayMidnightUTC; ts += DAY_IN_SEC) {
       dailyTs.push(ts);
     }
 
-    this.logger.log(`Processing ${dailyTs.length} daily timestamps`);
+    this.logger.log(
+      `Processing ${dailyTs.length} daily timestamps from ${new Date(firstMidnightUTC * 1000).toISOString().slice(0, 10)} to ${new Date(todayMidnightUTC * 1000).toISOString().slice(0, 10)}`,
+    );
+
+    // Check if we have a reasonable number of days to process
+    if (dailyTs.length === 0) {
+      this.logger.warn(`No days to process for source ${source.id}`);
+      return;
+    }
+
+    // Prices preload
+    if (!STABLECOIN_PRICES[asset.symbol]) {
+      try {
+        const firstDate = new Date(firstMidnightUTC * 1000);
+        await this.priceService.getHistoricalPrice(
+          { address: asset.address, symbol: asset.symbol, decimals: asset.decimals },
+          network,
+          firstDate,
+        );
+        this.logger.log(`Price data preloaded for ${asset.symbol}`);
+      } catch (error) {
+        this.logger.warn(`Failed to preload price data for ${asset.symbol}: ${error.message}`);
+      }
+    } else {
+      this.logger.log(`Skipping preload for stablecoin ${asset.symbol}`);
+    }
 
     let processedCount = 0;
     let priceErrors = 0;
+    let skippedCount = 0;
 
     for (const targetTs of dailyTs) {
       try {
@@ -488,15 +531,16 @@ export class ContractService {
         let reserves: bigint;
         try {
           reserves =
-            algorithm === 'COMET'
+            algorithm === Algorithm.COMET
               ? await contract.getReserves({ blockTag })
               : await contract.totalReserves({ blockTag });
         } catch (e: any) {
           if (e.code === 'CALL_EXCEPTION') {
             this.logger.warn(
-              `Skip ${new Date(targetTs * SEC_IN_MS).toISOString().slice(0, 10)} — reserves unavailable`,
+              `Skip ${new Date(targetTs * SEC_IN_MS).toISOString().slice(0, 10)} — reserves unavailable for contract ${contractAddress} at network ${network}`,
             );
             lastBlock = blockTag;
+            skippedCount++;
             continue;
           } else {
             throw e;
@@ -532,20 +576,16 @@ export class ContractService {
         if (isNaN(value) || value < 0) {
           this.logger.warn(`Invalid value: ${value}, skipping`);
           lastBlock = blockTag;
+          skippedCount++;
           continue;
         }
 
-        await this.historyService.create({
-          sourceId: source.id,
-          blockNumber: blockTag,
-          quantity: reserves.toString(),
-          price,
-          value,
-          date,
-        });
+        const newHistory = new History(source, blockTag, reserves.toString(), price, value, date);
 
-        await this.sourceService.update({
-          id: source.id,
+        await this.historyService.createWithSource(newHistory);
+
+        await this.sourceService.updateWithSource({
+          source,
           blockNumber: blockTag,
           checkedAt: new Date(),
         });
@@ -555,7 +595,7 @@ export class ContractService {
 
         if (processedCount % 50 === 0) {
           this.logger.log(
-            `Progress: ${processedCount}/${dailyTs.length} days processed (${priceErrors} price errors)`,
+            `Progress: ${processedCount}/${dailyTs.length} days processed (${priceErrors} price errors, ${skippedCount} skipped)`,
           );
         }
       } catch (error) {
@@ -569,13 +609,18 @@ export class ContractService {
           const networkConf = this.networkConfig[network];
           lastBlock = lastBlock + (networkConf?.blocksPerDay || 43200);
         }
+        skippedCount++;
         continue;
       }
     }
 
-    const successRate = Math.round((processedCount / dailyTs.length) * 100);
+    // Calculate final statistics
+    const totalAttempted = dailyTs.length;
+    const successRate =
+      totalAttempted > 0 ? Math.round((processedCount / totalAttempted) * 100) : 0;
+
     this.logger.log(
-      `Completed: ${successRate}% success (${processedCount}/${dailyTs.length}), ${priceErrors} price errors`,
+      `Completed: ${successRate}% success (${processedCount}/${totalAttempted} processed, ${skippedCount} skipped, ${priceErrors} price errors)`,
     );
   }
 }
