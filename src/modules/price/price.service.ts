@@ -64,6 +64,43 @@ export class PriceService {
     };
   }
 
+  private async preloadYearlyPrices(coinId: string): Promise<void> {
+    await this.rateLimitDelay();
+
+    const endDate = new Date();
+    endDate.setUTCHours(0, 0, 0, 0);
+
+    const startDate = new Date();
+    startDate.setFullYear(endDate.getFullYear() - 1);
+    startDate.setUTCHours(0, 0, 0, 0);
+
+    const fromTimestamp = Math.floor(startDate.getTime() / 1000);
+    const toTimestamp = Math.floor(endDate.getTime() / 1000);
+
+    const url = `${this.coingeckoBaseUrl}/coins/${coinId}/market_chart/range?vs_currency=usd&from=${fromTimestamp}&to=${toTimestamp}`;
+
+    try {
+      const response = await fetch(url, this.getCoingeckoOptions());
+      if (!response.ok) {
+        throw new Error(`CoinGecko range API error: ${response.status}`);
+      }
+
+      const data = await response.json();
+      const prices = data.prices || [];
+
+      for (const [timestamp, price] of prices) {
+        const date = new Date(timestamp);
+        date.setUTCHours(0, 0, 0, 0);
+
+        await this.setToCache('all', coinId, date, price, 'coingecko');
+      }
+
+      this.logger.log(`Preloaded ${prices.length} daily prices for ${coinId}`);
+    } catch (error) {
+      this.logger.warn(`Failed to preload yearly prices for ${coinId}: ${error.message}`);
+    }
+  }
+
   async getHistoricalPrice(
     asset: { address: string; symbol: string; decimals: number },
     network: string,
@@ -88,6 +125,27 @@ export class PriceService {
         // Try CoinGecko
         const coinId = COINGECKO_MAPPINGS[network]?.[asset.symbol];
         if (coinId) {
+          const yearCacheKey = `year_loaded:${coinId}`;
+          const yearLoaded = await this.getYearLoadedStatus(yearCacheKey);
+
+          if (!yearLoaded) {
+            this.logger.log(`Preloading yearly data for ${asset.symbol} (${coinId})`);
+            await this.preloadYearlyPrices(coinId);
+            await this.setYearLoadedStatus(yearCacheKey);
+          }
+
+          const cachedAfterPreload = await this.getFromCache('all', coinId, date);
+          if (cachedAfterPreload) {
+            await this.setToCache(
+              network,
+              asset.symbol,
+              date,
+              cachedAfterPreload.price,
+              cachedAfterPreload.source,
+            );
+            return cachedAfterPreload.price;
+          }
+
           const result = await this.fetchCoinGeckoPrice(coinId, date);
           price = result.price;
           source = result.source;
@@ -107,6 +165,34 @@ export class PriceService {
     }
 
     return price;
+  }
+
+  private async getYearLoadedStatus(key: string): Promise<boolean> {
+    try {
+      let cached: string | null = null;
+      if (this.redisClient?.get) {
+        cached = await this.redisClient.get(key);
+      } else {
+        cached = await this.cacheManager.get(key);
+      }
+      return cached === 'true';
+    } catch (error) {
+      return false;
+    }
+  }
+
+  private async setYearLoadedStatus(key: string): Promise<void> {
+    try {
+      const ttl = 24 * 60 * 60; // 24 часа
+
+      if (this.redisClient?.setEx) {
+        await this.redisClient.setEx(key, ttl, 'true');
+      } else {
+        await this.cacheManager.set(key, 'true', ttl * 1000);
+      }
+    } catch (error) {
+      this.logger.warn(`Failed to set year loaded status: ${error.message}`);
+    }
   }
 
   private async fetchCoinGeckoPrice(
@@ -210,18 +296,36 @@ export class PriceService {
     date: Date,
   ): Promise<CachedPrice | null> {
     try {
-      const key = `price:${network}:${symbol}:${date.toISOString().slice(0, 10)}`;
+      const dateKey = date.toISOString().slice(0, 10);
 
-      let cached: string | null = null;
-      if (this.redisClient?.get) {
-        cached = await this.redisClient.get(key);
-      } else {
-        cached = await this.cacheManager.get(key);
+      const networkKey = `price:${network}:${symbol}:${dateKey}`;
+      let cached = await this.getCacheValue(networkKey);
+
+      if (cached) {
+        return JSON.parse(cached);
       }
 
-      return cached ? JSON.parse(cached) : null;
+      const coinId = COINGECKO_MAPPINGS[network]?.[symbol];
+      if (coinId) {
+        const globalKey = `price:all:${coinId}:${dateKey}`;
+        cached = await this.getCacheValue(globalKey);
+
+        if (cached) {
+          return JSON.parse(cached);
+        }
+      }
+
+      return null;
     } catch (error) {
       return null;
+    }
+  }
+
+  private async getCacheValue(key: string): Promise<string | null> {
+    if (this.redisClient?.get) {
+      return this.redisClient.get(key);
+    } else {
+      return this.cacheManager.get(key);
     }
   }
 
