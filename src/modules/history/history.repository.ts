@@ -1,8 +1,12 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 
 import { History } from './history.entity';
+import { PaginationDto } from './dto/pagination.dto';
+
+import { Algorithm } from '@app/common/enum/algorithm.enum';
+import { PaginatedDataDto } from '@app/common/dto/paginated-data.dto';
 
 @Injectable()
 export class HistoryRepository {
@@ -19,12 +23,61 @@ export class HistoryRepository {
     });
   }
 
-  async paginate(page: number = 1, perPage: number = 20): Promise<[History[], number]> {
-    return this.historyRepository.findAndCount({
-      relations: { source: true },
-      order: { createdAt: 'DESC' },
-      skip: (page - 1) * perPage,
-      take: perPage,
+  async getTreasuryHistory(): Promise<History[]> {
+    return this.historyRepository.find({
+      relations: { source: { asset: true } },
+      order: { date: 'DESC' },
     });
+  }
+
+  async getPaginatedTreasuryHistory(dto: PaginationDto): Promise<PaginatedDataDto<History>> {
+    const query = this.historyRepository
+      .createQueryBuilder('history')
+      .leftJoinAndSelect('history.source', 'source')
+      .leftJoinAndSelect('source.asset', 'asset');
+
+    query.orderBy('history.date', dto.order);
+
+    if (dto.perPage) {
+      const skip = (dto.page - 1) * dto.perPage;
+      query.skip(skip).take(dto.perPage);
+    }
+
+    const [history, total] = await query.getManyAndCount();
+
+    return new PaginatedDataDto<History>(history, dto.page ?? 1, dto.perPage ?? total, total);
+  }
+
+  async getRevenueHistory(): Promise<History[]> {
+    return this.historyRepository.find({
+      where: {
+        source: {
+          algorithm: In([Algorithm.COMET, Algorithm.MARKET_V2]),
+        },
+      },
+      relations: { source: { asset: true } },
+      order: { date: 'DESC' },
+    });
+  }
+
+  async getPaginatedRevenueHistory(dto: PaginationDto): Promise<PaginatedDataDto<History>> {
+    const query = this.historyRepository
+      .createQueryBuilder('history')
+      .leftJoinAndSelect('history.source', 'source')
+      .leftJoinAndSelect('source.asset', 'asset')
+      .where('source.algorithm IN (:...algorithms)', {
+        algorithms: [Algorithm.COMET, Algorithm.MARKET_V2],
+      });
+
+    query.orderBy('history.date', dto.order);
+
+    if (dto.perPage) {
+      const skip = (dto.page - 1) * dto.perPage;
+      query.skip(skip).take(dto.perPage);
+    }
+
+    const [history, total] = await query.getManyAndCount();
+
+    return new PaginatedDataDto<History>(history, dto.page ?? 1, dto.perPage ?? total, total);
   }
 }

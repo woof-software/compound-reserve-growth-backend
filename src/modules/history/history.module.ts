@@ -9,6 +9,7 @@ import { History } from './history.entity';
 import { HistoryRepository } from './history.repository';
 import { HistoryService } from './history.service';
 import { HistoryGetCommand } from './cli/history-get.command';
+import { HistoryController } from './history.controller';
 
 @Module({
   imports: [
@@ -19,5 +20,6 @@ import { HistoryGetCommand } from './cli/history-get.command';
   ],
   providers: [HistoryRepository, HistoryService, HistoryGetCommand],
   exports: [HistoryService, HistoryRepository],
+  controllers: [HistoryController],
 })
 export class HistoryModule {}

@@ -22,8 +22,8 @@ export class HistoryResponse {
   @ApiProperty({ example: 105.525 })
   public value: number;
 
-  @ApiProperty({ example: '2025-06-17T12:00:00Z' })
-  public date: Date;
+  @ApiProperty({ example: 1750809600 })
+  public date: number;
 
   @ApiProperty({ example: '2025-06-17T12:00:00Z' })
   public createdAt: Date;
@@ -35,7 +35,7 @@ export class HistoryResponse {
     this.quantity = history.quantity;
     this.price = history.price;
     this.value = history.value;
-    this.date = history.date;
+    this.date = new Date(history.date).getTime() / 1000;
     this.createdAt = history.createdAt;
   }
 }
