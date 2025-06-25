@@ -7,6 +7,7 @@ import { HistoryService } from 'modules/history/history.service';
 import { Source } from 'modules/source/source.entity';
 import { SourceService } from 'modules/source/source.service';
 import { PriceService } from 'modules/price/price.service';
+import { STABLECOIN_PRICES } from 'modules/price/constants';
 
 import CometABI from './abi/CometABI.json';
 import CometExtensionABI from './abi/CometExtensionABI.json';
@@ -477,6 +478,23 @@ export class ContractService {
     }
 
     this.logger.log(`Processing ${dailyTs.length} daily timestamps`);
+
+    // prices preload
+    if (!STABLECOIN_PRICES[asset.symbol]) {
+      try {
+        const firstDate = new Date(firstMidnightUTC * 1000);
+        await this.priceService.getHistoricalPrice(
+          { address: asset.address, symbol: asset.symbol, decimals: asset.decimals },
+          network,
+          firstDate,
+        );
+        this.logger.log(`Price data preloaded for ${asset.symbol}`);
+      } catch (error) {
+        this.logger.warn(`Failed to preload price data for ${asset.symbol}: ${error.message}`);
+      }
+    } else {
+      this.logger.log(`Skipping preload for stablecoin ${asset.symbol}`);
+    }
 
     let processedCount = 0;
     let priceErrors = 0;

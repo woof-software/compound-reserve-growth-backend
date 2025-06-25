@@ -88,8 +88,10 @@ export class PriceService {
       const data = await response.json();
       const prices = data.prices || [];
 
+      // Cache prices by days
       for (const [timestamp, price] of prices) {
         const date = new Date(timestamp);
+        // Round to start of UTC day
         date.setUTCHours(0, 0, 0, 0);
 
         await this.setToCache('all', coinId, date, price, 'coingecko');
@@ -125,6 +127,7 @@ export class PriceService {
         // Try CoinGecko
         const coinId = COINGECKO_MAPPINGS[network]?.[asset.symbol];
         if (coinId) {
+          // Check if yearly data is loaded (only for non-stablecoins)
           const yearCacheKey = `year_loaded:${coinId}`;
           const yearLoaded = await this.getYearLoadedStatus(yearCacheKey);
 
@@ -134,6 +137,7 @@ export class PriceService {
             await this.setYearLoadedStatus(yearCacheKey);
           }
 
+          // Try to get from cache again after preloading
           const cachedAfterPreload = await this.getFromCache('all', coinId, date);
           if (cachedAfterPreload) {
             await this.setToCache(
@@ -146,6 +150,31 @@ export class PriceService {
             return cachedAfterPreload.price;
           }
 
+          // If exact date not found, look for nearest price
+          const daysDiff = Math.floor((Date.now() - date.getTime()) / DAY_IN_MS);
+          let nearestPrice: CachedPrice | null = null;
+
+          if (daysDiff > 365) {
+            // For data older than 1 year, find earliest available price
+            nearestPrice = await this.findEarliestPrice('all', coinId);
+          } else {
+            // For data within 1 year, find nearest next price
+            nearestPrice = await this.findNearestPrice('all', coinId, date);
+          }
+
+          if (nearestPrice) {
+            // Copy found price to cache for current date
+            await this.setToCache(
+              network,
+              asset.symbol,
+              date,
+              nearestPrice.price,
+              nearestPrice.source,
+            );
+            return nearestPrice.price;
+          }
+
+          // If still no price found, make regular request
           const result = await this.fetchCoinGeckoPrice(coinId, date);
           price = result.price;
           source = result.source;
@@ -326,6 +355,88 @@ export class PriceService {
       return this.redisClient.get(key);
     } else {
       return this.cacheManager.get(key);
+    }
+  }
+
+  private async findEarliestPrice(network: string, symbol: string): Promise<CachedPrice | null> {
+    try {
+      if (!this.redisClient?.scanIterator) {
+        this.logger.warn('Redis scan not available, cannot find earliest price');
+        return null;
+      }
+
+      const pattern = `price:${network}:${symbol}:*`;
+      let earliestDate: string | null = null;
+      let earliestPrice: CachedPrice | null = null;
+
+      for await (const key of this.redisClient.scanIterator({
+        MATCH: pattern,
+        COUNT: 1000,
+      })) {
+        // get date from key: price:network:symbol:YYYY-MM-DD
+        const datePart = key.split(':').pop();
+        if (datePart && datePart.match(/^\d{4}-\d{2}-\d{2}$/)) {
+          if (!earliestDate || datePart < earliestDate) {
+            const cached = await this.getCacheValue(key);
+            if (cached) {
+              earliestDate = datePart;
+              earliestPrice = JSON.parse(cached);
+            }
+          }
+        }
+      }
+
+      if (earliestPrice && earliestDate) {
+        this.logger.debug(
+          `Found earliest price for ${symbol}: ${earliestDate} = ${earliestPrice.price}`,
+        );
+        return earliestPrice;
+      }
+
+      return null;
+    } catch (error) {
+      this.logger.warn(`Error finding earliest price for ${symbol}: ${error.message}`);
+      return null;
+    }
+  }
+
+  private async findNearestPrice(
+    network: string,
+    symbol: string,
+    targetDate: Date,
+    maxDaysForward: number = 30,
+  ): Promise<CachedPrice | null> {
+    try {
+      for (let i = 1; i <= maxDaysForward; i++) {
+        const nextDate = new Date(targetDate);
+        nextDate.setUTCDate(nextDate.getUTCDate() + i);
+
+        const cached = await this.getFromCache(network, symbol, nextDate);
+        if (cached) {
+          this.logger.debug(
+            `Found nearest price for ${symbol}: ${i} days forward from ${targetDate.toISOString().slice(0, 10)}`,
+          );
+          return cached;
+        }
+      }
+
+      for (let i = 1; i <= 7; i++) {
+        const prevDate = new Date(targetDate);
+        prevDate.setUTCDate(prevDate.getUTCDate() - i);
+
+        const cached = await this.getFromCache(network, symbol, prevDate);
+        if (cached) {
+          this.logger.debug(
+            `Found nearest price for ${symbol}: ${i} days backward from ${targetDate.toISOString().slice(0, 10)}`,
+          );
+          return cached;
+        }
+      }
+
+      return null;
+    } catch (error) {
+      this.logger.warn(`Error finding nearest price for ${symbol}: ${error.message}`);
+      return null;
     }
   }
 
