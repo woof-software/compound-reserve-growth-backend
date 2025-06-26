@@ -60,6 +60,12 @@ export class HistoryService {
     return history;
   }
 
+  async getPaginatedRevenueHistory(
+    paginationDto: PaginationDto,
+  ): Promise<PaginatedDataDto<History>> {
+    return this.historyRepo.getPaginatedRevenueHistory(paginationDto);
+  }
+
   async getTreasuryHoldings(): Promise<History[]> {
     const holdings = await this.historyRepo.getTreasuryHoldings();
     if (!holdings || holdings.length === 0) {
