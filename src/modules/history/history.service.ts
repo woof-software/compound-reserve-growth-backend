@@ -59,4 +59,12 @@ export class HistoryService {
     }
     return history;
   }
+
+  async getTreasuryHoldings(): Promise<History[]> {
+    const holdings = await this.historyRepo.getTreasuryHoldings();
+    if (!holdings || holdings.length === 0) {
+      throw new NotFoundException('No treasury holdings found');
+    }
+    return holdings;
+  }
 }

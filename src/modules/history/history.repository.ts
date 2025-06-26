@@ -30,6 +30,18 @@ export class HistoryRepository {
     });
   }
 
+  async getTreasuryHoldings(): Promise<History[]> {
+    return this.historyRepository
+      .createQueryBuilder('history')
+      .innerJoinAndSelect('history.source', 'source')
+      .innerJoinAndSelect('source.asset', 'asset')
+      .distinctOn(['source.id', 'asset.id'])
+      .orderBy('source.id', 'ASC')
+      .addOrderBy('asset.id', 'ASC')
+      .addOrderBy('history.date', 'DESC')
+      .getMany();
+  }
+
   async getPaginatedTreasuryHistory(dto: PaginationDto): Promise<PaginatedDataDto<History>> {
     const query = this.historyRepository
       .createQueryBuilder('history')
