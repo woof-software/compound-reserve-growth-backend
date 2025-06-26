@@ -3,6 +3,8 @@ import { ApiProperty } from '@nestjs/swagger';
 import { AssetResponse } from 'modules/asset/response/asset.response';
 import { Source } from 'modules/source/source.entity';
 
+import { Algorithm } from '@app/common/enum/algorithm.enum';
+
 export class SourceResponse {
   @ApiProperty({ example: 1 })
   public id: number;
@@ -16,7 +18,7 @@ export class SourceResponse {
   @ApiProperty({ example: 'cUSDCv3', nullable: true })
   public market: string;
 
-  @ApiProperty({ example: 'subgraph' })
+  @ApiProperty({ example: Algorithm.COMET, enum: Algorithm })
   public algorithm: string;
 
   @ApiProperty({ example: 19876543 })

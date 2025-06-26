@@ -5,6 +5,9 @@ import { SourceRepository } from 'modules/source/source.repository';
 import { HistoryRepository } from './history.repository';
 import { CreateHistoryDto } from './dto/create-history.dto';
 import { History } from './history.entity';
+import { PaginationDto } from './dto/pagination.dto';
+
+import { PaginatedDataDto } from '@app/common/dto/paginated-data.dto';
 
 @Injectable()
 export class HistoryService {
@@ -33,5 +36,35 @@ export class HistoryService {
 
   async findById(id: number): Promise<History> {
     return this.historyRepo.findById(id);
+  }
+
+  async getTreasuryHistory(): Promise<History[]> {
+    const history = await this.historyRepo.getTreasuryHistory();
+    if (!history || history.length === 0) {
+      throw new NotFoundException('No treasury history found');
+    }
+    return history;
+  }
+
+  async getPaginatedTreasuryHistory(
+    paginationDto: PaginationDto,
+  ): Promise<PaginatedDataDto<History>> {
+    return this.historyRepo.getPaginatedTreasuryHistory(paginationDto);
+  }
+
+  async getRevenueHistory(): Promise<History[]> {
+    const history = await this.historyRepo.getRevenueHistory();
+    if (!history || history.length === 0) {
+      throw new NotFoundException('No revenue history found');
+    }
+    return history;
+  }
+
+  async getTreasuryHoldings(): Promise<History[]> {
+    const holdings = await this.historyRepo.getTreasuryHoldings();
+    if (!holdings || holdings.length === 0) {
+      throw new NotFoundException('No treasury holdings found');
+    }
+    return holdings;
   }
 }
