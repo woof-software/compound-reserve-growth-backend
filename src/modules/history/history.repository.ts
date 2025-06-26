@@ -90,6 +90,38 @@ export class HistoryRepository {
 
     const [history, total] = await query.getManyAndCount();
 
+    const sourceGroups = history.reduce(
+      (acc, item) => {
+        const sourceId = item.source.id;
+        if (!acc[sourceId]) {
+          acc[sourceId] = [];
+        }
+        acc[sourceId].push(item);
+        return acc;
+      },
+      {} as Record<number, History[]>,
+    );
+
+    Object.values(sourceGroups).forEach((sourceHistory) => {
+      sourceHistory.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+      const originalValues = sourceHistory.map((item) => item.value);
+      for (let i = 1; i < sourceHistory.length; i++) {
+        const currentOriginal = originalValues[i];
+        const previousOriginal = originalValues[i - 1];
+        const difference = currentOriginal - previousOriginal;
+        sourceHistory[i].value = difference;
+      }
+    });
+
+    history.sort((a, b) => {
+      const sourceComparison = a.source.id - b.source.id;
+      if (sourceComparison !== 0) {
+        return sourceComparison;
+      }
+      return new Date(b.date).getTime() - new Date(a.date).getTime();
+    });
+
     return new PaginatedDataDto<History>(history, dto.page ?? 1, dto.perPage ?? total, total);
   }
 }
