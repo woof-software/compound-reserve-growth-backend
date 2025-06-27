@@ -5,6 +5,7 @@ export const COINGECKO_MAPPINGS: Record<string, Record<string, string>> = {
     USDC: 'usd-coin',
     USDT: 'tether',
     DAI: 'dai',
+    SAI: 'sai',
     WBTC: 'wrapped-bitcoin',
     LINK: 'chainlink',
     UNI: 'uniswap',
