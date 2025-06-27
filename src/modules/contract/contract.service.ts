@@ -1,7 +1,10 @@
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
-import { Inject, Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ethers, JsonRpcProvider } from 'ethers';
+import { Cache } from 'cache-manager';
+import type { Redis } from 'ioredis';
 
+import { REDIS_CLIENT } from 'modules/redis/redis.module';
 import { ProviderFactory } from 'modules/network/provider.factory';
 import { HistoryService } from 'modules/history/history.service';
 import { History } from 'modules/history/history.entity';
@@ -29,9 +32,8 @@ interface CachedBlock {
 }
 
 @Injectable()
-export class ContractService {
+export class ContractService implements OnModuleInit {
   private readonly logger = new Logger(ContractService.name);
-  private redisClient: any;
 
   // Network configuration
   private networkConfig = {
@@ -72,22 +74,24 @@ export class ContractService {
   ];
 
   constructor(
-    @Inject(CACHE_MANAGER) private cacheManager: any,
+    @Inject(CACHE_MANAGER) private cacheManager: Cache,
+    @Inject(REDIS_CLIENT) private readonly redisClient: Redis,
     private readonly providerFactory: ProviderFactory,
     private readonly historyService: HistoryService,
     private readonly sourceService: SourceService,
     private readonly priceService: PriceService,
-  ) {
-    this.initializeRedis();
+  ) {}
+
+  async onModuleInit() {
+    await this.initializeRedis();
   }
 
-  private initializeRedis(): void {
+  private async initializeRedis(): Promise<void> {
     try {
-      if (this.cacheManager.store?.client) {
-        this.redisClient = this.cacheManager.store.client;
-      }
-    } catch (error) {
-      this.logger.warn(`Redis initialization failed: ${error.message}`);
+      const pong = await this.redisClient.ping();
+      this.logger.log(`Redis client initialized. Ping: ${pong}`);
+    } catch (err) {
+      this.logger.error(`Redis initialization error: ${(err as Error).message}`);
     }
   }
 
@@ -306,15 +310,15 @@ export class ContractService {
     try {
       const key = `block:${network}:${blockNumber}`;
       const blockData: CachedBlock = { blockNumber, timestamp, hash, cachedAt: Date.now() };
-      const ttl = 30 * 24 * 60 * 60; // 30 days
+      const ttlSeconds = 30 * DAY_IN_SEC;
 
-      if (this.redisClient?.setEx) {
-        await this.redisClient.setEx(key, ttl, JSON.stringify(blockData));
+      if (this.redisClient) {
+        await this.redisClient.setex(key, ttlSeconds, JSON.stringify(blockData));
       } else {
-        await this.cacheManager.set(key, JSON.stringify(blockData), ttl * 1000);
+        await this.cacheManager.set(key, JSON.stringify(blockData), ttlSeconds * SEC_IN_MS);
       }
     } catch (error) {
-      this.logger.warn(`Block cache SET error: ${error.message}`);
+      this.logger.warn(`Block cache SET error: ${(error as Error).message}`);
     }
   }
 
