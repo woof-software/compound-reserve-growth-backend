@@ -20,6 +20,8 @@ export const COINGECKO_MAPPINGS: Record<string, Record<string, string>> = {
     USDP: 'paxos-standard',
     FEI: 'fei-usd',
     wstETH: 'wrapped-steth',
+    cUSDCv3: 'usd-coin',
+    cWETHv3: 'weth',
   },
   arbitrum: { ETH: 'ethereum', WETH: 'weth', USDC: 'usd-coin', USDT: 'tether' },
   base: {
@@ -43,4 +45,5 @@ export const STABLECOIN_PRICES: Record<string, number> = {
   TUSD: 1.0,
   USDP: 1.0,
   FEI: 1.0,
+  cUSDCv3: 1.0,
 };

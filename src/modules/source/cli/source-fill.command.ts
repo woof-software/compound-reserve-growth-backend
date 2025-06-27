@@ -81,7 +81,8 @@ export class SourceFillCommand extends CommandRunner {
           (s) =>
             s.address === source.address &&
             s.network === source.network &&
-            s.algorithm === source.algorithm,
+            s.algorithm === source.algorithm &&
+            s.asset.address === source.asset.address,
         );
         if (existingSource) continue;
 
