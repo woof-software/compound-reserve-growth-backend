@@ -458,19 +458,15 @@ export class ContractService implements OnModuleInit {
     return this.arbitrumPeriods[this.arbitrumPeriods.length - 1];
   }
 
-  // ==================== MAIN METHOD ====================
-
-  async getMarketHistory(source: Source) {
+  async getHistory(source: Source) {
     const { address: contractAddress, network, asset, algorithm } = source;
+    const { address: assetAddress } = asset;
 
     this.logger.log(
       `Starting history collection for source ${source.id} on ${network}, algorithm: ${algorithm}`,
     );
 
     const provider = this.providerFactory.get(network);
-
-    const ABI = algorithm === Algorithm.COMET ? CometABI : MarketV2ABI;
-    const contract = new ethers.Contract(contractAddress, ABI, provider) as any;
 
     let lastBlock = source.blockNumber;
     const startBlockData = await this.getCachedBlock(network, provider, lastBlock);
@@ -530,16 +526,31 @@ export class ContractService implements OnModuleInit {
     let priceErrors = 0;
     let skippedCount = 0;
 
+    const ABI = algorithm === Algorithm.COMET ? CometABI : MarketV2ABI;
+
+    const contract = new ethers.Contract(contractAddress, ABI, provider) as any;
+    const assetContract = new ethers.Contract(assetAddress, ERC20ABI, provider) as any;
+
     for (const targetTs of dailyTs) {
       try {
         const blockTag = await this.findBlockByTimestamp(network, provider, targetTs, lastBlock);
 
         let reserves: bigint;
         try {
-          reserves =
-            algorithm === Algorithm.COMET
-              ? await contract.getReserves({ blockTag })
-              : await contract.totalReserves({ blockTag });
+          switch (algorithm) {
+            case Algorithm.COMET:
+              reserves = await contract.getReserves({ blockTag });
+              break;
+            case Algorithm.MARKET_V2:
+              reserves = await contract.totalReserves({ blockTag });
+              break;
+            case Algorithm.COMPTROLLER:
+            case Algorithm.AERA_COMPOUND_RESERVES:
+            case Algorithm.AERA_VENDORS_VAULT:
+            case Algorithm.AVANTGARDE_TREASURY_GROWTH_PROPOSAL:
+              reserves = await assetContract.balanceOf(contractAddress, { blockTag });
+              break;
+          }
         } catch (e: any) {
           if (e.code === 'CALL_EXCEPTION') {
             this.logger.warn(
