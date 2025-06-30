@@ -23,6 +23,7 @@ import { AppController } from './app.controller';
 import appConfig from 'config/app';
 import databaseConfig from 'config/database';
 import networksConfig from 'config/networks.config';
+import redis from 'config/redis';
 import { DatabaseModule } from 'database/database.module';
 import { Logger } from 'infrastructure/logger';
 import { ExceptionInterceptor } from 'infrastructure/http/interceptors/exception.interceptor';
@@ -31,7 +32,7 @@ import { ExceptionInterceptor } from 'infrastructure/http/interceptors/exception
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      load: [appConfig, databaseConfig, networksConfig],
+      load: [appConfig, databaseConfig, networksConfig, redis],
     }),
     ScheduleModule.forRoot(),
     ThrottlerModule.forRoot({
@@ -49,7 +50,7 @@ import { ExceptionInterceptor } from 'infrastructure/http/interceptors/exception
       useFactory: async (config: ConfigService, redisClient: Redis) => ({
         store: await redisStore({
           redisInstance: redisClient,
-          ttl: +config.get<string>('REDIS_DEFAULT_TTL', '86400'),
+          ttl: config.get<number>('redis.ttl'),
         }),
       }),
     }),

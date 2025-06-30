@@ -16,15 +16,17 @@ export const REDIS_CLIENT = 'REDIS_CLIENT';
       useFactory: (config: ConfigService) => {
         const logger = new Logger('RedisClient');
 
-        const redisHost = config.get<string>('REDIS_HOST');
+        const redisHost = config.get<string>('redis.host');
+        logger.log(`Connecting to Redis at ${redisHost}`);
         if (!redisHost) throw new Error('REDIS_HOST is not set');
 
         const client = new Redis({
           host: redisHost,
-          port: +config.get('REDIS_PORT', '6379'),
-          password: config.get('REDIS_PASSWORD'),
-          db: +config.get('REDIS_DB', '0'),
-          tls: config.get('REDIS_TLS', 'false') === 'true' ? {} : undefined,
+          port: config.get('redis.port'),
+          password: config.get('redis.password'),
+          db: config.get('redis.db'),
+          tls: config.get('redis.tls'),
+          connectTimeout: config.get('redis.timeout'),
           retryStrategy: (times) => Math.min(times * 50, 2000),
           reconnectOnError: (err) => err.message.includes('READONLY'),
         });
