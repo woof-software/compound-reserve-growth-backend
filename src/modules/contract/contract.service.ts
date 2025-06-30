@@ -463,7 +463,9 @@ export class ContractService implements OnModuleInit {
   async getMarketHistory(source: Source) {
     const { address: contractAddress, network, asset, algorithm } = source;
 
-    this.logger.log(`Starting history collection for source ${source.id} on ${network}`);
+    this.logger.log(
+      `Starting history collection for source ${source.id} on ${network}, algorithm: ${algorithm}`,
+    );
 
     const provider = this.providerFactory.get(network);
 

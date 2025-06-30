@@ -47,11 +47,10 @@ import { ExceptionInterceptor } from 'infrastructure/http/interceptors/exception
       isGlobal: true,
       imports: [ConfigModule, RedisModule],
       inject: [ConfigService, REDIS_CLIENT],
-      useFactory: async (config: ConfigService, redisClient: Redis) => ({
-        store: await redisStore({
-          redisInstance: redisClient,
-          ttl: config.get<number>('redis.ttl'),
-        }),
+      useFactory: async (cfg: ConfigService, client: Redis) => ({
+        store: redisStore,
+        redisInstance: client,
+        ttl: cfg.get<number>('redis.ttl'),
       }),
     }),
     DatabaseModule,
