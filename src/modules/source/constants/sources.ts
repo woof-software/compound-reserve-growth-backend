@@ -7,7 +7,7 @@ export const sources = [
     algorithm: Algorithm.TIMELOCK,
     address: '0x6d903f6003cca6255D85CcA4D3B5E5146dC33925',
     network: 'mainnet',
-    creationBlockNumber: 8722895,
+    creationBlockNumber: 13553257,
     asset: {
       name: 'ETH',
       address: '0x0000000000000000000000000000000000000000',
@@ -99,7 +99,7 @@ export const sources = [
     algorithm: Algorithm.AERA_COMPOUND_RESERVES,
     address: '0x3D6eEf6A92b15361697698695334E98C5db91D6b',
     network: 'mainnet',
-    creationBlockNumber: 18215232,
+    creationBlockNumber: 20401360,
     asset: {
       name: 'Compound',
       address: '0xc00e94Cb662C3520282E6f5717214004A7f26888',
@@ -112,7 +112,7 @@ export const sources = [
     algorithm: Algorithm.AERA_COMPOUND_RESERVES,
     address: '0x3D6eEf6A92b15361697698695334E98C5db91D6b',
     network: 'mainnet',
-    creationBlockNumber: 18215232,
+    creationBlockNumber: 21053276,
     asset: {
       name: 'Dai Stablecoin',
       address: '0x6B175474E89094C44Da98b954EedeAC495271d0F',
@@ -145,7 +145,7 @@ export const sources = [
     algorithm: Algorithm.COMPTROLLER,
     address: '0x3d9819210A31b4961b30EF54bE2aeD79B9c9Cd3B',
     network: 'mainnet',
-    creationBlockNumber: 7710671,
+    creationBlockNumber: 10253989,
     asset: {
       name: 'Compound',
       address: '0xc00e94Cb662C3520282E6f5717214004A7f26888',
