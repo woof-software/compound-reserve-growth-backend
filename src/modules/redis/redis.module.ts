@@ -21,6 +21,7 @@ export const REDIS_CLIENT = 'REDIS_CLIENT';
         if (!redisHost) throw new Error('REDIS_HOST is not set');
 
         const client = new Redis({
+          lazyConnect: true,
           host: redisHost,
           port: config.get('redis.port'),
           password: config.get('redis.password'),
