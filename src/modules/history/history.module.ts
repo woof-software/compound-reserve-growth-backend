@@ -10,6 +10,7 @@ import { HistoryRepository } from './history.repository';
 import { HistoryService } from './history.service';
 import { HistoryGetCommand } from './cli/history-get.command';
 import { HistoryController } from './history.controller';
+import { HistoryGetCron } from './cron/history-get.cron';
 
 @Module({
   imports: [
@@ -18,7 +19,7 @@ import { HistoryController } from './history.controller';
     AssetModule,
     forwardRef(() => ContractModule),
   ],
-  providers: [HistoryRepository, HistoryService, HistoryGetCommand],
+  providers: [HistoryRepository, HistoryService, HistoryGetCommand, HistoryGetCron],
   exports: [HistoryService, HistoryRepository],
   controllers: [HistoryController],
 })
