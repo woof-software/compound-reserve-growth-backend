@@ -21,9 +21,6 @@ export class AssetResponse {
   @ApiProperty({ example: 'ERC20' })
   public type: string;
 
-  @ApiProperty({ example: '2025-06-17T12:00:00Z' })
-  public createdAt: Date;
-
   constructor(asset: Asset) {
     this.id = asset.id;
     this.address = asset.address;
@@ -31,6 +28,5 @@ export class AssetResponse {
     this.symbol = asset.symbol;
     this.network = asset.network;
     this.type = asset.type;
-    this.createdAt = asset.createdAt;
   }
 }
