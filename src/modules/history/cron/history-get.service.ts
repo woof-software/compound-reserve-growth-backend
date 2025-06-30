@@ -3,8 +3,6 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ContractService } from 'modules/contract/contract.service';
 import { SourceService } from 'modules/source/source.service';
 
-import { Algorithm } from '@app/common/enum/algorithm.enum';
-
 @Injectable()
 export class GetHistoryService {
   private readonly logger = new Logger(GetHistoryService.name);
@@ -22,10 +20,7 @@ export class GetHistoryService {
       const dbSources = await this.sourceService.listAll();
 
       for (const source of dbSources) {
-        const { algorithm } = source;
-        if (algorithm !== Algorithm.TIMELOCK) {
-          await this.contractService.getHistory(source);
-        }
+        await this.contractService.getHistory(source);
       }
 
       this.logger.log('Getting history data completed.');

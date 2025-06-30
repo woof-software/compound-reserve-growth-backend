@@ -544,6 +544,9 @@ export class ContractService implements OnModuleInit {
             case Algorithm.MARKET_V2:
               reserves = await contract.totalReserves({ blockTag });
               break;
+            case Algorithm.TIMELOCK:
+              reserves = await provider.getBalance(contractAddress, blockTag);
+              break;
             case Algorithm.COMPTROLLER:
             case Algorithm.AERA_COMPOUND_RESERVES:
             case Algorithm.AERA_VENDORS_VAULT:
