@@ -20,7 +20,7 @@ export class GetHistoryService {
       const dbSources = await this.sourceService.listAll();
 
       for (const source of dbSources) {
-        if ([65, 71].includes(source.id)) await this.contractService.getHistory(source);
+        await this.contractService.getHistory(source);
       }
 
       this.logger.log('Getting history data completed.');
