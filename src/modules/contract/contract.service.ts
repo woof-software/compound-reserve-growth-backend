@@ -545,13 +545,19 @@ export class ContractService implements OnModuleInit {
               reserves = await contract.totalReserves({ blockTag });
               break;
             case Algorithm.TIMELOCK:
-              reserves = await provider.getBalance(contractAddress, blockTag);
-              break;
             case Algorithm.COMPTROLLER:
             case Algorithm.AERA_COMPOUND_RESERVES:
             case Algorithm.AERA_VENDORS_VAULT:
             case Algorithm.AVANTGARDE_TREASURY_GROWTH_PROPOSAL:
-              reserves = await assetContract.balanceOf(contractAddress, { blockTag });
+            case Algorithm.COMPOUND_COMMUNITY_MULTISIG:
+            case Algorithm.IMMUNEFI_BUG_BOUNTY_PROGRAM:
+            case Algorithm.WOOF_PAYMENT_STREAM_CONTRACT:
+            case Algorithm.OPENZEPPELIN_PAYMENT_STREAM_CONTRACT:
+              if (asset.symbol === 'ETH') {
+                reserves = await provider.getBalance(contractAddress, blockTag);
+              } else {
+                reserves = await assetContract.balanceOf(contractAddress, { blockTag });
+              }
               break;
           }
         } catch (e: any) {
