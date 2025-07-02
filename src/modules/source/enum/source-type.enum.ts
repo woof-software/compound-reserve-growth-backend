@@ -1,0 +1,13 @@
+export enum SourceType {
+  TIMELOCK = 'Timelock',
+  MARKET_V2 = 'Market V2',
+  MARKET_V3 = 'Market V3',
+  COMPTROLLER = 'Comptroller',
+  AVANTGARDE_TREASURY_GROWTH_PROPOSAL = 'Avantgarde Treasury Growth Proposal',
+  AERA_COMPOUND_RESERVES = 'Aera Compound Reserves',
+  AERA_VENDORS_VAULT = 'Aera Vendors Vault',
+  COMPOUND_COMMUNITY_MULTISIG = 'Compound Community Multisig',
+  IMMUNEFI_BUG_BOUNTY_PROGRAM = 'Immunefi Bug Bounty Program',
+  WOOF_PAYMENT_STREAM_CONTRACT = 'WOOF Payment Stream Contract',
+  OPENZEPPELIN_PAYMENT_STREAM_CONTRACT = 'OpenZeppelin Payment Stream Contract',
+}

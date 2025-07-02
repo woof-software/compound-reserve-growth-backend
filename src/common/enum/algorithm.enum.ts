@@ -6,4 +6,8 @@ export enum Algorithm {
   AVANTGARDE_TREASURY_GROWTH_PROPOSAL = 'avantgarde_treasury_growth_proposal',
   AERA_COMPOUND_RESERVES = 'aera_compound_reserves',
   AERA_VENDORS_VAULT = 'aera_vendors_vault',
+  COMPOUND_COMMUNITY_MULTISIG = 'compound_community_multisig',
+  IMMUNEFI_BUG_BOUNTY_PROGRAM = 'immunefi_bug_bounty_program',
+  WOOF_PAYMENT_STREAM_CONTRACT = 'woof_payment_stream_contract',
+  OPENZEPPELIN_PAYMENT_STREAM_CONTRACT = 'openzeppelin_payment_stream_contract',
 }

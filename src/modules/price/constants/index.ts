@@ -23,6 +23,7 @@ export const COINGECKO_MAPPINGS: Record<string, Record<string, string>> = {
     wstETH: 'wrapped-steth',
     cUSDCv3: 'usd-coin',
     cWETHv3: 'weth',
+    REPv2: 'augur',
   },
   arbitrum: { ETH: 'ethereum', WETH: 'weth', USDC: 'usd-coin', USDT: 'tether' },
   base: {
