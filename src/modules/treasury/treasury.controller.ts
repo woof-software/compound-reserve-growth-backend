@@ -6,7 +6,7 @@ import { HistoryService } from 'modules/history/history.service';
 import { HistoryResponse } from 'modules/history/response/history.response';
 
 @Injectable()
-@Controller('trasury')
+@Controller('treasury')
 export class TreasuryController {
   constructor(private readonly historyService: HistoryService) {}
 

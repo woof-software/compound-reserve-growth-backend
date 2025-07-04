@@ -577,7 +577,7 @@ export class ContractService implements OnModuleInit {
             date,
           );
 
-          if (price <= 0 || price > 100000) {
+          if (price <= 0) {
             this.logger.warn(`Suspicious price for ${symbol}: $${price}, using fallback`);
             price = 1;
             priceErrors++;
