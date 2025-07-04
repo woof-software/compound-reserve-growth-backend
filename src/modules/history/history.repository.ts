@@ -78,7 +78,7 @@ export class HistoryRepository {
       .leftJoinAndSelect('history.source', 'source')
       .leftJoinAndSelect('source.asset', 'asset')
       .where('source.algorithm IN (:...algorithms)', {
-        algorithms: [Algorithm.COMET, Algorithm.MARKET_V2],
+        algorithms: [Algorithm.COMET, Algorithm.MARKET_V2, Algorithm.AERA_COMPOUND_RESERVES],
       });
 
     query.orderBy('history.date', dto.order);
