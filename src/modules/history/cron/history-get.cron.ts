@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { Cron, CronExpression } from '@nestjs/schedule';
 
 import { GetHistoryService } from 'modules/history/cron/history-get.service';
 
@@ -8,6 +9,7 @@ export class HistoryGetCron {
 
   constructor(private readonly getHistoryService: GetHistoryService) {}
 
+  @Cron(CronExpression.EVERY_DAY_AT_NOON)
   async getHistoryTask() {
     try {
       await this.getHistoryService.getHistory();
