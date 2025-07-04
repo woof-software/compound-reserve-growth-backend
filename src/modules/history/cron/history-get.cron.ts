@@ -9,7 +9,7 @@ export class HistoryGetCron {
 
   constructor(private readonly getHistoryService: GetHistoryService) {}
 
-  @Cron(CronExpression.EVERY_DAY_AT_NOON)
+  @Cron(CronExpression.EVERY_DAY_AT_NOON, { timeZone: 'UTC' })
   async getHistoryTask() {
     try {
       await this.getHistoryService.getHistory();
