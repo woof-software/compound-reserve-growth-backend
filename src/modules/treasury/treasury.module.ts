@@ -7,12 +7,12 @@ import { HistoryModule } from 'modules/history/history.module';
 import { Treasury } from './treasury.entity';
 import { TreasuryRepository } from './treasury.repository';
 import { TreasuryService } from './treasury.service';
-// import { TreasuryController } from './treasury.controller';
+import { TreasuryController } from './treasury.controller';
 
 @Module({
   imports: [TypeOrmModule.forFeature([Treasury]), SourceModule, HistoryModule],
   providers: [TreasuryRepository, TreasuryService],
   exports: [TreasuryService, TreasuryRepository],
-  // controllers: [TreasuryController],
+  controllers: [TreasuryController],
 })
 export class TreasuryModule {}
