@@ -1,6 +1,6 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { IsEnum, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
+import { IsEnum, IsInt, IsOptional, IsString, Min } from 'class-validator';
 
 import { Order } from 'common/enum/order.enum';
 
@@ -17,13 +17,13 @@ export abstract class PaginationRequest {
 
   @ApiPropertyOptional({
     minimum: 1,
-    maximum: 1000,
+    // maximum: 1000,
   })
   @IsOptional()
   @Type(() => Number)
   @IsInt()
   @Min(1)
-  @Max(1000)
+  // @Max(1000)
   readonly perPage?: number;
 
   @ApiPropertyOptional({ enum: Order, default: Order.DESC })
