@@ -21,7 +21,9 @@ export class EventFillCommand extends CommandRunner {
 
       for (const event of events) {
         const eventDate = new Date(event.date);
-        const existingEvent = dbEvents.find((e) => e.name === event.name && e.date === eventDate);
+        const existingEvent = dbEvents.find(
+          (e) => e.name === event.name && e.date.getTime() === eventDate.getTime(),
+        );
         if (existingEvent) continue;
 
         const newEvent = new Event(event.name, eventDate);

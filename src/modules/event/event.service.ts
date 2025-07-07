@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 
 import { EventRepository } from './event.repository';
 import { Event } from './event.entity';
@@ -16,8 +16,6 @@ export class EventService {
   }
 
   async listAll(): Promise<Event[]> {
-    const events = await this.eventRepository.list();
-    if (!events || events.length === 0) throw new NotFoundException('No events found');
-    return events;
+    return this.eventRepository.list();
   }
 }

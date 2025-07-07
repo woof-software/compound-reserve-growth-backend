@@ -1,10 +1,10 @@
 export const events = [
   {
     name: 'Some Event',
-    date: '20.02.2020',
+    date: '2020-02-20T00:00:00.000Z',
   },
   {
     name: 'Some other Event',
-    date: '25.05.2025',
+    date: '2025-05-25T00:00:00.000Z',
   },
 ];
