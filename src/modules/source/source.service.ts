@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 
 import { AssetService } from 'modules/asset/asset.service';
+import { AssetResponse } from 'modules/asset/response/asset.response';
 
 import { SourceRepository } from './source.repository';
 import { CreateSourceDto } from './dto/create-source.dto';
@@ -8,6 +9,8 @@ import { UpdateSourceDto } from './dto/update-source.dto';
 import { Source } from './source.entity';
 import { CreateSourceWithAssetDto } from './dto/create-source-with-asset.dto';
 import { UpdateWithSourceDto } from './dto/update-with-source.dto';
+import { SourcesWithAssetsResponse } from './response/sourcesWithAssets.response';
+import { SourceResponse } from './response/source.response';
 
 @Injectable()
 export class SourceService {
@@ -64,5 +67,16 @@ export class SourceService {
 
   async listAll(): Promise<Source[]> {
     return this.sourceRepository.list();
+  }
+
+  async listSourcesWithAssets(): Promise<SourcesWithAssetsResponse> {
+    const [sources, assets] = await Promise.all([
+      this.sourceRepository.list(),
+      this.assetService.listAll(),
+    ]);
+    return {
+      sources: sources.map((source) => new SourceResponse(source)),
+      assets: assets.map((asset) => new AssetResponse(asset)),
+    };
   }
 }

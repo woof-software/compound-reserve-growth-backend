@@ -1,9 +1,10 @@
 import { ApiProperty } from '@nestjs/swagger';
 
+import { AssetResponse } from 'modules/asset/response/asset.response';
 import { Source } from 'modules/source/source.entity';
 import { SourceType } from 'modules/source/enum/source-type.enum';
 
-export class SourceResponse {
+export class SourceFullResponse {
   @ApiProperty({ example: 1 })
   public id: number;
 
@@ -19,8 +20,8 @@ export class SourceResponse {
   @ApiProperty({ example: 'cUSDCv3', nullable: true })
   public market: string;
 
-  @ApiProperty({ example: 12 })
-  public assetId: number;
+  @ApiProperty({ type: AssetResponse })
+  public asset: AssetResponse;
 
   constructor(source: Source) {
     this.id = source.id;
@@ -28,6 +29,6 @@ export class SourceResponse {
     this.network = source.network;
     this.type = source.type;
     this.market = source.market;
-    this.assetId = source.asset.id;
+    this.asset = new AssetResponse(source.asset);
   }
 }

@@ -9,6 +9,7 @@ import { Source } from './source.entity';
 import { SourceRepository } from './source.repository';
 import { SourceService } from './source.service';
 import { SourceFillCommand } from './cli/source-fill.command';
+import { SourceController } from './source.controller';
 
 @Module({
   imports: [
@@ -19,5 +20,6 @@ import { SourceFillCommand } from './cli/source-fill.command';
   ],
   providers: [SourceRepository, SourceService, SourceFillCommand],
   exports: [SourceService, SourceRepository],
+  controllers: [SourceController],
 })
 export class SourceModule {}

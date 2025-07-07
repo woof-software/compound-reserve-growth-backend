@@ -22,6 +22,7 @@ export class SourceRepository {
   async list(): Promise<Source[]> {
     return this.sourceRepository.find({
       relations: { asset: true },
+      order: { id: 'ASC' },
     });
   }
 
