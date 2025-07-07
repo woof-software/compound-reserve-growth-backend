@@ -1,33 +1,32 @@
 import { ApiProperty } from '@nestjs/swagger';
 
 import { History } from 'modules/history/history.entity';
-import { SourceResponse } from 'modules/source/response/source.response';
 
 export class HistoryResponse {
   @ApiProperty({ example: 1 })
   public id: number;
 
   @ApiProperty({ example: '10008879' })
-  public quantity: string;
+  public q: string; // quantity of tokens
 
   @ApiProperty({ example: 1.05 })
-  public price: number;
+  public p: number; // price in USD
 
   @ApiProperty({ example: 105.525 })
-  public value: number;
+  public v: number; // value in USD
 
   @ApiProperty({ example: 1750809600 })
-  public date: number;
+  public d: number; // date in seconds
 
-  @ApiProperty({ type: SourceResponse })
-  public source: SourceResponse;
+  @ApiProperty({ example: 23 })
+  public sourceId: number; // source ID
 
   constructor(history: History) {
     this.id = history.id;
-    this.quantity = history.quantity;
-    this.price = history.price;
-    this.value = history.value;
-    this.date = new Date(history.date).getTime() / 1000;
-    this.source = new SourceResponse(history.source);
+    this.q = history.quantity;
+    this.p = history.price;
+    this.v = history.value;
+    this.d = new Date(history.date).getTime() / 1000;
+    this.sourceId = history.source.id;
   }
 }
