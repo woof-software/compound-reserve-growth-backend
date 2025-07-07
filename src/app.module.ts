@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { ConfigModule, ConfigService } from '@nestjs/config';
+import { MailerModule } from '@nestjs-modules/mailer';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { ScheduleModule } from '@nestjs/schedule';
 import { CacheModule } from '@nestjs/cache-manager';
@@ -18,6 +19,7 @@ import { RevenueModule } from 'modules/revenue/revenue.module';
 import { PriceModule } from 'modules/price/price.module';
 import { RedisModule, REDIS_CLIENT } from 'modules/redis/redis.module';
 import { RunwayModule } from 'modules/runway/runway.module';
+import { MailModule } from 'modules/mail/mail.module';
 
 import { AppController } from './app.controller';
 
@@ -55,6 +57,16 @@ import { ExceptionInterceptor } from 'infrastructure/http/interceptors/exception
         ttl: cfg.get<number>('redis.ttl'),
       }),
     }),
+    MailerModule.forRoot({
+      transport: {
+        host: 'in-v3.mailjet.com',
+        port: 587,
+        auth: {
+          user: process.env.MAILJET_USER,
+          pass: process.env.MAILJET_PASS,
+        },
+      },
+    }),
     DatabaseModule,
     GithubModule,
     NetworkModule,
@@ -66,6 +78,7 @@ import { ExceptionInterceptor } from 'infrastructure/http/interceptors/exception
     RevenueModule,
     PriceModule,
     RunwayModule,
+    MailModule,
   ],
   controllers: [AppController],
   providers: [
