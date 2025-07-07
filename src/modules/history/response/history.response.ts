@@ -19,7 +19,7 @@ export class HistoryResponse {
   public d: number; // date in seconds
 
   @ApiProperty({ example: 23 })
-  public sourceId: number; // source ID
+  public sId: number; // source ID
 
   constructor(history: History) {
     this.id = history.id;
@@ -27,6 +27,6 @@ export class HistoryResponse {
     this.p = history.price;
     this.v = history.value;
     this.d = new Date(history.date).getTime() / 1000;
-    this.sourceId = history.source.id;
+    this.sId = history.source.id;
   }
 }

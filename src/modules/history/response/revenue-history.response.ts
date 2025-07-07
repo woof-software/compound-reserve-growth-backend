@@ -7,18 +7,18 @@ export class RevenueHistoryResponse {
   public id: number;
 
   @ApiProperty({ example: 105.525 })
-  public value: number;
+  public v: number;
 
   @ApiProperty({ example: 1750809600 })
-  public date: number;
+  public d: number;
 
   @ApiProperty({ example: 12 })
-  public sourceId: number;
+  public sId: number;
 
   constructor(history: History) {
     this.id = history.id;
-    this.value = history.value;
-    this.date = new Date(history.date).getTime() / 1000;
-    this.sourceId = history.source.id;
+    this.v = history.value;
+    this.d = new Date(history.date).getTime() / 1000;
+    this.sId = history.source.id;
   }
 }
