@@ -11,6 +11,7 @@ export type TAppConfig = {
   cors: TCorsConfig;
   apiDocumentation: boolean;
   logLevel: string;
+  emailTo: string;
 };
 
 export default (): { app: TAppConfig } => {
@@ -30,6 +31,9 @@ export default (): { app: TAppConfig } => {
       cors,
       apiDocumentation: process.env.API_DOCUMENTATION === 'true',
       logLevel: process.env.LOG_LEVEL || 'error',
+      emailTo:
+        process.env.EMAIL_TO ||
+        'dmitriy@woof.software,stas.b@woof.software,stanislav.k@woof.software',
     },
   };
 };
