@@ -31,6 +31,7 @@ import google from 'config/google';
 import { DatabaseModule } from 'database/database.module';
 import { Logger } from 'infrastructure/logger';
 import { ExceptionInterceptor } from 'infrastructure/http/interceptors/exception.interceptor';
+import { EventModule } from 'modules/event/event.module';
 
 @Module({
   imports: [
@@ -79,6 +80,7 @@ import { ExceptionInterceptor } from 'infrastructure/http/interceptors/exception
     PriceModule,
     RunwayModule,
     MailModule,
+    EventModule,
   ],
   controllers: [AppController],
   providers: [
