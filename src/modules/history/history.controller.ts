@@ -9,10 +9,15 @@ import { PaginationRequest } from './request/pagination.request';
 import { RevenueHistoryResponse } from './response/revenue-history.response';
 import { RevenueHistoryFullResponse } from './response/revenue-history-full.response';
 import { HistoryFullResponse } from './response/history-full.response';
+import { OffsetRequest } from './request/offset.request';
+import { OffsetDto } from './dto/offset.dto';
 
 import { ApiPaginatedResponse } from '@app/common/swagger/api-paginated-response.decorator';
 import { PaginatedDataResponse } from '@app/common/response/paginated-data.response';
 import { PaginationMetaResponse } from '@app/common/response/pagination-meta.response';
+import { OffsetDataResponse } from '@app/common/response/offset-data.response';
+import { OffsetnMetaResponse } from '@app/common/response/offset-meta.response';
+import { ApiOffsetResponse } from '@app/common/swagger/api-offset-response.decorator';
 
 @Injectable()
 @Controller('history')
@@ -60,40 +65,39 @@ export class HistoryController {
 
   @Throttle({ default: { limit: 15, ttl: 1000 } })
   @ApiOperation({ summary: 'Get treasury history reduced response' })
-  @ApiPaginatedResponse(HistoryResponse)
+  @ApiOffsetResponse(HistoryResponse)
   @HttpCode(HttpStatus.OK)
   @Get('v2/treasury')
   async getTreasuryHistory(
-    @Query() request: PaginationRequest,
-  ): Promise<PaginatedDataResponse<HistoryResponse>> {
-    const paginatedData = await this.historyService.getPaginatedTreasuryHistory(
-      new PaginationDto(request?.page, request?.perPage, request?.order),
+    @Query() request: OffsetRequest,
+  ): Promise<OffsetDataResponse<HistoryResponse>> {
+    const paginatedData = await this.historyService.getOffsetTreasuryHistory(
+      new OffsetDto(request?.limit, request?.offset, request?.order),
     );
-    return new PaginatedDataResponse<HistoryResponse>(
+    return new OffsetDataResponse<HistoryResponse>(
       paginatedData.data.map((history) => {
         return new HistoryResponse(history);
       }),
-      new PaginationMetaResponse(paginatedData.page, paginatedData.perPage, paginatedData.total),
+      new OffsetnMetaResponse(paginatedData.limit, paginatedData.offset, paginatedData.total),
     );
   }
 
   @Throttle({ default: { limit: 15, ttl: 1000 } })
   @ApiOperation({ summary: 'Get revenue history reduced response' })
-  @ApiPaginatedResponse(RevenueHistoryResponse)
+  @ApiOffsetResponse(RevenueHistoryResponse)
   @HttpCode(HttpStatus.OK)
   @Get('v2/revenue')
   async getRevenueHistory(
-    @Query() request: PaginationRequest,
-  ): Promise<PaginatedDataResponse<RevenueHistoryResponse>> {
-    const paginatedData = await this.historyService.getPaginatedRevenueHistory(
-      new PaginationDto(request?.page, request?.perPage, request?.order),
+    @Query() request: OffsetRequest,
+  ): Promise<OffsetDataResponse<RevenueHistoryResponse>> {
+    const paginatedData = await this.historyService.getOffsetRevenueHistory(
+      new OffsetDto(request?.limit, request?.offset, request?.order),
     );
-    const paginatedResponse = new PaginatedDataResponse<RevenueHistoryResponse>(
+    return new OffsetDataResponse<RevenueHistoryResponse>(
       paginatedData.data.map((history) => {
         return new RevenueHistoryResponse(history);
       }),
-      new PaginationMetaResponse(paginatedData.page, paginatedData.perPage, paginatedData.total),
+      new OffsetnMetaResponse(paginatedData.limit, paginatedData.offset, paginatedData.total),
     );
-    return paginatedResponse;
   }
 }

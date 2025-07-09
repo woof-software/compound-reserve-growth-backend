@@ -6,8 +6,10 @@ import { HistoryRepository } from './history.repository';
 import { CreateHistoryDto } from './dto/create-history.dto';
 import { History } from './history.entity';
 import { PaginationDto } from './dto/pagination.dto';
+import { OffsetDto } from './dto/offset.dto';
 
 import { PaginatedDataDto } from '@app/common/dto/paginated-data.dto';
+import { OffsetDataDto } from '@app/common/dto/offset-data.dto';
 
 @Injectable()
 export class HistoryService {
@@ -52,6 +54,10 @@ export class HistoryService {
     return this.historyRepo.getPaginatedTreasuryHistory(paginationDto);
   }
 
+  async getOffsetTreasuryHistory(dto: OffsetDto): Promise<OffsetDataDto<History>> {
+    return this.historyRepo.getOffsetTreasuryHistory(dto);
+  }
+
   async getRevenueHistory(): Promise<History[]> {
     const history = await this.historyRepo.getRevenueHistory();
     if (!history || history.length === 0) {
@@ -64,6 +70,10 @@ export class HistoryService {
     paginationDto: PaginationDto,
   ): Promise<PaginatedDataDto<History>> {
     return this.historyRepo.getPaginatedRevenueHistory(paginationDto);
+  }
+
+  async getOffsetRevenueHistory(dto: OffsetDto): Promise<OffsetDataDto<History>> {
+    return this.historyRepo.getOffsetRevenueHistory(dto);
   }
 
   async getTreasuryHoldings(): Promise<History[]> {
