@@ -6,20 +6,26 @@ export class HistoryResponse {
   @ApiProperty({ example: 1 })
   public id: number;
 
-  @ApiProperty({ example: '10008879' })
-  public q: string; // quantity of tokens
+  @ApiProperty({
+    example: '10008879',
+    description: 'quantity - quantity of tokens in string format',
+  })
+  public q: string;
 
-  @ApiProperty({ example: 1.05 })
-  public p: number; // price in USD
+  @ApiProperty({ example: 1.05, description: 'price - price in USD' })
+  public p: number;
 
-  @ApiProperty({ example: 105.525 })
-  public v: number; // value in USD
+  @ApiProperty({ example: 105.525, description: 'value - value in USD' })
+  public v: number;
 
-  @ApiProperty({ example: 1750809600 })
-  public d: number; // date in seconds
+  @ApiProperty({ example: 1750809600, description: 'date - date in seconds since epoch' })
+  public d: number;
 
-  @ApiProperty({ example: 23 })
-  public sId: number; // source ID
+  @ApiProperty({
+    example: 23,
+    description: 'sourceId - ID of the source that generated this history entry',
+  })
+  public sId: number;
 
   constructor(history: History) {
     this.id = history.id;

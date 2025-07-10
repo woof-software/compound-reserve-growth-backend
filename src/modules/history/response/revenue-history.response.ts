@@ -6,13 +6,16 @@ export class RevenueHistoryResponse {
   @ApiProperty({ example: 1 })
   public id: number;
 
-  @ApiProperty({ example: 105.525 })
+  @ApiProperty({ example: 105.525, description: 'value - value in USD' })
   public v: number;
 
-  @ApiProperty({ example: 1750809600 })
+  @ApiProperty({ example: 1750809600, description: 'date - date in seconds since epoch' })
   public d: number;
 
-  @ApiProperty({ example: 12 })
+  @ApiProperty({
+    example: 12,
+    description: 'sourceId - ID of the source that generated this history entry',
+  })
   public sId: number;
 
   constructor(history: History) {
