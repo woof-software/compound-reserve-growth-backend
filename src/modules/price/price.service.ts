@@ -580,7 +580,7 @@ export class PriceService implements OnModuleInit {
       return 2200;
     }
     if (asset.symbol === 'WBTC' && currentPrice <= 1) {
-      return 40000;
+      return 100000;
     }
     if (currentPrice <= 0) {
       return 1;
