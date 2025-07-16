@@ -20,6 +20,7 @@ import { PriceModule } from 'modules/price/price.module';
 import { RedisModule, REDIS_CLIENT } from 'modules/redis/redis.module';
 import { RunwayModule } from 'modules/runway/runway.module';
 import { MailModule } from 'modules/mail/mail.module';
+import { EventModule } from 'modules/event/event.module';
 
 import { AppController } from './app.controller';
 
@@ -31,7 +32,6 @@ import google from 'config/google';
 import { DatabaseModule } from 'database/database.module';
 import { Logger } from 'infrastructure/logger';
 import { ExceptionInterceptor } from 'infrastructure/http/interceptors/exception.interceptor';
-import { EventModule } from 'modules/event/event.module';
 
 @Module({
   imports: [
@@ -43,7 +43,7 @@ import { EventModule } from 'modules/event/event.module';
     ThrottlerModule.forRoot({
       throttlers: [
         {
-          ttl: 60000,
+          ttl: 1000,
           limit: 10,
         },
       ],
