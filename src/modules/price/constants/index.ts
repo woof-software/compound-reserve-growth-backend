@@ -34,7 +34,16 @@ export const COINGECKO_MAPPINGS: Record<string, Record<string, string>> = {
     USDbC: 'usd-coin',
   },
   optimism: { ETH: 'ethereum', WETH: 'weth', USDC: 'usd-coin', USDT: 'tether' },
-  polygon: { USDC: 'usd-coin', USDT: 'tether' },
+  polygon: {
+    USDC: 'usd-coin',
+    USDT: 'tether',
+    ETH: 'ethereum',
+    WETH: 'weth',
+    compWETH: 'weth',
+    morphoUSDC: 'usd-coin',
+    morphoUSDT: 'tether',
+    WPOL: 'wmatic',
+  },
 };
 
 export const STABLECOIN_PRICES: Record<string, number> = {
@@ -48,4 +57,6 @@ export const STABLECOIN_PRICES: Record<string, number> = {
   USDP: 1.0,
   FEI: 1.0,
   cUSDCv3: 1.0,
+  morphoUSDC: 1.0,
+  morphoUSDT: 1.0,
 };
