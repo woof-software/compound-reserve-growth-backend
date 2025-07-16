@@ -11,8 +11,8 @@ import { History } from 'modules/history/history.entity';
 import { Source } from 'modules/source/source.entity';
 import { SourceService } from 'modules/source/source.service';
 import { PriceService } from 'modules/price/price.service';
-import { STABLECOIN_PRICES } from 'modules/price/constants';
 import { MailService } from 'modules/mail/mail.service';
+import { STABLECOIN_PRICES } from 'modules/price/constants';
 
 import CometABI from './abi/CometABI.json';
 import CometExtensionABI from './abi/CometExtensionABI.json';
