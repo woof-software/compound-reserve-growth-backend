@@ -21,6 +21,7 @@ import { RedisModule, REDIS_CLIENT } from 'modules/redis/redis.module';
 import { RunwayModule } from 'modules/runway/runway.module';
 import { MailModule } from 'modules/mail/mail.module';
 import { EventModule } from 'modules/event/event.module';
+import { CoinGeckoModule } from 'modules/price/providers/coingecko/coingecko.module';
 
 import { AppController } from './app.controller';
 
@@ -77,6 +78,7 @@ import { ExceptionInterceptor } from 'infrastructure/http/interceptors/exception
     HistoryModule,
     TreasuryModule,
     RevenueModule,
+    CoinGeckoModule,
     PriceModule,
     RunwayModule,
     MailModule,

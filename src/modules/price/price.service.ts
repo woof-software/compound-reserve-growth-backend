@@ -1,47 +1,37 @@
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Inject, Injectable, Logger, OnModuleInit } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { Cache } from 'cache-manager';
 import type { Redis } from 'ioredis';
 
 import { REDIS_CLIENT } from 'modules/redis/redis.module';
 
-import { COINGECKO_MAPPINGS, STABLECOIN_PRICES } from './constants';
+import { PriceProviderInterface } from './interfaces/price-provider.interface';
+import { CachedPrice } from './interfaces/cached-price.interface';
+import { CoinGeckoProviderService } from './providers/coingecko/coingecko.service';
+import { STABLECOIN_PRICES } from './constants';
 
 import { DAY_IN_MS, DAY_IN_SEC, HOUR_IN_SEC, SEC_IN_MS } from '@app/common/constants';
-
-interface CachedPrice {
-  price: number;
-  source: 'coingecko' | 'coingecko_fallback' | 'hardcoded';
-  timestamp: number;
-}
 
 @Injectable()
 export class PriceService implements OnModuleInit {
   private readonly logger = new Logger(PriceService.name);
-  private lastCoingeckoRequest = 0;
-  private coingeckoDelay: number;
-  private readonly coingeckoApiKey: string;
-  private readonly coingeckoBaseUrl = 'https://api.coingecko.com/api/v3';
+  private readonly providers: Map<string, PriceProviderInterface> = new Map();
 
   constructor(
     @Inject(CACHE_MANAGER) private cacheManager: Cache,
     @Inject(REDIS_CLIENT) private readonly redisClient: Redis,
-    private readonly configService: ConfigService,
+    private readonly coinGeckoProvider: CoinGeckoProviderService,
   ) {
-    this.coingeckoApiKey = this.configService.get<string>('COINGECKO_API_KEY', '');
-
-    if (this.coingeckoApiKey) {
-      this.logger.log('CoinGecko Pro API key configured');
-      this.coingeckoDelay = 500; // Pro tier
-    } else {
-      this.logger.warn('No CoinGecko API key found, using free tier');
-      this.coingeckoDelay = 1200; // Free tier
-    }
+    this.registerProvider(this.coinGeckoProvider);
   }
 
   async onModuleInit() {
     await this.initializeRedis();
+  }
+
+  private registerProvider(provider: PriceProviderInterface): void {
+    this.providers.set(provider.getProviderName(), provider);
+    this.logger.log(`Registered price provider: ${provider.getProviderName()}`);
   }
 
   private async initializeRedis(): Promise<void> {
@@ -68,7 +58,7 @@ export class PriceService implements OnModuleInit {
     }
 
     let price = 1;
-    let source: CachedPrice['source'] = 'hardcoded';
+    let source = 'hardcoded';
 
     try {
       // Check if stablecoin
@@ -76,53 +66,11 @@ export class PriceService implements OnModuleInit {
         price = STABLECOIN_PRICES[asset.symbol];
         source = 'hardcoded';
       } else {
-        // Try CoinGecko
-        const coinId = COINGECKO_MAPPINGS[network]?.[asset.symbol];
-        if (coinId) {
-          // Calculate if the requested date is older than 1 year
-          const oneYearAgo = new Date();
-          oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
-          const isOlderThanOneYear = date < oneYearAgo;
-
-          if (isOlderThanOneYear) {
-            // For dates older than 1 year, use the earliest available price from the last year
-            this.logger.debug(
-              `Date ${date.toISOString().slice(0, 10)} is older than 1 year, looking for earliest available price`,
-            );
-
-            // First ensure we have the yearly data loaded
-            const yearCacheKey = `year_loaded:${coinId}`;
-            const yearLoaded = await this.getYearLoadedStatus(yearCacheKey);
-
-            if (!yearLoaded) {
-              this.logger.log(`Preloading yearly data for ${asset.symbol} (${coinId})`);
-              await this.preloadYearlyPrices(coinId);
-              await this.setYearLoadedStatus(yearCacheKey);
-            }
-
-            // Find the earliest available price in our cache
-            const earliestPrice = await this.findEarliestAvailablePrice(coinId);
-
-            if (earliestPrice) {
-              price = earliestPrice.price;
-              source = 'coingecko_fallback';
-              this.logger.debug(`Using earliest available price for ${asset.symbol}: $${price}`);
-            } else {
-              // If no cached price found, fetch the oldest available from API
-              const fallbackPrice = await this.fetchOldestAvailablePrice(coinId);
-              if (fallbackPrice > 0) {
-                price = fallbackPrice;
-                source = 'coingecko_fallback';
-              }
-            }
-          } else {
-            // For recent dates (within 1 year), try to get exact price
-            const exactPrice = await this.getExactOrNearestPrice(coinId, date);
-            if (exactPrice) {
-              price = exactPrice.price;
-              source = exactPrice.source;
-            }
-          }
+        // Try providers in order of preference
+        const result = await this.fetchPriceFromProviders(asset, network, date);
+        if (result) {
+          price = result.price;
+          source = result.source;
         }
       }
 
@@ -141,45 +89,176 @@ export class PriceService implements OnModuleInit {
     return price;
   }
 
-  private async getExactOrNearestPrice(
-    coinId: string,
+  private async fetchPriceFromProviders(
+    asset: { address: string; symbol: string; decimals: number },
+    network: string,
     date: Date,
-  ): Promise<{ price: number; source: CachedPrice['source'] } | null> {
-    // First ensure yearly data is loaded
-    const yearCacheKey = `year_loaded:${coinId}`;
-    const yearLoaded = await this.getYearLoadedStatus(yearCacheKey);
+  ): Promise<{ price: number; source: string } | null> {
+    for (const [providerName, provider] of this.providers) {
+      try {
+        const coinId = this.getCoinIdFromProvider(provider, network, asset.symbol);
+        if (!coinId) continue;
 
-    if (!yearLoaded) {
-      this.logger.log(`Preloading yearly data for ${coinId}`);
-      await this.preloadYearlyPrices(coinId);
-      await this.setYearLoadedStatus(yearCacheKey);
-    }
-
-    // Check if exact date is in cache
-    const exactCached = await this.getFromCache('all', coinId, date);
-    if (exactCached) {
-      return { price: exactCached.price, source: exactCached.source };
-    }
-
-    // Try to fetch exact date from API
-    try {
-      const exactPrice = await this.getCoinGeckoHistoricalPrice(coinId, date);
-      if (exactPrice > 0) {
-        return { price: exactPrice, source: 'coingecko' };
+        const result = await this.getExactOrNearestPrice(provider, coinId, date);
+        if (result) {
+          return { price: result.price, source: result.source };
+        }
+      } catch (error) {
+        this.logger.warn(`Provider ${providerName} failed for ${asset.symbol}: ${error.message}`);
+        continue;
       }
-    } catch (error) {
-      this.logger.debug(
-        `Could not fetch exact price for ${coinId} on ${date.toISOString().slice(0, 10)}: ${error.message}`,
-      );
-    }
-
-    // Find nearest available price
-    const nearestPrice = await this.findNearestPrice('all', coinId, date);
-    if (nearestPrice) {
-      return { price: nearestPrice.price, source: 'coingecko_fallback' };
     }
 
     return null;
+  }
+
+  private getCoinIdFromProvider(
+    provider: PriceProviderInterface,
+    network: string,
+    symbol: string,
+  ): string | null {
+    const mappings = provider.getMappings();
+    return mappings[network]?.[symbol] || null;
+  }
+
+  private async getExactOrNearestPrice(
+    provider: PriceProviderInterface,
+    coinId: string,
+    date: Date,
+  ): Promise<{ price: number; source: string } | null> {
+    const providerName = provider.getProviderName();
+
+    // Calculate if the requested date is older than 1 year
+    const oneYearAgo = new Date();
+    oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
+    const isOlderThanOneYear = date < oneYearAgo;
+
+    if (isOlderThanOneYear) {
+      // For dates older than 1 year, use the earliest available price from the last year
+      this.logger.debug(
+        `Date ${date.toISOString().slice(0, 10)} is older than 1 year, looking for earliest available price`,
+      );
+
+      // First ensure we have the yearly data loaded
+      const yearCacheKey = `year_loaded:${coinId}`;
+      const yearLoaded = await this.getYearLoadedStatus(yearCacheKey);
+
+      if (!yearLoaded) {
+        this.logger.log(`Preloading yearly data for ${coinId}`);
+        await this.preloadPrices(provider, coinId);
+        await this.setYearLoadedStatus(yearCacheKey);
+      }
+
+      // Find the earliest available price in our cache
+      const earliestPrice = await this.findEarliestAvailablePrice(coinId);
+
+      if (earliestPrice) {
+        return { price: earliestPrice.price, source: `${providerName}_fallback` };
+      } else {
+        // If no cached price found, fetch the oldest available from provider
+        if (provider instanceof CoinGeckoProviderService) {
+          const fallbackPrice = await provider.fetchOldestAvailablePrice(coinId);
+          if (fallbackPrice > 0) {
+            return { price: fallbackPrice, source: `${providerName}_fallback` };
+          }
+        }
+      }
+    } else {
+      // For recent dates (within 1 year), try to get exact price
+      // First ensure yearly data is loaded
+      const yearCacheKey = `year_loaded:${coinId}`;
+      const yearLoaded = await this.getYearLoadedStatus(yearCacheKey);
+
+      if (!yearLoaded) {
+        this.logger.log(`Preloading yearly data for ${coinId}`);
+        await this.preloadPrices(provider, coinId);
+        await this.setYearLoadedStatus(yearCacheKey);
+      }
+
+      // Check if exact date is in cache
+      const exactCached = await this.getFromCache('all', coinId, date);
+      if (exactCached) {
+        return { price: exactCached.price, source: exactCached.source };
+      }
+
+      // Try to fetch exact date from provider
+      try {
+        const exactPrice = await provider.getHistoricalPrice(coinId, date);
+        if (exactPrice > 0) {
+          return { price: exactPrice, source: providerName };
+        }
+      } catch (error) {
+        this.logger.debug(
+          `Could not fetch exact price for ${coinId} on ${date.toISOString().slice(0, 10)}: ${error.message}`,
+        );
+      }
+
+      // Find nearest available price
+      const nearestPrice = await this.findNearestPrice('all', coinId, date);
+      if (nearestPrice) {
+        return { price: nearestPrice.price, source: `${providerName}_fallback` };
+      }
+    }
+
+    return null;
+  }
+
+  private async preloadPrices(provider: PriceProviderInterface, coinId: string): Promise<void> {
+    try {
+      const prices = await provider.preloadPrices(coinId);
+
+      if (!Array.isArray(prices) || prices.length === 0) {
+        this.logger.warn(`No price data returned for ${coinId}`);
+        return;
+      }
+
+      let earliestDate: string | null = null;
+      let latestDate: string | null = null;
+
+      const pipeline = this.redisClient?.pipeline();
+
+      for (const [timestamp, price] of prices) {
+        const date = new Date(timestamp);
+        date.setUTCHours(0, 0, 0, 0);
+
+        const dateStr = date.toISOString().slice(0, 10);
+
+        if (!earliestDate || dateStr < earliestDate) {
+          earliestDate = dateStr;
+        }
+        if (!latestDate || dateStr > latestDate) {
+          latestDate = dateStr;
+        }
+
+        const key = `price:all:${coinId}:${dateStr}`;
+        const cacheData: CachedPrice = {
+          price,
+          source: provider.getProviderName(),
+          timestamp: Date.now(),
+        };
+        const ttl = this.getPriceTTL(provider.getProviderName(), date);
+
+        if (pipeline) {
+          pipeline.setex(key, ttl, JSON.stringify(cacheData));
+        } else {
+          await this.setToCache('all', coinId, date, price, provider.getProviderName());
+        }
+      }
+
+      if (pipeline) {
+        await pipeline.exec();
+      }
+
+      // Store metadata
+      if (earliestDate && latestDate) {
+        await this.setMetadata(coinId, { earliestDate, latestDate });
+        this.logger.log(
+          `Preloaded ${prices.length} daily prices for ${coinId} (${earliestDate} to ${latestDate})`,
+        );
+      }
+    } catch (error) {
+      this.logger.warn(`Failed to preload yearly prices for ${coinId}: ${error.message}`);
+    }
   }
 
   private async findEarliestAvailablePrice(coinId: string): Promise<CachedPrice | null> {
@@ -255,119 +334,6 @@ export class PriceService implements OnModuleInit {
     }
   }
 
-  private async fetchOldestAvailablePrice(coinId: string): Promise<number> {
-    try {
-      await this.rateLimitDelay();
-
-      // Get price from exactly 365 days ago (maximum for free tier)
-      const oneYearAgo = new Date();
-      oneYearAgo.setDate(oneYearAgo.getDate() - 365);
-
-      const dateString = oneYearAgo.toISOString().split('T')[0];
-      const url = `${this.coingeckoBaseUrl}/coins/${coinId}/history?date=${dateString}`;
-
-      const response = await fetch(url, this.getCoingeckoOptions());
-      if (!response.ok) {
-        throw new Error(`CoinGecko API error: ${response.status}`);
-      }
-
-      const data = await response.json();
-      const price = data.market_data?.current_price?.usd || 0;
-
-      if (price > 0) {
-        // Cache this price
-        await this.setToCache('all', coinId, oneYearAgo, price, 'coingecko');
-        this.logger.debug(
-          `Fetched oldest available price for ${coinId}: ${dateString} = $${price}`,
-        );
-      }
-
-      return price;
-    } catch (error) {
-      this.logger.warn(`Failed to fetch oldest available price for ${coinId}: ${error.message}`);
-      return 0;
-    }
-  }
-
-  private async preloadYearlyPrices(coinId: string): Promise<void> {
-    await this.rateLimitDelay();
-
-    const endDate = new Date();
-    endDate.setUTCHours(0, 0, 0, 0);
-
-    // For free tier, we can only get last 365 days
-    const startDate = new Date();
-    startDate.setDate(startDate.getDate() - 365);
-    startDate.setUTCHours(0, 0, 0, 0);
-
-    const fromTimestamp = Math.floor(startDate.getTime() / 1000);
-    const toTimestamp = Math.floor(endDate.getTime() / 1000);
-
-    const url = `${this.coingeckoBaseUrl}/coins/${coinId}/market_chart/range?vs_currency=usd&from=${fromTimestamp}&to=${toTimestamp}`;
-
-    try {
-      const response = await fetch(url, this.getCoingeckoOptions());
-      if (!response.ok) {
-        throw new Error(`CoinGecko range API error: ${response.status}`);
-      }
-
-      const data = await response.json();
-      const prices = data.prices || [];
-
-      if (prices.length === 0) {
-        this.logger.warn(`No price data returned for ${coinId}`);
-        return;
-      }
-
-      let earliestDate: string | null = null;
-      let latestDate: string | null = null;
-
-      const pipeline = this.redisClient?.pipeline();
-
-      for (const [timestamp, price] of prices) {
-        const date = new Date(timestamp);
-        date.setUTCHours(0, 0, 0, 0);
-
-        const dateStr = date.toISOString().slice(0, 10);
-
-        if (!earliestDate || dateStr < earliestDate) {
-          earliestDate = dateStr;
-        }
-        if (!latestDate || dateStr > latestDate) {
-          latestDate = dateStr;
-        }
-
-        const key = `price:all:${coinId}:${dateStr}`;
-        const cacheData: CachedPrice = {
-          price,
-          source: 'coingecko',
-          timestamp: Date.now(),
-        };
-        const ttl = this.getPriceTTL('coingecko', date);
-
-        if (pipeline) {
-          pipeline.setex(key, ttl, JSON.stringify(cacheData));
-        } else {
-          await this.setToCache('all', coinId, date, price, 'coingecko');
-        }
-      }
-
-      if (pipeline) {
-        await pipeline.exec();
-      }
-
-      // Store metadata
-      if (earliestDate && latestDate) {
-        await this.setMetadata(coinId, { earliestDate, latestDate });
-        this.logger.log(
-          `Preloaded ${prices.length} daily prices for ${coinId} (${earliestDate} to ${latestDate})`,
-        );
-      }
-    } catch (error) {
-      this.logger.warn(`Failed to preload yearly prices for ${coinId}: ${error.message}`);
-    }
-  }
-
   private async findNearestPrice(
     network: string,
     symbol: string,
@@ -410,7 +376,7 @@ export class PriceService implements OnModuleInit {
     }
   }
 
-  // Helper methods remain the same
+  // Helper methods
   private async getFromCache(
     network: string,
     symbol: string,
@@ -425,13 +391,16 @@ export class PriceService implements OnModuleInit {
         return JSON.parse(cached);
       }
 
-      const coinId = COINGECKO_MAPPINGS[network]?.[symbol];
-      if (coinId) {
-        const globalKey = `price:all:${coinId}:${dateKey}`;
-        cached = await this.getCacheValue(globalKey);
+      // Try to find in global cache using any provider mapping
+      for (const provider of this.providers.values()) {
+        const coinId = this.getCoinIdFromProvider(provider, network, symbol);
+        if (coinId) {
+          const globalKey = `price:all:${coinId}:${dateKey}`;
+          cached = await this.getCacheValue(globalKey);
 
-        if (cached) {
-          return JSON.parse(cached);
+          if (cached) {
+            return JSON.parse(cached);
+          }
         }
       }
 
@@ -458,7 +427,7 @@ export class PriceService implements OnModuleInit {
     symbol: string,
     date: Date,
     price: number,
-    source: CachedPrice['source'],
+    source: string,
     customTTL?: number,
   ): Promise<void> {
     try {
@@ -527,57 +496,15 @@ export class PriceService implements OnModuleInit {
     }
   }
 
-  private getCoingeckoOptions(): RequestInit {
-    const headers: HeadersInit = {
-      accept: 'application/json',
-    };
-
-    if (this.coingeckoApiKey) {
-      headers['x-cg-demo-api-key'] = this.coingeckoApiKey;
-    }
-
-    return {
-      method: 'GET',
-      headers,
-    };
-  }
-
-  private async rateLimitDelay(): Promise<void> {
-    const now = Date.now();
-    const timeSinceLastRequest = now - this.lastCoingeckoRequest;
-
-    if (timeSinceLastRequest < this.coingeckoDelay) {
-      const delay = this.coingeckoDelay - timeSinceLastRequest;
-      await new Promise((resolve) => setTimeout(resolve, delay));
-    }
-
-    this.lastCoingeckoRequest = Date.now();
-  }
-
-  private async getCoinGeckoHistoricalPrice(coinId: string, date: Date): Promise<number> {
-    await this.rateLimitDelay();
-
-    const dateString = date.toISOString().split('T')[0];
-    const url = `${this.coingeckoBaseUrl}/coins/${coinId}/history?date=${dateString}`;
-
-    const response = await fetch(url, this.getCoingeckoOptions());
-    if (!response.ok) {
-      throw new Error(`CoinGecko API error: ${response.status}`);
-    }
-
-    const data = await response.json();
-    return data.market_data?.current_price?.usd || 0;
-  }
-
   private handleSpecialCases(
     asset: { address: string; symbol: string; decimals: number },
     currentPrice: number,
   ): number {
     if ((asset.symbol === 'ETH' || asset.symbol === 'WETH') && currentPrice <= 1) {
-      return 2000;
+      return 3000;
     }
     if (asset.symbol === 'wstETH' && currentPrice <= 1) {
-      return 2200;
+      return 3200;
     }
     if (asset.symbol === 'WBTC' && currentPrice <= 1) {
       return 100000;
@@ -588,12 +515,13 @@ export class PriceService implements OnModuleInit {
     return currentPrice;
   }
 
-  private getPriceTTL(source: CachedPrice['source'], date: Date): number {
+  private getPriceTTL(source: string, date: Date): number {
     const daysDiff = Math.floor((Date.now() - date.getTime()) / DAY_IN_MS);
 
     if (source === 'hardcoded') return 7 * DAY_IN_SEC;
-    if (source === 'coingecko') return daysDiff > 30 ? 7 * DAY_IN_SEC : DAY_IN_SEC;
-    if (source === 'coingecko_fallback') return daysDiff > 7 ? 3 * DAY_IN_SEC : 12 * HOUR_IN_SEC;
+    if (source.includes('coingecko') && !source.includes('fallback'))
+      return daysDiff > 30 ? 7 * DAY_IN_SEC : DAY_IN_SEC;
+    if (source.includes('fallback')) return daysDiff > 7 ? 3 * DAY_IN_SEC : 12 * HOUR_IN_SEC;
 
     return DAY_IN_SEC;
   }
