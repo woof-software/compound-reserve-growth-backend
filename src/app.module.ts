@@ -1,10 +1,12 @@
 import { Module } from '@nestjs/common';
 import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { ConfigModule, ConfigService } from '@nestjs/config';
+import { MailerModule } from '@nestjs-modules/mailer';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { ScheduleModule } from '@nestjs/schedule';
 import { CacheModule } from '@nestjs/cache-manager';
-import { redisStore } from 'cache-manager-redis-yet';
+import { redisStore } from 'cache-manager-ioredis-yet';
+import Redis from 'ioredis';
 
 import { ContractModule } from 'modules/contract/contract.module';
 import { GithubModule } from 'modules/github/github.module';
@@ -15,13 +17,19 @@ import { HistoryModule } from 'modules/history/history.module';
 import { TreasuryModule } from 'modules/treasury/treasury.module';
 import { RevenueModule } from 'modules/revenue/revenue.module';
 import { PriceModule } from 'modules/price/price.module';
+import { RedisModule, REDIS_CLIENT } from 'modules/redis/redis.module';
+import { RunwayModule } from 'modules/runway/runway.module';
+import { MailModule } from 'modules/mail/mail.module';
+import { EventModule } from 'modules/event/event.module';
+import { CoinGeckoModule } from 'modules/price/providers/coingecko/coingecko.module';
 
 import { AppController } from './app.controller';
-import { getErrorMessage } from './common/utils/get-error-message';
 
 import appConfig from 'config/app';
 import databaseConfig from 'config/database';
 import networksConfig from 'config/networks.config';
+import redis from 'config/redis';
+import google from 'config/google';
 import { DatabaseModule } from 'database/database.module';
 import { Logger } from 'infrastructure/logger';
 import { ExceptionInterceptor } from 'infrastructure/http/interceptors/exception.interceptor';
@@ -30,103 +38,35 @@ import { ExceptionInterceptor } from 'infrastructure/http/interceptors/exception
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      load: [appConfig, databaseConfig, networksConfig],
+      load: [appConfig, databaseConfig, networksConfig, redis, google],
     }),
     ScheduleModule.forRoot(),
     ThrottlerModule.forRoot({
       throttlers: [
         {
-          ttl: 60000,
+          ttl: 1000,
           limit: 10,
         },
       ],
     }),
     CacheModule.registerAsync({
       isGlobal: true,
-      imports: [ConfigModule],
-      inject: [ConfigService],
-      useFactory: async (configService: ConfigService) => {
-        const logger = new Logger('RedisCache');
-
-        try {
-          // Get Redis configuration from environment
-          const redisHost = configService.get<string>('REDIS_HOST', 'localhost');
-          const redisPort = parseInt(configService.get<string>('REDIS_PORT', '6379'), 10);
-          const redisPassword = configService.get<string>('REDIS_PASSWORD');
-          const redisDb = parseInt(configService.get<string>('REDIS_DB', '0'), 10);
-          const redisTls = configService.get<string>('REDIS_TLS', 'false') === 'true';
-          const redisDefaultTtl = parseInt(
-            configService.get<string>('REDIS_DEFAULT_TTL', '86400'),
-            10,
-          );
-          const redisConnectionTimeout = parseInt(
-            configService.get<string>('REDIS_CONNECTION_TIMEOUT', '10000'),
-            10,
-          );
-
-          logger.log(`Connecting to Redis at ${redisHost}:${redisPort} (DB: ${redisDb})`);
-
-          // Create Redis store with configuration
-          const store = await redisStore({
-            ttl: redisDefaultTtl,
-            socket: {
-              host: redisHost,
-              port: redisPort,
-              connectTimeout: redisConnectionTimeout,
-              tls: redisTls, // Enable TLS if required
-            },
-            password: redisPassword,
-            database: redisDb,
-          });
-
-          // Set up error handling
-          store.client.on('error', (err) => {
-            const aggregateErrors =
-              err instanceof AggregateError ? err.errors.map(getErrorMessage) : [];
-            const reason = getErrorMessage(err);
-            logger.error(`Redis client error: ${JSON.stringify({ reason, aggregateErrors })}`);
-          });
-
-          store.client.on('connect', () => {
-            logger.log('Redis client connected successfully');
-          });
-
-          store.client.on('ready', () => {
-            logger.log('Redis client ready to accept commands');
-          });
-
-          store.client.on('end', () => {
-            logger.warn('Redis client connection ended');
-          });
-
-          store.client.on('reconnecting', () => {
-            logger.log('Redis client reconnecting...');
-          });
-
-          // Test connection
-          try {
-            await store.client.ping();
-            logger.log('Redis ping successful - cache store setup completed');
-          } catch (pingError) {
-            logger.warn(
-              `Redis ping failed: ${getErrorMessage(pingError)}, but continuing with setup`,
-            );
-          }
-
-          return {
-            store,
-            isGlobal: true,
-          };
-        } catch (err) {
-          const aggregateErrors =
-            err instanceof AggregateError ? err.errors.map(getErrorMessage) : [];
-          const reason = getErrorMessage(err);
-          logger.error(
-            `Failed to setup Redis cache store: ${JSON.stringify({ reason, aggregateErrors })}`,
-          );
-
-          throw new Error(`Redis cache setup failed: ${reason}`);
-        }
+      imports: [ConfigModule, RedisModule],
+      inject: [ConfigService, REDIS_CLIENT],
+      useFactory: async (cfg: ConfigService, client: Redis) => ({
+        store: redisStore,
+        redisInstance: client,
+        ttl: cfg.get<number>('redis.ttl'),
+      }),
+    }),
+    MailerModule.forRoot({
+      transport: {
+        host: 'in-v3.mailjet.com',
+        port: 587,
+        auth: {
+          user: process.env.MAILJET_USER,
+          pass: process.env.MAILJET_PASS,
+        },
       },
     }),
     DatabaseModule,
@@ -138,7 +78,11 @@ import { ExceptionInterceptor } from 'infrastructure/http/interceptors/exception
     HistoryModule,
     TreasuryModule,
     RevenueModule,
+    CoinGeckoModule,
     PriceModule,
+    RunwayModule,
+    MailModule,
+    EventModule,
   ],
   controllers: [AppController],
   providers: [

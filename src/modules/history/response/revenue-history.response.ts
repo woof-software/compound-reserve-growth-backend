@@ -1,33 +1,27 @@
 import { ApiProperty } from '@nestjs/swagger';
 
 import { History } from 'modules/history/history.entity';
-import { SourceResponse } from 'modules/source/response/source.response';
 
 export class RevenueHistoryResponse {
   @ApiProperty({ example: 1 })
   public id: number;
 
-  @ApiProperty({ type: SourceResponse })
-  public source: SourceResponse;
+  @ApiProperty({ example: 105.525, description: 'value - value in USD' })
+  public v: number;
 
-  @ApiProperty({ example: 20123456 })
-  public blockNumber: number;
+  @ApiProperty({ example: 1750809600, description: 'date - date in seconds since epoch' })
+  public d: number;
 
-  @ApiProperty({ example: 105.525 })
-  public value: number;
-
-  @ApiProperty({ example: 1750809600 })
-  public date: number;
-
-  @ApiProperty({ example: '2025-06-17T12:00:00Z' })
-  public createdAt: Date;
+  @ApiProperty({
+    example: 12,
+    description: 'sourceId - ID of the source that generated this history entry',
+  })
+  public sId: number;
 
   constructor(history: History) {
     this.id = history.id;
-    this.source = new SourceResponse(history.source);
-    this.blockNumber = history.blockNumber;
-    this.value = history.value;
-    this.date = new Date(history.date).getTime() / 1000;
-    this.createdAt = history.createdAt;
+    this.v = history.value;
+    this.d = new Date(history.date).getTime() / 1000;
+    this.sId = history.source.id;
   }
 }

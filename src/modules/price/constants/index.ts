@@ -1,38 +1,3 @@
-export const COINGECKO_MAPPINGS: Record<string, Record<string, string>> = {
-  mainnet: {
-    ETH: 'ethereum',
-    WETH: 'weth',
-    USDC: 'usd-coin',
-    USDT: 'tether',
-    DAI: 'dai',
-    WBTC: 'wrapped-bitcoin',
-    LINK: 'chainlink',
-    UNI: 'uniswap',
-    AAVE: 'aave',
-    YFI: 'yearn-finance',
-    MKR: 'maker',
-    COMP: 'compound-governance-token',
-    SUSHI: 'sushi',
-    BAT: 'basic-attention-token',
-    REP: 'augur',
-    ZRX: '0x',
-    TUSD: 'true-usd',
-    USDP: 'paxos-standard',
-    FEI: 'fei-usd',
-    wstETH: 'wrapped-steth',
-  },
-  arbitrum: { ETH: 'ethereum', WETH: 'weth', USDC: 'usd-coin', USDT: 'tether' },
-  base: {
-    ETH: 'ethereum',
-    WETH: 'weth',
-    USDC: 'usd-coin',
-    AERO: 'aerodrome-finance',
-    USDbC: 'usd-coin',
-  },
-  optimism: { ETH: 'ethereum', WETH: 'weth', USDC: 'usd-coin', USDT: 'tether' },
-  polygon: { USDC: 'usd-coin', USDT: 'tether' },
-};
-
 export const STABLECOIN_PRICES: Record<string, number> = {
   USDC: 1.0,
   USDT: 1.0,
@@ -43,4 +8,7 @@ export const STABLECOIN_PRICES: Record<string, number> = {
   TUSD: 1.0,
   USDP: 1.0,
   FEI: 1.0,
+  cUSDCv3: 1.0,
+  morphoUSDC: 1.0,
+  morphoUSDT: 1.0,
 };

@@ -19,6 +19,9 @@ export class Source {
   @Column({ nullable: true })
   public market: string;
 
+  @Column({ nullable: true })
+  public type: string;
+
   @Column()
   public algorithm: string;
 
@@ -47,6 +50,7 @@ export class Source {
     address: string,
     network: string,
     algorithm: string,
+    type: string,
     blockNumber: number,
     asset: Asset,
     market?: string,
@@ -54,6 +58,7 @@ export class Source {
     this.address = address;
     this.network = network;
     this.algorithm = algorithm;
+    this.type = type;
     this.blockNumber = blockNumber;
     this.asset = asset;
     this.market = market;

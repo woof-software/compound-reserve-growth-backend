@@ -36,7 +36,8 @@ export default registerAs('networks', (): NetworkConfig[] => [
   {
     network: 'unichain',
     chainId: 130,
-    url: `https://multi-boldest-patina.unichain-mainnet.quiknode.pro/${process.env.UNICHAIN_QUICKNODE_KEY}`,
+    url: `https://unichain.drpc.org`,
+    // url: `https://multi-boldest-patina.unichain-mainnet.quiknode.pro/${process.env.UNICHAIN_QUICKNODE_KEY}`,
   },
   {
     network: 'base',

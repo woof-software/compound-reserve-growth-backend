@@ -8,6 +8,7 @@ import { SourceService } from 'modules/source/source.service';
 import { Source } from 'modules/source/source.entity';
 import { sources } from 'modules/source/constants/sources';
 import { AssetService } from 'modules/asset/asset.service';
+import { SourceType } from 'modules/source/enum/source-type.enum';
 
 import { Algorithm } from '@app/common/enum/algorithm.enum';
 
@@ -68,6 +69,7 @@ export class SourceFillCommand extends CommandRunner {
               marketAddress,
               source.network,
               Algorithm.MARKET_V2,
+              SourceType.MARKET_V2,
               creationBlockNumber,
               marketAsset,
               symbol,
@@ -81,7 +83,8 @@ export class SourceFillCommand extends CommandRunner {
           (s) =>
             s.address === source.address &&
             s.network === source.network &&
-            s.algorithm === source.algorithm,
+            s.algorithm === source.algorithm &&
+            s.asset.address === source.asset.address,
         );
         if (existingSource) continue;
 
@@ -97,6 +100,7 @@ export class SourceFillCommand extends CommandRunner {
           source.address,
           source.network,
           source.algorithm,
+          source.type,
           source.creationBlockNumber,
           assetInDB,
         );
@@ -143,6 +147,7 @@ export class SourceFillCommand extends CommandRunner {
             marketData.cometAddress,
             marketData.network,
             Algorithm.COMET,
+            SourceType.MARKET_V3,
             creationBlockNumber,
             cometAsset,
             marketData.market,

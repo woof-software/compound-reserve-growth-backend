@@ -35,4 +35,7 @@ export class AssetService {
     if (!asset) throw new NotFoundException(`Asset with id ${id} not found`);
     return asset;
   }
+  async listAll(): Promise<Asset[]> {
+    return this.assetRepository.list();
+  }
 }

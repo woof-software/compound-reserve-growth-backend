@@ -1,39 +1,21 @@
 import { Logger } from '@nestjs/common';
 import { Command, CommandRunner } from 'nest-commander';
 
-import { ContractService } from 'modules/contract/contract.service';
-import { SourceService } from 'modules/source/source.service';
-
-import { Algorithm } from '@app/common/enum/algorithm.enum';
+import { GetHistoryService } from 'modules/history/cron/history-get.service';
 
 @Command({ name: 'history:get', description: 'Get history data by sources' })
 export class HistoryGetCommand extends CommandRunner {
   private readonly logger = new Logger(HistoryGetCommand.name);
 
-  constructor(
-    private readonly sourceService: SourceService,
-    private readonly contractService: ContractService,
-  ) {
+  constructor(private readonly getHistoryService: GetHistoryService) {
     super();
   }
 
   async run() {
     try {
-      this.logger.log('Starting to get history data...');
-
-      const dbSources = await this.sourceService.listAll();
-
-      for (const source of dbSources) {
-        const { algorithm } = source;
-        if (algorithm === Algorithm.COMET || algorithm === Algorithm.MARKET_V2) {
-          await this.contractService.getMarketHistory(source);
-        }
-      }
-
-      this.logger.log('Getting history data completed.');
-      return;
+      return this.getHistoryService.getHistory();
     } catch (error) {
-      this.logger.error('An error occurred while getting history data:', error);
+      this.logger.error('An error occurred while running getHistory command:', error);
       return;
     }
   }

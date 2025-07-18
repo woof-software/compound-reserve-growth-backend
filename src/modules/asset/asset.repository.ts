@@ -19,4 +19,8 @@ export class AssetRepository {
   async save(asset: Asset): Promise<Asset> {
     return this.repository.save(asset);
   }
+
+  async list(): Promise<Asset[]> {
+    return this.repository.find({ order: { id: 'ASC' } });
+  }
 }

@@ -1,5 +1,9 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsNotEmpty, IsString, IsOptional, IsNumber, IsInt } from 'class-validator';
+import { IsNotEmpty, IsString, IsOptional, IsNumber, IsInt, IsEnum } from 'class-validator';
+
+import { SourceType } from 'modules/source/enum/source-type.enum';
+
+import { Algorithm } from '@app/common/enum/algorithm.enum';
 
 export class CreateSourceRequest {
   @ApiProperty({ example: '0xabc123', description: 'Source address' })
@@ -17,10 +21,15 @@ export class CreateSourceRequest {
   @IsString()
   public network: string;
 
-  @ApiProperty({ example: 'subgraph', description: 'Algorithm used for reading' })
+  @ApiProperty({ example: Algorithm.MARKET_V2, description: 'Algorithm used for reading' })
   @IsNotEmpty()
-  @IsString()
-  public algorithm: string;
+  @IsEnum(Algorithm)
+  public algorithm: Algorithm;
+
+  @ApiProperty({ example: SourceType.MARKET_V3, description: 'Algorithm used for reading' })
+  @IsNotEmpty()
+  @IsEnum(SourceType)
+  public type: SourceType;
 
   @ApiProperty({ example: 19876543, description: 'Start block number' })
   @IsNotEmpty()
