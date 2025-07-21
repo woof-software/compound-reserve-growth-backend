@@ -43,7 +43,7 @@ export class ContractService implements OnModuleInit {
     base: { avgBlockTime: 2, blocksPerDay: 43200 },
     optimism: { avgBlockTime: 2, blocksPerDay: 43200 },
     polygon: { avgBlockTime: 2, blocksPerDay: 43200 },
-    linea: { avgBlockTime: 12, blocksPerDay: 7200 },
+    linea: { avgBlockTime: 2, blocksPerDay: 43200 },
     ronin: { avgBlockTime: 3, blocksPerDay: 28800 },
     scroll: { avgBlockTime: 3, blocksPerDay: 28800 },
     unichain: { avgBlockTime: 2, blocksPerDay: 43200 },
