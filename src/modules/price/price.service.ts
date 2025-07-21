@@ -45,20 +45,19 @@ export class PriceService implements OnModuleInit {
 
   async getHistoricalPrice(
     asset: { address: string; symbol: string; decimals: number },
-    network: string,
     date: Date,
   ): Promise<number> {
     // Check cache first
-    const cachedPrice = await this.getFromCache(network, asset.symbol, date);
+    const cachedPrice = await this.getFromCache(asset.symbol, date);
     if (cachedPrice) {
       this.logger.debug(
-        `Price cache HIT: ${asset.symbol} @ ${date.toISOString().slice(0, 10)} = $${cachedPrice.price}`,
+        `Price cache HIT: ${asset.symbol} @ ${date.toISOString().slice(0, 10)} = ${cachedPrice.price}`,
       );
       return cachedPrice.price;
     }
 
-    let price = 1;
-    let source = 'hardcoded';
+    let price: number | null = null;
+    let source = '';
 
     try {
       // Check if stablecoin
@@ -67,37 +66,44 @@ export class PriceService implements OnModuleInit {
         source = 'hardcoded';
       } else {
         // Try providers in order of preference
-        const result = await this.fetchPriceFromProviders(asset, network, date);
+        const result = await this.fetchPriceFromProviders(asset, date);
         if (result) {
           price = result.price;
           source = result.source;
         }
       }
 
-      // Handle special cases ONLY if no price was found
-      if (price <= 1 && !STABLECOIN_PRICES[asset.symbol]) {
-        price = this.handleSpecialCases(asset, price);
+      // If still no price found, throw error
+      if (price === null || price <= 0) {
+        throw new Error(
+          `No price data available for ${asset.symbol} on ${date.toISOString().slice(0, 10)}`,
+        );
       }
 
       // Cache the result
-      await this.setToCache(network, asset.symbol, date, price, source);
+      await this.setToCache(asset.symbol, date, price, source);
+      return price;
     } catch (error) {
-      this.logger.error(`Error getting price for ${asset.symbol}:`, error);
-      await this.setToCache(network, asset.symbol, date, price, 'hardcoded', 3600);
+      this.logger.error(
+        `Failed to get price for ${asset.symbol} on ${date.toISOString().slice(0, 10)}: ${error.message}`,
+      );
+      throw error;
     }
-
-    return price;
   }
 
   private async fetchPriceFromProviders(
     asset: { address: string; symbol: string; decimals: number },
-    network: string,
     date: Date,
   ): Promise<{ price: number; source: string } | null> {
     for (const [providerName, provider] of this.providers) {
       try {
-        const coinId = this.getCoinIdFromProvider(provider, network, asset.symbol);
-        if (!coinId) continue;
+        const coinId = this.getCoinIdFromProvider(provider, asset.symbol);
+        if (!coinId) {
+          this.logger.debug(
+            `No coinId mapping found for ${asset.symbol} in provider ${providerName}`,
+          );
+          continue;
+        }
 
         const result = await this.getExactOrNearestPrice(provider, coinId, date);
         if (result) {
@@ -112,13 +118,9 @@ export class PriceService implements OnModuleInit {
     return null;
   }
 
-  private getCoinIdFromProvider(
-    provider: PriceProviderInterface,
-    network: string,
-    symbol: string,
-  ): string | null {
+  private getCoinIdFromProvider(provider: PriceProviderInterface, symbol: string): string | null {
     const mappings = provider.getMappings();
-    return mappings[network]?.[symbol] || null;
+    return mappings[symbol] || null;
   }
 
   private async getExactOrNearestPrice(
@@ -127,6 +129,7 @@ export class PriceService implements OnModuleInit {
     date: Date,
   ): Promise<{ price: number; source: string } | null> {
     const providerName = provider.getProviderName();
+    const dateString = date.toISOString().slice(0, 10);
 
     // Calculate if the requested date is older than 1 year
     const oneYearAgo = new Date();
@@ -136,7 +139,7 @@ export class PriceService implements OnModuleInit {
     if (isOlderThanOneYear) {
       // For dates older than 1 year, use the earliest available price from the last year
       this.logger.debug(
-        `Date ${date.toISOString().slice(0, 10)} is older than 1 year, looking for earliest available price`,
+        `Date ${dateString} is older than 1 year, looking for earliest available price`,
       );
 
       // First ensure we have the yearly data loaded
@@ -157,9 +160,14 @@ export class PriceService implements OnModuleInit {
       } else {
         // If no cached price found, fetch the oldest available from provider
         if (provider instanceof CoinGeckoProviderService) {
-          const fallbackPrice = await provider.fetchOldestAvailablePrice(coinId);
-          if (fallbackPrice > 0) {
-            return { price: fallbackPrice, source: `${providerName}_fallback` };
+          try {
+            const fallbackPrice = await provider.fetchOldestAvailablePrice(coinId);
+            if (fallbackPrice > 0) {
+              this.logger.debug(`Provider fallback price for ${coinId}: ${fallbackPrice}`);
+              return { price: fallbackPrice, source: `${providerName}_fallback` };
+            }
+          } catch (error) {
+            this.logger.warn(`Provider fallback failed for ${coinId}: ${error.message}`);
           }
         }
       }
@@ -176,7 +184,7 @@ export class PriceService implements OnModuleInit {
       }
 
       // Check if exact date is in cache
-      const exactCached = await this.getFromCache('all', coinId, date);
+      const exactCached = await this.getFromCache(coinId, date);
       if (exactCached) {
         return { price: exactCached.price, source: exactCached.source };
       }
@@ -188,13 +196,11 @@ export class PriceService implements OnModuleInit {
           return { price: exactPrice, source: providerName };
         }
       } catch (error) {
-        this.logger.debug(
-          `Could not fetch exact price for ${coinId} on ${date.toISOString().slice(0, 10)}: ${error.message}`,
-        );
+        this.logger.warn(`Direct API call failed for ${coinId} on ${dateString}: ${error.message}`);
       }
 
       // Find nearest available price
-      const nearestPrice = await this.findNearestPrice('all', coinId, date);
+      const nearestPrice = await this.findNearestPrice(coinId, date);
       if (nearestPrice) {
         return { price: nearestPrice.price, source: `${providerName}_fallback` };
       }
@@ -230,7 +236,7 @@ export class PriceService implements OnModuleInit {
           latestDate = dateStr;
         }
 
-        const key = `price:all:${coinId}:${dateStr}`;
+        const key = `price:${coinId}:${dateStr}`;
         const cacheData: CachedPrice = {
           price,
           source: provider.getProviderName(),
@@ -241,7 +247,7 @@ export class PriceService implements OnModuleInit {
         if (pipeline) {
           pipeline.setex(key, ttl, JSON.stringify(cacheData));
         } else {
-          await this.setToCache('all', coinId, date, price, provider.getProviderName());
+          await this.setToCache(coinId, date, price, provider.getProviderName());
         }
       }
 
@@ -267,7 +273,7 @@ export class PriceService implements OnModuleInit {
       const metadata = await this.getMetadata(coinId);
       if (metadata?.earliestDate) {
         const earliestDate = new Date(metadata.earliestDate);
-        const cached = await this.getFromCache('all', coinId, earliestDate);
+        const cached = await this.getFromCache(coinId, earliestDate);
         if (cached) {
           this.logger.debug(
             `Found earliest price from metadata for ${coinId}: ${metadata.earliestDate} = ${cached.price}`,
@@ -278,7 +284,7 @@ export class PriceService implements OnModuleInit {
 
       // Use SCAN to find earliest cached price
       if (this.redisClient) {
-        const pattern = `price:all:${coinId}:*`;
+        const pattern = `price:${coinId}:*`;
         const stream = this.redisClient.scanStream({
           match: pattern,
           count: 100,
@@ -322,7 +328,7 @@ export class PriceService implements OnModuleInit {
       oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
       oneYearAgo.setUTCHours(0, 0, 0, 0);
 
-      const yearOldPrice = await this.getFromCache('all', coinId, oneYearAgo);
+      const yearOldPrice = await this.getFromCache(coinId, oneYearAgo);
       if (yearOldPrice) {
         return yearOldPrice;
       }
@@ -335,7 +341,6 @@ export class PriceService implements OnModuleInit {
   }
 
   private async findNearestPrice(
-    network: string,
     symbol: string,
     targetDate: Date,
     maxDaysForward: number = 30,
@@ -346,7 +351,7 @@ export class PriceService implements OnModuleInit {
         const nextDate = new Date(targetDate);
         nextDate.setUTCDate(nextDate.getUTCDate() + i);
 
-        const cached = await this.getFromCache(network, symbol, nextDate);
+        const cached = await this.getFromCache(symbol, nextDate);
         if (cached) {
           this.logger.debug(
             `Found nearest price for ${symbol}: ${i} days forward from ${targetDate.toISOString().slice(0, 10)}`,
@@ -360,7 +365,7 @@ export class PriceService implements OnModuleInit {
         const prevDate = new Date(targetDate);
         prevDate.setUTCDate(prevDate.getUTCDate() - i);
 
-        const cached = await this.getFromCache(network, symbol, prevDate);
+        const cached = await this.getFromCache(symbol, prevDate);
         if (cached) {
           this.logger.debug(
             `Found nearest price for ${symbol}: ${i} days backward from ${targetDate.toISOString().slice(0, 10)}`,
@@ -377,26 +382,24 @@ export class PriceService implements OnModuleInit {
   }
 
   // Helper methods
-  private async getFromCache(
-    network: string,
-    symbol: string,
-    date: Date,
-  ): Promise<CachedPrice | null> {
+  private async getFromCache(symbol: string, date: Date): Promise<CachedPrice | null> {
     try {
       const dateKey = date.toISOString().slice(0, 10);
-      const networkKey = `price:${network}:${symbol}:${dateKey}`;
-      let cached = await this.getCacheValue(networkKey);
+
+      // Try direct symbol cache first
+      const symbolKey = `price:${symbol}:${dateKey}`;
+      let cached = await this.getCacheValue(symbolKey);
 
       if (cached) {
         return JSON.parse(cached);
       }
 
-      // Try to find in global cache using any provider mapping
+      // Try to find using provider mapping
       for (const provider of this.providers.values()) {
-        const coinId = this.getCoinIdFromProvider(provider, network, symbol);
+        const coinId = this.getCoinIdFromProvider(provider, symbol);
         if (coinId) {
-          const globalKey = `price:all:${coinId}:${dateKey}`;
-          cached = await this.getCacheValue(globalKey);
+          const coinIdKey = `price:${coinId}:${dateKey}`;
+          cached = await this.getCacheValue(coinIdKey);
 
           if (cached) {
             return JSON.parse(cached);
@@ -423,7 +426,6 @@ export class PriceService implements OnModuleInit {
   }
 
   private async setToCache(
-    network: string,
     symbol: string,
     date: Date,
     price: number,
@@ -431,7 +433,7 @@ export class PriceService implements OnModuleInit {
     customTTL?: number,
   ): Promise<void> {
     try {
-      const key = `price:${network}:${symbol}:${date.toISOString().slice(0, 10)}`;
+      const key = `price:${symbol}:${date.toISOString().slice(0, 10)}`;
       const cacheData: CachedPrice = { price, source, timestamp: Date.now() };
       const ttl = customTTL || this.getPriceTTL(source, date);
 
@@ -496,25 +498,6 @@ export class PriceService implements OnModuleInit {
     }
   }
 
-  private handleSpecialCases(
-    asset: { address: string; symbol: string; decimals: number },
-    currentPrice: number,
-  ): number {
-    if ((asset.symbol === 'ETH' || asset.symbol === 'WETH') && currentPrice <= 1) {
-      return 3000;
-    }
-    if (asset.symbol === 'wstETH' && currentPrice <= 1) {
-      return 3200;
-    }
-    if (asset.symbol === 'WBTC' && currentPrice <= 1) {
-      return 100000;
-    }
-    if (currentPrice <= 0) {
-      return 1;
-    }
-    return currentPrice;
-  }
-
   private getPriceTTL(source: string, date: Date): number {
     const daysDiff = Math.floor((Date.now() - date.getTime()) / DAY_IN_MS);
 
@@ -526,13 +509,13 @@ export class PriceService implements OnModuleInit {
     return DAY_IN_SEC;
   }
 
-  async clearCache(network?: string): Promise<number> {
+  async clearCache(): Promise<number> {
     if (!this.redisClient) {
       this.logger.warn('Redis client not available for cache clearing');
       return 0;
     }
 
-    const pattern = network ? `price:${network}:*` : 'price:*';
+    const pattern = 'price:*';
 
     try {
       const stream = this.redisClient.scanStream({

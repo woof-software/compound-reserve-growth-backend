@@ -46,7 +46,7 @@ export class ContractService implements OnModuleInit {
     linea: { avgBlockTime: 2, blocksPerDay: 43200 },
     ronin: { avgBlockTime: 3, blocksPerDay: 28800 },
     scroll: { avgBlockTime: 3, blocksPerDay: 28800 },
-    unichain: { avgBlockTime: 2, blocksPerDay: 43200 },
+    unichain: { avgBlockTime: 1, blocksPerDay: 86400 },
   };
 
   // Arbitrum periods
@@ -514,7 +514,6 @@ export class ContractService implements OnModuleInit {
           const firstDate = new Date(firstMidnightUTC * 1000);
           await this.priceService.getHistoricalPrice(
             { address: asset.address, symbol: asset.symbol, decimals: asset.decimals },
-            network,
             firstDate,
           );
           this.logger.log(`Price data preloaded for ${asset.symbol}`);
@@ -526,7 +525,6 @@ export class ContractService implements OnModuleInit {
       }
 
       let processedCount = 0;
-      let priceErrors = 0;
       let skippedCount = 0;
 
       const ABI = algorithm === Algorithm.COMET ? CometABI : MarketV2ABI;
@@ -576,19 +574,19 @@ export class ContractService implements OnModuleInit {
           try {
             price = await this.priceService.getHistoricalPrice(
               { address: asset.address, symbol: asset.symbol, decimals: asset.decimals },
-              network,
               date,
             );
 
             if (price <= 0) {
-              this.logger.warn(`Suspicious price for ${symbol}: $${price}, using fallback`);
-              price = 1;
-              priceErrors++;
+              throw new Error(`Invalid price received: ${price}`);
             }
           } catch (priceError) {
-            this.logger.warn(`Price fetch failed for ${symbol}: ${priceError.message}`);
-            price = 1;
-            priceErrors++;
+            const message = `Price fetch failed for ${symbol} on ${date.toISOString().slice(0, 10)}: ${priceError.message}. Stopping to retry on next cron run.`;
+            this.logger.error(message);
+            await this.mailService.notifyGetHistoryError(message);
+
+            // Stop processing - will retry from this date on next cron run
+            return;
           }
 
           const quantity = ethers.formatUnits(reserves, decimals);
@@ -616,7 +614,7 @@ export class ContractService implements OnModuleInit {
 
           if (processedCount % 50 === 0) {
             this.logger.log(
-              `Progress: ${processedCount}/${dailyTs.length} days processed (${priceErrors} price errors, ${skippedCount} skipped)`,
+              `Progress: ${processedCount}/${dailyTs.length} days processed (${skippedCount} skipped)`,
             );
           }
         } catch (error) {
@@ -641,7 +639,7 @@ export class ContractService implements OnModuleInit {
         totalAttempted > 0 ? Math.round((processedCount / totalAttempted) * 100) : 0;
 
       this.logger.log(
-        `Completed: ${successRate}% success (${processedCount}/${totalAttempted} processed, ${skippedCount} skipped, ${priceErrors} price errors)`,
+        `Completed: ${successRate}% success (${processedCount}/${totalAttempted} processed, ${skippedCount} skipped)`,
       );
     } catch (error) {
       const message = `Error processing source ${source.id} on ${network} for contract ${contractAddress}, algorithm ${algorithm}, asset ${asset.symbol}: ${error.message}`;

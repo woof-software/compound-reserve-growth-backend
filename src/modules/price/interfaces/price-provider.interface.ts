@@ -3,7 +3,7 @@ export interface PriceProviderInterface {
 
   preloadPrices(coinId: string): Promise<void>;
 
-  getMappings(): Record<string, Record<string, string>>;
+  getMappings(): Record<string, string>;
 
   getProviderName(): string;
 }

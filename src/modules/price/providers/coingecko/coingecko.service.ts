@@ -29,15 +29,23 @@ export class CoinGeckoProviderService implements PriceProviderInterface {
     return 'coingecko';
   }
 
-  getMappings(): Record<string, Record<string, string>> {
+  getMappings(): Record<string, string> {
     return COINGECKO_MAPPINGS;
+  }
+
+  private formatDateForAPI(date: Date): string {
+    const day = date.getUTCDate().toString().padStart(2, '0');
+    const month = (date.getUTCMonth() + 1).toString().padStart(2, '0');
+    const year = date.getUTCFullYear();
+
+    return `${day}-${month}-${year}`;
   }
 
   async getHistoricalPrice(coinId: string, date: Date): Promise<number> {
     await this.rateLimitDelay();
 
-    const dateString = date.toISOString().split('T')[0];
-    const url = `${this.coingeckoBaseUrl}/coins/${coinId}/history?date=${dateString}`;
+    const formattedDate = this.formatDateForAPI(date);
+    const url = `${this.coingeckoBaseUrl}/coins/${coinId}/history?date=${formattedDate}`;
 
     const response = await fetch(url, this.getCoingeckoOptions());
     if (!response.ok) {
