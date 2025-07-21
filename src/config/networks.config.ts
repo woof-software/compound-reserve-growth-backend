@@ -21,7 +21,8 @@ export default registerAs('networks', (): NetworkConfig[] => [
   {
     network: 'polygon',
     chainId: 137,
-    url: `https://rpc.ankr.com/polygon/${process.env.ANKR_KEY}`,
+    url: `https://polygon.drpc.org`,
+    // url: `https://rpc.ankr.com/polygon/${process.env.ANKR_KEY}`,
   },
   {
     network: 'optimism',
