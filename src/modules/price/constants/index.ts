@@ -11,4 +11,5 @@ export const STABLECOIN_PRICES: Record<string, number> = {
   cUSDCv3: 1.0,
   morphoUSDC: 1.0,
   morphoUSDT: 1.0,
+  USDe: 1.0,
 };
