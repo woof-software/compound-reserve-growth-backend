@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 
 import { Source } from './source.entity';
+import { FindSourceDto } from './dto/find-source.dto';
 
 @Injectable()
 export class SourceRepository {
@@ -17,6 +18,11 @@ export class SourceRepository {
 
   async findByAddress(address: string): Promise<Source> {
     return this.sourceRepository.findOne({ where: { address } });
+  }
+  async findByAddressNetworkAndType(dto: FindSourceDto): Promise<Source> {
+    return this.sourceRepository.findOne({
+      where: { address: dto.address, network: dto.network, type: dto.type },
+    });
   }
 
   async list(): Promise<Source[]> {

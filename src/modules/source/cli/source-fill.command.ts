@@ -9,6 +9,7 @@ import { Source } from 'modules/source/source.entity';
 import { sources } from 'modules/source/constants/sources';
 import { AssetService } from 'modules/asset/asset.service';
 import { SourceType } from 'modules/source/enum/source-type.enum';
+import { AssetType } from 'modules/asset/enum/asset-type.enum';
 
 import { Algorithm } from '@app/common/enum/algorithm.enum';
 
@@ -119,13 +120,53 @@ export class SourceFillCommand extends CommandRunner {
           const response = await axios.get(rawUrl, { responseType: 'json' });
           const rootObj = response.data;
           const marketData = await this.contractService.readMarketData(rootObj, path);
-          const existingSource = dbSources.find(
+
+          if (marketData.rewardsAddress) {
+            const existingRewardSource = await this.sourceService.findByAddressNetworkAndType({
+              address: marketData.rewardsAddress,
+              network: marketData.network,
+              type: SourceType.REWARDS,
+            });
+            if (!existingRewardSource) {
+              const compTokenAddress = await this.contractService.getRewardsCompToken(
+                marketData.rewardsAddress,
+                marketData.cometAddress,
+                marketData.network,
+                marketData.provider,
+              );
+
+              const compAsset = await this.assetService.findOrCreate({
+                address: compTokenAddress,
+                network: marketData.network,
+                decimals: 18,
+                symbol: 'COMP',
+                type: AssetType.COMP,
+              });
+
+              const creationBlockNumber = await this.contractService.getContractCreationBlock(
+                marketData.rewardsAddress,
+                marketData.network,
+              );
+
+              const newRewardSource = new Source(
+                marketData.rewardsAddress,
+                marketData.network,
+                Algorithm.REWARDS,
+                SourceType.REWARDS,
+                creationBlockNumber,
+                compAsset,
+              );
+              await this.sourceService.createWithAsset(newRewardSource);
+            }
+          }
+
+          const existingCometSource = dbSources.find(
             (source) =>
               source.address === marketData.cometAddress &&
               source.network === marketData.network &&
               source.algorithm === Algorithm.COMET,
           );
-          if (existingSource) continue;
+          if (existingCometSource) continue;
           const creationBlockNumber = await this.contractService.getContractCreationBlock(
             marketData.cometAddress,
             marketData.network,
