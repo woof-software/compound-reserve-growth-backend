@@ -1,3 +1,5 @@
+import { ethers } from 'ethers';
+
 export interface RootJson {
   comet: string; // Comet contract address
   configurator: string; // Configurator contract address
@@ -49,4 +51,6 @@ export interface MarketData {
   network: string;
   market: string;
   cometAddress: string;
+  rewardsAddress?: string; // optional, if not present, rewards are not used
+  provider: ethers.JsonRpcProvider;
 }

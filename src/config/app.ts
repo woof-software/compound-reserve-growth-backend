@@ -12,6 +12,7 @@ export type TAppConfig = {
   apiDocumentation: boolean;
   logLevel: string;
   emailTo: string;
+  cron: string;
 };
 
 export default (): { app: TAppConfig } => {
@@ -34,6 +35,7 @@ export default (): { app: TAppConfig } => {
       emailTo:
         process.env.EMAIL_TO ||
         'dmitriy@woof.software,stas.b@woof.software,stanislav.k@woof.software',
+      cron: process.env.CRON || '2 12 * * *', // Every day at 12:02 UTC
     },
   };
 };

@@ -18,6 +18,8 @@ import CometABI from './abi/CometABI.json';
 import CometExtensionABI from './abi/CometExtensionABI.json';
 import ComptrollerABI from './abi/ComptrollerABI.json';
 import MarketV2ABI from './abi/MarketV2ABI.json';
+import RewardsABI from './abi/RewardsABI.json';
+import LegacyRewardsABI from './abi/LegacyRewardsABI.json';
 import ERC20ABI from './abi/ERC20ABI.json';
 import Bytes32TokenABI from './abi/Bytes32TokenABI.json';
 import { MarketData, RootJson } from './contract.type';
@@ -126,10 +128,14 @@ export class ContractService implements OnModuleInit {
 
     const cometSymbol = await extensionDelegateContract.symbol();
 
+    const rewardsAddress = root.rewards || '';
+
     return {
       network: networkKey,
       market: cometSymbol,
       cometAddress,
+      rewardsAddress,
+      provider,
     };
   }
 
@@ -256,6 +262,21 @@ export class ContractService implements OnModuleInit {
       );
       throw error;
     }
+  }
+
+  async getRewardsCompToken(
+    rewardsAddress: string,
+    cometAddress: string,
+    network: string,
+    provider: ethers.JsonRpcProvider,
+  ) {
+    const legacyNetworks = ['mainnet', 'polygon'];
+    const rewardsABI = legacyNetworks.includes(network) ? LegacyRewardsABI : RewardsABI;
+    const rewardsContract = new ethers.Contract(rewardsAddress, rewardsABI, provider) as any;
+
+    const rewardConfig = await rewardsContract.rewardConfig(cometAddress);
+    const tokenAddress = rewardConfig[0];
+    return tokenAddress;
   }
 
   // ==================== BLOCK CACHE METHODS ====================

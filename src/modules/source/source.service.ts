@@ -11,6 +11,7 @@ import { CreateSourceWithAssetDto } from './dto/create-source-with-asset.dto';
 import { UpdateWithSourceDto } from './dto/update-with-source.dto';
 import { SourcesWithAssetsResponse } from './response/sourcesWithAssets.response';
 import { SourceResponse } from './response/source.response';
+import { FindSourceDto } from './dto/find-source.dto';
 
 @Injectable()
 export class SourceService {
@@ -63,6 +64,10 @@ export class SourceService {
 
   async findById(id: number): Promise<Source> {
     return this.sourceRepository.findById(id);
+  }
+
+  async findByAddressNetworkAndType(dto: FindSourceDto): Promise<Source> {
+    return this.sourceRepository.findByAddressNetworkAndType(dto);
   }
 
   async listAll(): Promise<Source[]> {

@@ -10,4 +10,5 @@ export enum SourceType {
   IMMUNEFI_BUG_BOUNTY_PROGRAM = 'Immunefi Bug Bounty Program',
   WOOF_PAYMENT_STREAM_CONTRACT = 'WOOF Payment Stream Contract',
   OPENZEPPELIN_PAYMENT_STREAM_CONTRACT = 'OpenZeppelin Payment Stream Contract',
+  REWARDS = 'Rewards',
 }
