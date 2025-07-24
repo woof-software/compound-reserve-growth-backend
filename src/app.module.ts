@@ -22,6 +22,7 @@ import { RunwayModule } from 'modules/runway/runway.module';
 import { MailModule } from 'modules/mail/mail.module';
 import { EventModule } from 'modules/event/event.module';
 import { CoinGeckoModule } from 'modules/price/providers/coingecko/coingecko.module';
+import { CapoModule } from 'modules/capo/capo.module';
 
 import { AppController } from './app.controller';
 
@@ -83,6 +84,7 @@ import { ExceptionInterceptor } from 'infrastructure/http/interceptors/exception
     RunwayModule,
     MailModule,
     EventModule,
+    CapoModule,
   ],
   controllers: [AppController],
   providers: [

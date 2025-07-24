@@ -1,0 +1,77 @@
+services:
+  db:
+    image: postgres:17
+    shm_size: 4g
+    ports:
+      - "${DB_PORT}:5432"
+    environment:
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - "./pg-db:/var/lib/postgres"
+
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: pgadmin
+    restart: unless-stopped
+    ports:
+      - "5050:80"
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@example.com
+      PGADMIN_DEFAULT_PASSWORD: supersecret
+    depends_on:
+      - db
+
+  redis:
+    container_name: redis
+    image: 'redis:6.2.6-alpine'
+    restart: always
+    volumes:
+      - redis_data:/data
+    ports:
+      - '${REDIS_PORT}:6379'
+    environment:
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+    command: sh -c 'exec redis-server --requirepass "$$REDIS_PASSWORD"'
+    healthcheck:
+      test: [ 'CMD', 'redis-cli', '--raw', 'incr', 'ping' ]
+      interval: 1s
+      timeout: 3s
+      retries: 10
+
+#  migrate:
+#    build:
+#      dockerfile: ".docker/Dockerfile"
+#      context: .
+#      target: build
+#    command: ["npm", "run", "mikro-orm", "migration:up"]
+#    volumes:
+#      - ./migrations:/code/migrations:delegated
+#    depends_on:
+#      - db
+#    env_file:
+#      - ".env"
+
+#  app:
+#    build:
+#      dockerfile: ".docker/Dockerfile"
+#      context: .
+#      target: develop
+#    env_file:
+#      - ".env"
+#    volumes:
+#      - ./src:/code/src:delegated
+#      - ./migrations:/code/migrations:delegated
+#      - ./package.json:/code/package.json:delegated
+#      - ./package-lock.json:/code/package-lock.json:delegated
+#    ports:
+#      - "3000:3000"
+#    depends_on:
+#      - db
+
+volumes:
+  pg-db:
+  redis_data:
+    name: redis_data
+    driver: local

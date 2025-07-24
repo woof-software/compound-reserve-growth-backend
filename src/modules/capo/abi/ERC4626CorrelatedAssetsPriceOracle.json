@@ -1,0 +1,510 @@
+[
+    {
+        "inputs": [
+            {
+                "internalType": "address",
+                "name": "_manager",
+                "type": "address"
+            },
+            {
+                "internalType": "contract AggregatorV3Interface",
+                "name": "_baseAggregatorAddress",
+                "type": "address"
+            },
+            {
+                "internalType": "address",
+                "name": "_ratioProviderAddress",
+                "type": "address"
+            },
+            {
+                "internalType": "string",
+                "name": "_description",
+                "type": "string"
+            },
+            {
+                "internalType": "uint8",
+                "name": "_priceFeedDecimals",
+                "type": "uint8"
+            },
+            {
+                "internalType": "uint48",
+                "name": "_minimumSnapshotDelay",
+                "type": "uint48"
+            },
+            {
+                "components": [
+                    {
+                        "internalType": "uint256",
+                        "name": "snapshotRatio",
+                        "type": "uint256"
+                    },
+                    {
+                        "internalType": "uint48",
+                        "name": "snapshotTimestamp",
+                        "type": "uint48"
+                    },
+                    {
+                        "internalType": "uint32",
+                        "name": "maxYearlyRatioGrowthPercent",
+                        "type": "uint32"
+                    }
+                ],
+                "internalType": "struct PriceCapAdapterBase.PriceCapSnapshot",
+                "name": "_priceCapSnapshot",
+                "type": "tuple"
+            }
+        ],
+        "stateMutability": "nonpayable",
+        "type": "constructor"
+    },
+    {
+        "inputs": [],
+        "name": "InvalidAddress",
+        "type": "error"
+    },
+    {
+        "inputs": [],
+        "name": "InvalidCheckpointDuration",
+        "type": "error"
+    },
+    {
+        "inputs": [],
+        "name": "InvalidInt256",
+        "type": "error"
+    },
+    {
+        "inputs": [
+            {
+                "internalType": "uint48",
+                "name": "timestamp",
+                "type": "uint48"
+            }
+        ],
+        "name": "InvalidRatioTimestamp",
+        "type": "error"
+    },
+    {
+        "inputs": [],
+        "name": "ManagerIsZeroAddress",
+        "type": "error"
+    },
+    {
+        "inputs": [],
+        "name": "OnlyManager",
+        "type": "error"
+    },
+    {
+        "inputs": [
+            {
+                "internalType": "uint256",
+                "name": "snapshotRatio",
+                "type": "uint256"
+            },
+            {
+                "internalType": "uint32",
+                "name": "maxYearlyRatioGrowthPercent",
+                "type": "uint32"
+            }
+        ],
+        "name": "SnapshotCloseToOverflow",
+        "type": "error"
+    },
+    {
+        "inputs": [],
+        "name": "SnapshotRatioIsZero",
+        "type": "error"
+    },
+    {
+        "anonymous": false,
+        "inputs": [
+            {
+                "indexed": true,
+                "internalType": "address",
+                "name": "newManager",
+                "type": "address"
+            }
+        ],
+        "name": "NewManager",
+        "type": "event"
+    },
+    {
+        "anonymous": false,
+        "inputs": [
+            {
+                "indexed": true,
+                "internalType": "uint256",
+                "name": "newMinimumSnapshotDelay",
+                "type": "uint256"
+            }
+        ],
+        "name": "NewMinimumSnapshotDelay",
+        "type": "event"
+    },
+    {
+        "anonymous": false,
+        "inputs": [
+            {
+                "indexed": true,
+                "internalType": "uint256",
+                "name": "snapshotRatio",
+                "type": "uint256"
+            },
+            {
+                "indexed": false,
+                "internalType": "uint256",
+                "name": "snapshotTimestamp",
+                "type": "uint256"
+            },
+            {
+                "indexed": true,
+                "internalType": "uint256",
+                "name": "maxRatioGrowthPerSecond",
+                "type": "uint256"
+            },
+            {
+                "indexed": true,
+                "internalType": "uint32",
+                "name": "maxYearlyRatioGrowthPercent",
+                "type": "uint32"
+            }
+        ],
+        "name": "NewPriceCapSnapshot",
+        "type": "event"
+    },
+    {
+        "inputs": [],
+        "name": "BASIS_POINTS",
+        "outputs": [
+            {
+                "internalType": "uint256",
+                "name": "",
+                "type": "uint256"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [],
+        "name": "GROWTH_RATIO_SCALE",
+        "outputs": [
+            {
+                "internalType": "uint256",
+                "name": "",
+                "type": "uint256"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [],
+        "name": "SECONDS_PER_YEAR",
+        "outputs": [
+            {
+                "internalType": "uint256",
+                "name": "",
+                "type": "uint256"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [],
+        "name": "VERSION",
+        "outputs": [
+            {
+                "internalType": "uint256",
+                "name": "",
+                "type": "uint256"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [],
+        "name": "assetToBaseAggregator",
+        "outputs": [
+            {
+                "internalType": "contract AggregatorV3Interface",
+                "name": "",
+                "type": "address"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [],
+        "name": "decimals",
+        "outputs": [
+            {
+                "internalType": "uint8",
+                "name": "",
+                "type": "uint8"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [],
+        "name": "description",
+        "outputs": [
+            {
+                "internalType": "string",
+                "name": "",
+                "type": "string"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [],
+        "name": "getRatio",
+        "outputs": [
+            {
+                "internalType": "int256",
+                "name": "",
+                "type": "int256"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [],
+        "name": "isCapped",
+        "outputs": [
+            {
+                "internalType": "bool",
+                "name": "",
+                "type": "bool"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [],
+        "name": "lastSnapshotUpdateTimestamp",
+        "outputs": [
+            {
+                "internalType": "uint256",
+                "name": "",
+                "type": "uint256"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [],
+        "name": "latestRoundData",
+        "outputs": [
+            {
+                "internalType": "uint80",
+                "name": "roundId",
+                "type": "uint80"
+            },
+            {
+                "internalType": "int256",
+                "name": "answer",
+                "type": "int256"
+            },
+            {
+                "internalType": "uint256",
+                "name": "startedAt",
+                "type": "uint256"
+            },
+            {
+                "internalType": "uint256",
+                "name": "updatedAt",
+                "type": "uint256"
+            },
+            {
+                "internalType": "uint80",
+                "name": "answeredInRound",
+                "type": "uint80"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [],
+        "name": "manager",
+        "outputs": [
+            {
+                "internalType": "address",
+                "name": "",
+                "type": "address"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [],
+        "name": "maxRatioGrowthPerSecond",
+        "outputs": [
+            {
+                "internalType": "uint256",
+                "name": "",
+                "type": "uint256"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [],
+        "name": "maxYearlyRatioGrowthPercent",
+        "outputs": [
+            {
+                "internalType": "uint32",
+                "name": "",
+                "type": "uint32"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [],
+        "name": "minimumSnapshotDelay",
+        "outputs": [
+            {
+                "internalType": "uint48",
+                "name": "",
+                "type": "uint48"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [],
+        "name": "ratioDecimals",
+        "outputs": [
+            {
+                "internalType": "uint8",
+                "name": "",
+                "type": "uint8"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [],
+        "name": "ratioProvider",
+        "outputs": [
+            {
+                "internalType": "address",
+                "name": "",
+                "type": "address"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [
+            {
+                "internalType": "address",
+                "name": "newManager",
+                "type": "address"
+            }
+        ],
+        "name": "setManager",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+    },
+    {
+        "inputs": [
+            {
+                "internalType": "uint48",
+                "name": "newMinimumSnapshotDelay",
+                "type": "uint48"
+            }
+        ],
+        "name": "setMinimumSnapshotDelay",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+    },
+    {
+        "inputs": [],
+        "name": "snapshotRatio",
+        "outputs": [
+            {
+                "internalType": "uint256",
+                "name": "",
+                "type": "uint256"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [],
+        "name": "snapshotTimestamp",
+        "outputs": [
+            {
+                "internalType": "uint48",
+                "name": "",
+                "type": "uint48"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [
+            {
+                "components": [
+                    {
+                        "internalType": "uint256",
+                        "name": "snapshotRatio",
+                        "type": "uint256"
+                    },
+                    {
+                        "internalType": "uint48",
+                        "name": "snapshotTimestamp",
+                        "type": "uint48"
+                    },
+                    {
+                        "internalType": "uint32",
+                        "name": "maxYearlyRatioGrowthPercent",
+                        "type": "uint32"
+                    }
+                ],
+                "internalType": "struct PriceCapAdapterBase.PriceCapSnapshot",
+                "name": "priceCapParams",
+                "type": "tuple"
+            }
+        ],
+        "name": "updateSnapshot",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+    },
+    {
+        "inputs": [],
+        "name": "version",
+        "outputs": [
+            {
+                "internalType": "uint256",
+                "name": "",
+                "type": "uint256"
+            }
+        ],
+        "stateMutability": "pure",
+        "type": "function"
+    }
+]
