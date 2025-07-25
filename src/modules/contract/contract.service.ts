@@ -567,7 +567,7 @@ export class ContractService implements OnModuleInit {
                 reserves = await contract.totalReserves({ blockTag });
                 break;
               default:
-                if (asset.symbol === 'ETH') {
+                if (asset.symbol === 'ETH' || asset.symbol === 'MNT') {
                   reserves = await provider.getBalance(contractAddress, blockTag);
                 } else {
                   reserves = await assetContract.balanceOf(contractAddress, { blockTag });

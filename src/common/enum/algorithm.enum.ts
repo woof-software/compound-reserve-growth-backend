@@ -11,4 +11,6 @@ export enum Algorithm {
   WOOF_PAYMENT_STREAM_CONTRACT = 'woof_payment_stream_contract',
   OPENZEPPELIN_PAYMENT_STREAM_CONTRACT = 'openzeppelin_payment_stream_contract',
   REWARDS = 'rewards',
+  MANTLE = 'mantle',
+  DELEGATE_RACE = 'delegate_race',
 }
