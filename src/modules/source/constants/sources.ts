@@ -489,7 +489,7 @@ export const sources = [
   },
   {
     algorithm: Algorithm.DELEGATE_RACE,
-    address: ' 0x59dC38b5CEe74ca7189394eddAf5A13611DF0B63',
+    address: '0x59dC38b5CEe74ca7189394eddAf5A13611DF0B63',
     network: 'mainnet',
     type: SourceType.DELEGATE_RACE,
     creationBlockNumber: 20661215,
@@ -503,7 +503,7 @@ export const sources = [
   },
   {
     algorithm: Algorithm.DELEGATE_RACE,
-    address: ' 0xe8B2B94612240d57D830944a668E4e48eDF9F9D8',
+    address: '0xe8B2B94612240d57D830944a668E4e48eDF9F9D8',
     network: 'mainnet',
     type: SourceType.DELEGATE_RACE,
     creationBlockNumber: 20661215,
@@ -517,7 +517,7 @@ export const sources = [
   },
   {
     algorithm: Algorithm.DELEGATE_RACE,
-    address: ' 0xEC8604670F07dB6E40f84147F4297b7f58775350',
+    address: '0xEC8604670F07dB6E40f84147F4297b7f58775350',
     network: 'mainnet',
     type: SourceType.DELEGATE_RACE,
     creationBlockNumber: 20661215,
@@ -531,7 +531,7 @@ export const sources = [
   },
   {
     algorithm: Algorithm.DELEGATE_RACE,
-    address: ' 0x603657fDEc47a9dF15A5661cE011E13C0D449982',
+    address: '0x603657fDEc47a9dF15A5661cE011E13C0D449982',
     network: 'mainnet',
     type: SourceType.DELEGATE_RACE,
     creationBlockNumber: 20661215,
@@ -545,7 +545,7 @@ export const sources = [
   },
   {
     algorithm: Algorithm.DELEGATE_RACE,
-    address: '  0x1543D57471A5F168cBabb5922246a77013c9d2E4',
+    address: '0x1543D57471A5F168cBabb5922246a77013c9d2E4',
     network: 'mainnet',
     type: SourceType.DELEGATE_RACE,
     creationBlockNumber: 20661215,
