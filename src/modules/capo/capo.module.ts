@@ -6,7 +6,6 @@ import { SourceModule } from 'modules/source/source.module';
 import { MailModule } from 'modules/mail/mail.module';
 
 import { OracleService } from './oracle.service';
-import { MockOracleService } from './mock-oracle.service';
 import { CapoController } from './capo.controller';
 import { CapoService } from './capo.service';
 import { DiscoveryService } from './discovery.service';
@@ -25,17 +24,13 @@ import { TelegramService } from './telegram.service';
     TypeOrmModule.forFeature([Oracle, Snapshot, DailyAggregation, Alert]),
   ],
   controllers: [CapoController],
-  providers:
-    process.env.MOCK_CAPO === 'true'
-      ? [
-          CapoService,
-          DiscoveryService,
-          MockOracleService,
-          { provide: OracleService, useExisting: MockOracleService },
-          AlertService,
-          TelegramService,
-        ]
-      : [CapoService, DiscoveryService, OracleService, AlertService, TelegramService],
+  providers: [
+    CapoService,
+    DiscoveryService,
+    OracleService,
+    AlertService,
+    TelegramService,
+  ],
   exports: [DiscoveryService],
 })
 export class CapoModule {}

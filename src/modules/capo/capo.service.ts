@@ -257,4 +257,9 @@ export class CapoService implements OnModuleInit {
       totalCount: snapshots.length,
     });
   }
+
+  async listDailyAggregations(oracleAddress?: string): Promise<DailyAggregation[]> {
+    const where = oracleAddress ? { oracleAddress } : {};
+    return this.aggregationRepository.find({ where, order: { date: 'DESC' } });
+  }
 }

@@ -91,7 +91,11 @@ export class MockOracleService {
       currentGrowthRate,
       maxGrowthRate,
       isCapped: oracleData.isCapped,
-      utilizationPercent: this.calculateUtilization(oracleData.ratio, maxRatio.toString()),
+      utilizationPercent: this.calculateUtilization(
+        oracleData.snapshotRatio,
+        oracleData.ratio,
+        maxRatio.toString(),
+      ),
     };
   }
 
@@ -135,13 +139,18 @@ export class MockOracleService {
     return Number(annualizedGrowth) / 10000;
   }
 
-  private calculateUtilization(currentRatio: string, maxRatio: string): number {
+  private calculateUtilization(
+    snapshotRatio: string,
+    currentRatio: string,
+    maxRatio: string,
+  ): number {
+    const snapshot = BigInt(snapshotRatio);
     const current = BigInt(currentRatio);
     const max = BigInt(maxRatio);
 
-    if (max === 0n) return 0;
+    if (max <= snapshot) return 0;
 
-    const utilization = (current * 10000n) / max;
+    const utilization = ((current - snapshot) * 10000n) / (max - snapshot);
     return Number(utilization) / 100;
   }
 }

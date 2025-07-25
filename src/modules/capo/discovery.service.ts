@@ -41,23 +41,88 @@ export class DiscoveryService implements OnModuleInit {
   ) {}
 
   async onModuleInit() {
-    if (process.env.MOCK_CAPO === 'true') {
-      await this.oracleRepository.upsert(
-        {
-          address: '0x1111111111111111111111111111111111111111',
-          chainId: 1,
-          network: 'mainnet',
-          description: 'Mock CAPO',
-          maxYearlyRatioGrowthPercent: 500,
-          snapshotRatio: '1000000000000000000',
-          snapshotTimestamp: Math.floor(Date.now() / 1_000),
-          decimals: 18,
-          isActive: true,
-        },
-        ['address'],
-      );
-    }
-    this.logger.log('DiscoveryService initialized');
+    // if (process.env.MOCK_CAPO === 'true') {
+    //   await this.oracleRepository.upsert(
+    //     {
+    //       address: '0x1111111111111111111111111111111111111111',
+    //       chainId: 1,
+    //       network: 'mainnet',
+    //       description: 'Mock CAPO',
+    //       maxYearlyRatioGrowthPercent: 500,
+    //       snapshotRatio: '1000000000000000000',
+    //       snapshotTimestamp: Math.floor(Date.now() / 1_000),
+    //       decimals: 18,
+    //       isActive: true,
+    //     },
+    //     ['address'],
+    //   );
+    // }
+    // this.logger.log('DiscoveryService initialized');
+    // // Ensure the standalone wstETH/USD CAPO oracle is tracked even though
+    // // it does not belong to any Comet market yet.
+    // const standaloneOracleAddress = '0xdd5b1151ef4808137b0b6e80765192b62968e643'.toLowerCase();
+
+    // try {
+    //   await this.oracleRepository.upsert(
+    //     {
+    //       address: standaloneOracleAddress,
+    //       chainId: 1,
+    //       network: 'mainnet',
+    //       description: 'wstETH / USD Oracle',
+    //       isActive: true,
+    //     },
+    //     ['address'],
+    //   );
+    //   // Fetch any missing on-chain data (snapshotRatio, decimals, etc.)
+    //   const oracleRow = await this.oracleRepository.findOne({
+    //     where: { address: standaloneOracleAddress },
+    //   });
+
+    //   if (oracleRow && (!oracleRow.snapshotRatio || !oracleRow.decimals)) {
+    //     try {
+    //       const provider = this.providerFactory.get('mainnet');
+    //       const oracleContract = new ethers.Contract(standaloneOracleAddress, CapoABI, provider);
+
+    //       const [
+    //         snapshotRatioBn,
+    //         snapshotTimestampBn,
+    //         decimals,
+    //         minDelay,
+    //         ratioProvider,
+    //         baseAgg,
+    //         maxYearlyRatioGrowthPercent,
+    //         snapshotTimestamp,
+    //       ] = await Promise.all([
+    //         oracleContract.snapshotRatio(),
+    //         oracleContract.snapshotTimestamp(),
+    //         oracleContract.decimals(),
+    //         oracleContract.minimumSnapshotDelay(),
+    //         oracleContract.ratioProvider(),
+    //         oracleContract.assetToBaseAggregator(),
+    //         oracleContract.maxYearlyRatioGrowthPercent(),
+    //         oracleContract.snapshotTimestamp(),
+    //       ]);
+
+    //       oracleRow.snapshotRatio = snapshotRatioBn.toString();
+    //       oracleRow.snapshotTimestamp = Number(snapshotTimestampBn);
+    //       oracleRow.decimals = Number(decimals);
+    //       oracleRow.minimumSnapshotDelay = Number(minDelay);
+    //       oracleRow.ratioProvider = ratioProvider.toLowerCase();
+    //       oracleRow.baseAggregator = baseAgg.toLowerCase();
+    //       oracleRow.maxYearlyRatioGrowthPercent = Number(maxYearlyRatioGrowthPercent);
+    //       oracleRow.snapshotTimestamp = Number(snapshotTimestamp);
+
+    //       await this.oracleRepository.save(oracleRow);
+    //       this.logger.log(`Oracle ${standaloneOracleAddress} initialised from on-chain data`);
+    //     } catch (e) {
+    //       this.logger.warn(`Could not fetch on-chain oracle data: ${e.message}`);
+    //     }
+    //   }
+
+    //   this.logger.log(`Standalone oracle ${standaloneOracleAddress} upserted`);
+    // } catch (e) {
+    //   this.logger.error(`Failed to upsert standalone oracle: ${e.message}`);
+    // }
     await this.syncFromSources();
     this.logger.log('Initial discovery completed');
   }
