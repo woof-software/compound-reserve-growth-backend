@@ -1,14 +1,14 @@
 import { Injectable, OnModuleInit, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, Between } from 'typeorm';
+import { Repository } from 'typeorm';
 import { Cron, CronExpression } from '@nestjs/schedule';
 
-import { Snapshot } from './entities/snapshot.entity';
-import { DailyAggregation } from './entities/daily.entity';
-import { Oracle } from './entities/oracle.entity';
-import { OracleService } from './oracle.service';
-import { DiscoveryService } from './discovery.service';
-import { AlertService } from './alert.service';
+import { Snapshot } from './snapshot.entity';
+import { DailyAggregation } from './daily.entity';
+import { Oracle } from '../oracle/oracle.entity';
+import { OracleService } from '../oracle/oracle.service';
+import { DiscoveryService } from '../oracle/discovery.service';
+import { AlertService } from '../alert/alert.service';
 
 @Injectable()
 export class CapoService implements OnModuleInit {
@@ -188,39 +188,66 @@ export class CapoService implements OnModuleInit {
   async aggregateDailyData() {
     this.logger.log('Starting daily aggregation...');
 
-    const yesterday = new Date();
-    yesterday.setDate(yesterday.getDate() - 1);
-    yesterday.setHours(0, 0, 0, 0);
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - 1);
+    startDate.setHours(0, 0, 0, 0);
 
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const endDate = new Date(startDate);
+    endDate.setDate(startDate.getDate() + 1);
 
-    const oracles = await this.oracleRepository.find();
+    const results = await this.snapshotRepository
+      .createQueryBuilder('snapshot')
+      .select([
+        'snapshot.oracleAddress as "oracleAddress"',
+        'snapshot.oracleName as "oracleName"',
+        'snapshot.chainId as "chainId"',
+        'AVG(CAST(snapshot.ratio AS DECIMAL(78,0))) as "avgRatio"',
+        'MIN(CAST(snapshot.ratio AS DECIMAL(78,0))) as "minRatio"',
+        'MAX(CAST(snapshot.ratio AS DECIMAL(78,0))) as "maxRatio"',
+        'AVG(CAST(snapshot.price AS DECIMAL(78,0))) as "avgPrice"',
+        'MIN(CAST(snapshot.price AS DECIMAL(78,0))) as "minPrice"',
+        'MAX(CAST(snapshot.price AS DECIMAL(78,0))) as "maxPrice"',
+        'COUNT(CASE WHEN snapshot.isCapped = true THEN 1 END) as "cappedCount"',
+        'COUNT(*) as "totalCount"',
+      ])
+      .where('snapshot.timestamp >= :startDate', { startDate })
+      .andWhere('snapshot.timestamp < :endDate', { endDate })
+      .andWhere('snapshot.ratio IS NOT NULL')
+      .andWhere('snapshot.price IS NOT NULL')
+      .andWhere("snapshot.ratio != ''")
+      .andWhere("snapshot.price != ''")
+      .groupBy('snapshot.oracleAddress')
+      .addGroupBy('snapshot.oracleName')
+      .addGroupBy('snapshot.chainId')
+      .having('COUNT(*) > 0')
+      .orderBy('snapshot.oracleAddress', 'ASC')
+      .getRawMany();
 
-    for (const oracle of oracles) {
+    for (const row of results) {
       try {
-        const snapshots = await this.snapshotRepository.find({
-          where: {
-            oracleAddress: oracle.address,
-            timestamp: Between(yesterday, today),
-          },
+        const aggregation = this.aggregationRepository.create({
+          oracleAddress: row.oracleAddress,
+          oracleName: row.oracleName,
+          chainId: row.chainId,
+          date: startDate,
+          avgRatio: row.avgRatio,
+          minRatio: row.minRatio,
+          maxRatio: row.maxRatio,
+          avgPrice: row.avgPrice,
+          minPrice: row.minPrice,
+          maxPrice: row.maxPrice,
+          cappedCount: Number(row.cappedCount ?? 0),
+          totalCount: Number(row.totalCount ?? 0),
         });
 
-        if (snapshots.length === 0) {
-          this.logger.log(
-            `No snapshots found for ${oracle.description} on ${yesterday.toISOString().split('T')[0]}`,
-          );
-          continue;
-        }
-
-        const aggregation = this.calculateAggregation(oracle, snapshots, yesterday);
         await this.aggregationRepository.save(aggregation);
-
-        this.logger.log(`Aggregated ${snapshots.length} snapshots for ${oracle.description}`);
+        this.logger.log(`Saved aggregation for oracle ${row.oracleAddress}`);
       } catch (error) {
-        this.logger.error(`Failed to aggregate data for ${oracle.description}:`, error);
+        this.logger.error(`Failed to save aggregation for oracle ${row.oracleAddress}:`, error);
       }
     }
+
+    this.logger.log(`Daily aggregation complete. Processed ${results.length} oracles.`);
   }
 
   private calculateAggregation(

@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 
-import { Oracle } from './entities/oracle.entity';
+import { Oracle } from './oracle.entity';
 
 export interface MockOracleData {
   ratio: string;
@@ -128,15 +128,17 @@ export class MockOracleService {
     const snapshot = BigInt(snapshotRatio);
     const current = BigInt(currentRatio);
 
-    if (snapshot === 0n) return 0;
+    if (snapshot === 0n || current <= snapshot) return 0;
 
-    const BASIS_POINTS = 10000n;
-    const SECONDS_PER_YEAR = 365n * 24n * 60n * 60n;
+    const diff = Number(current - snapshot);
+    const snap = Number(snapshot);
 
-    const growth = ((current - snapshot) * BASIS_POINTS) / snapshot;
-    const annualizedGrowth = (growth * SECONDS_PER_YEAR) / BigInt(timeDiff);
+    const growthFraction = diff / snap;
 
-    return Number(annualizedGrowth) / 10000;
+    const SECONDS_PER_YEAR = 365 * 24 * 60 * 60;
+    const annualisedFraction = (growthFraction / timeDiff) * SECONDS_PER_YEAR;
+
+    return annualisedFraction * 100;
   }
 
   private calculateUtilization(

@@ -4,7 +4,7 @@ import { ethers } from 'ethers';
 import { ProviderFactory } from 'modules/network/provider.factory';
 import CapoABI from 'modules/capo/abi/ERC4626CorrelatedAssetsPriceOracle.json';
 
-import { Oracle } from './entities/oracle.entity';
+import { Oracle } from './oracle.entity';
 
 interface OracleData {
   ratio: string;
@@ -30,21 +30,12 @@ export class OracleService {
 
       const currentBlock = await provider.getBlock('latest');
 
-      const [
-        latestRoundData,
-        ratio,
-        isCapped,
-        snapshotRatio,
-        snapshotTimestamp,
-        maxYearlyGrowthPercent,
-      ] = await Promise.all([
-        oracleContract.latestRoundData(),
-        oracleContract.getRatio(),
-        oracleContract.isCapped(),
-        oracleContract.snapshotRatio(),
-        oracleContract.snapshotTimestamp(),
-        oracleContract.maxYearlyRatioGrowthPercent(),
-      ]);
+      const latestRoundData = await oracleContract.latestRoundData();
+      const ratio = await oracleContract.getRatio();
+      const isCapped = await oracleContract.isCapped();
+      const snapshotRatio = await oracleContract.snapshotRatio();
+      const snapshotTimestamp = await oracleContract.snapshotTimestamp();
+      const maxYearlyGrowthPercent = await oracleContract.maxYearlyRatioGrowthPercent();
 
       const price = latestRoundData.answer;
 
@@ -73,22 +64,14 @@ export class OracleService {
       if (!block) {
         throw new Error(`Block ${blockNumber} not found`);
       }
-
-      const [
-        latestRoundData,
-        ratio,
-        isCapped,
-        snapshotRatio,
-        snapshotTimestamp,
-        maxYearlyGrowthPercent,
-      ] = await Promise.all([
-        oracleContract.latestRoundData({ blockTag: blockNumber }),
-        oracleContract.getRatio({ blockTag: blockNumber }),
-        oracleContract.isCapped({ blockTag: blockNumber }),
-        oracleContract.snapshotRatio({ blockTag: blockNumber }),
-        oracleContract.snapshotTimestamp({ blockTag: blockNumber }),
-        oracleContract.maxYearlyRatioGrowthPercent({ blockTag: blockNumber }),
-      ]);
+      const latestRoundData = await oracleContract.latestRoundData({ blockTag: blockNumber });
+      const ratio = await oracleContract.getRatio({ blockTag: blockNumber });
+      const isCapped = await oracleContract.isCapped({ blockTag: blockNumber });
+      const snapshotRatio = await oracleContract.snapshotRatio({ blockTag: blockNumber });
+      const snapshotTimestamp = await oracleContract.snapshotTimestamp({ blockTag: blockNumber });
+      const maxYearlyGrowthPercent = await oracleContract.maxYearlyRatioGrowthPercent({
+        blockTag: blockNumber,
+      });
 
       const price = latestRoundData.answer;
 
@@ -169,15 +152,17 @@ export class OracleService {
     const snapshot = BigInt(snapshotRatio);
     const current = BigInt(currentRatio);
 
-    if (snapshot === 0n) return 0;
+    if (snapshot === 0n || current <= snapshot) return 0;
 
-    const BASIS_POINTS = 10000n;
-    const SECONDS_PER_YEAR = 365n * 24n * 60n * 60n;
+    const diff = Number(current - snapshot);
+    const snap = Number(snapshot);
 
-    const growth = ((current - snapshot) * BASIS_POINTS) / snapshot;
-    const annualizedGrowth = (growth * SECONDS_PER_YEAR) / BigInt(timeDiff);
+    const growthFraction = diff / snap;
 
-    return Number(annualizedGrowth) / 10000;
+    const SECONDS_PER_YEAR = 365 * 24 * 60 * 60;
+    const annualisedFraction = (growthFraction / timeDiff) * SECONDS_PER_YEAR;
+
+    return annualisedFraction * 100;
   }
 
   private calculateUtilization(

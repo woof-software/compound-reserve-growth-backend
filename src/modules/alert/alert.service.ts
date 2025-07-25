@@ -6,7 +6,7 @@ import { ConfigService } from '@nestjs/config';
 import { MailService } from 'modules/mail/mail.service';
 
 import { TelegramService } from './telegram.service';
-import { Alert } from './entities/alert.entity';
+import { Alert } from './alert.entity';
 
 @Injectable()
 export class AlertService {

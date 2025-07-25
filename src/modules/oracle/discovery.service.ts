@@ -12,7 +12,7 @@ import CapoABI from 'modules/capo/abi/ERC4626CorrelatedAssetsPriceOracle.json';
 
 import { Algorithm } from 'common/enum/algorithm.enum';
 
-import { Oracle } from './entities/oracle.entity';
+import { Oracle } from './oracle.entity';
 
 interface CapoOracleInfo {
   address: string;
@@ -58,8 +58,7 @@ export class DiscoveryService implements OnModuleInit {
     //   );
     // }
     // this.logger.log('DiscoveryService initialized');
-    // // Ensure the standalone wstETH/USD CAPO oracle is tracked even though
-    // // it does not belong to any Comet market yet.
+
     // const standaloneOracleAddress = '0xdd5b1151ef4808137b0b6e80765192b62968e643'.toLowerCase();
 
     // try {
@@ -72,8 +71,7 @@ export class DiscoveryService implements OnModuleInit {
     //       isActive: true,
     //     },
     //     ['address'],
-    //   );
-    //   // Fetch any missing on-chain data (snapshotRatio, decimals, etc.)
+
     //   const oracleRow = await this.oracleRepository.findOne({
     //     where: { address: standaloneOracleAddress },
     //   });
@@ -234,25 +232,15 @@ export class DiscoveryService implements OnModuleInit {
         return null;
       }
 
-      const [
-        description,
-        ratioProvider,
-        baseAggregator,
-        manager,
-        snapshotRatio,
-        snapshotTimestamp,
-        minimumSnapshotDelay,
-        decimals,
-      ] = await Promise.all([
-        oracleContract.description(),
-        oracleContract.ratioProvider(),
-        oracleContract.assetToBaseAggregator(),
-        oracleContract.manager(),
-        oracleContract.snapshotRatio(),
-        oracleContract.snapshotTimestamp(),
-        oracleContract.minimumSnapshotDelay(),
-        oracleContract.decimals(),
-      ]);
+      // Sequential RPC calls to avoid excessive parallel requests
+      const description = await oracleContract.description();
+      const ratioProvider = await oracleContract.ratioProvider();
+      const baseAggregator = await oracleContract.assetToBaseAggregator();
+      const manager = await oracleContract.manager();
+      const snapshotRatio = await oracleContract.snapshotRatio();
+      const snapshotTimestamp = await oracleContract.snapshotTimestamp();
+      const minimumSnapshotDelay = await oracleContract.minimumSnapshotDelay();
+      const decimals = await oracleContract.decimals();
 
       const oracleInfo: CapoOracleInfo = {
         address: oracleAddress,
