@@ -21,7 +21,8 @@
     "migration:show": "npm run typeorm -- migration:show -d ./src/database/typeorm.config.ts",
     "cli:source-fill": "nest build && node dist/src/cli.js source:fill",
     "cli:history-get": "nest build && node dist/src/cli.js history:get",
-    "cli:event-fill": "nest build && node dist/src/cli.js event:fill"
+    "cli:event-fill": "nest build && node dist/src/cli.js event:fill",
+    "cli:price-preload": "nest build && node dist/src/cli.js price:preload"
   },
   "dependencies": {
     "@nestjs-modules/mailer": "^2.0.2",
