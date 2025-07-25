@@ -31,6 +31,9 @@ export class RunwayResponse {
   @ApiProperty({ description: 'End date', example: '2/2/2025' })
   endDate: string;
 
+  @ApiProperty({ description: 'Proposal link', example: 'https://example.com/proposal/1' })
+  proposalLink: string;
+
   constructor(
     type: string,
     name: string,
@@ -42,6 +45,7 @@ export class RunwayResponse {
     paymentType: string,
     startDate: string,
     endDate: string,
+    proposalLink: string,
   ) {
     this.type = type;
     this.name = name;
@@ -53,5 +57,6 @@ export class RunwayResponse {
     this.paymentType = paymentType;
     this.startDate = startDate;
     this.endDate = endDate;
+    this.proposalLink = proposalLink;
   }
 }

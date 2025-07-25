@@ -55,6 +55,7 @@ export class RunwayService {
         paymentType: row[7] || '',
         startDate: row[8] || '',
         endDate: row[9] || '',
+        proposalLink: row[10] || '',
       }));
 
       return parsedData;
