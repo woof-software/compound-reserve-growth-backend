@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
+import { ethers } from 'ethers';
 
 import { History } from './history.entity';
 import { PaginationDto } from './dto/pagination.dto';
@@ -122,12 +123,13 @@ export class HistoryRepository {
     Object.values(sourceGroups).forEach((sourceHistory) => {
       sourceHistory.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
-      const originalValues = sourceHistory.map((item) => item.value);
       for (let i = 1; i < sourceHistory.length; i++) {
-        const currentOriginal = originalValues[i];
-        const previousOriginal = originalValues[i - 1];
-        const difference = currentOriginal - previousOriginal;
-        sourceHistory[i].value = difference;
+        const currentOriginalQuantity = BigInt(sourceHistory[i].quantity);
+        const previousOriginalQuantity = BigInt(sourceHistory[i - 1].quantity);
+        const difference = currentOriginalQuantity - previousOriginalQuantity;
+        sourceHistory[i].value =
+          Number(ethers.formatUnits(difference, sourceHistory[i].source.asset.decimals)) *
+          sourceHistory[i].price;
       }
     });
 
@@ -172,12 +174,13 @@ export class HistoryRepository {
     Object.values(sourceGroups).forEach((sourceHistory) => {
       sourceHistory.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
-      const originalValues = sourceHistory.map((item) => item.value);
       for (let i = 1; i < sourceHistory.length; i++) {
-        const currentOriginal = originalValues[i];
-        const previousOriginal = originalValues[i - 1];
-        const difference = currentOriginal - previousOriginal;
-        sourceHistory[i].value = difference;
+        const currentOriginalQuantity = BigInt(sourceHistory[i].quantity);
+        const previousOriginalQuantity = BigInt(sourceHistory[i - 1].quantity);
+        const difference = currentOriginalQuantity - previousOriginalQuantity;
+        sourceHistory[i].value =
+          Number(ethers.formatUnits(difference, sourceHistory[i].source.asset.decimals)) *
+          sourceHistory[i].price;
       }
     });
 
