@@ -31,4 +31,5 @@ export const COINGECKO_MAPPINGS: Record<string, string> = {
   WPOL: 'wmatic',
   compPOL: 'wmatic',
   WRON: 'ronin',
+  MNT: 'mantle',
 };

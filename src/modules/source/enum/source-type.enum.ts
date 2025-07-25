@@ -11,4 +11,6 @@ export enum SourceType {
   WOOF_PAYMENT_STREAM_CONTRACT = 'WOOF Payment Stream Contract',
   OPENZEPPELIN_PAYMENT_STREAM_CONTRACT = 'OpenZeppelin Payment Stream Contract',
   REWARDS = 'Rewards',
+  MANTLE = 'Mantle',
+  DELEGATE_RACE = 'Delegate Race',
 }
