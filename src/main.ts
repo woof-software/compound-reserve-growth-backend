@@ -22,7 +22,7 @@ async function bootstrap() {
 
   if (appConfig.apiDocumentation) {
     const config = new DocumentBuilder()
-      .setTitle('Compound Reserve Growth API project')
+      .setTitle('Compound Reserve Growth API project ')
       .setDescription('Compound Reserve Growth API project REST API documentation')
       .setVersion('1.0.0')
       .addTag('Compound Reserve Growth API project documentation')
