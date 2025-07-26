@@ -193,8 +193,8 @@ export class CoinGeckoProviderService implements PriceProviderInterface {
   }
 
   getMaxHistoryDays(): number {
-    // Pro API can get 5 years of data, demo/free can get 1 year
-    return this.coingeckoApiType === 'pro' ? 5 * 365 : 365;
+    // Pro API can get 6 years of data, demo/free can get 1 year
+    return this.coingeckoApiType === 'pro' ? 6 * 365 : 365;
   }
 
   supportsSymbol(symbol: string): boolean {
