@@ -3,12 +3,13 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Cron, CronExpression } from '@nestjs/schedule';
 
+import { Oracle } from 'modules/oracle/oracle.entity';
+import { OracleService } from 'modules/oracle/oracle.service';
+import { DiscoveryService } from 'modules/oracle/discovery.service';
+import { AlertService } from 'modules/alert/alert.service';
+
 import { Snapshot } from './snapshot.entity';
 import { DailyAggregation } from './daily.entity';
-import { Oracle } from '../oracle/oracle.entity';
-import { OracleService } from '../oracle/oracle.service';
-import { DiscoveryService } from '../oracle/discovery.service';
-import { AlertService } from '../alert/alert.service';
 
 @Injectable()
 export class CapoService implements OnModuleInit {
@@ -27,12 +28,12 @@ export class CapoService implements OnModuleInit {
   ) {}
 
   async onModuleInit() {
-    this.logger.log('CapoService initialized');
-    await this.discoveryService.syncFromSources();
-    await this.collectOracleData();
+    // this.logger.log('CapoService initialized');
+    // await this.discoveryService.syncFromSources();
+    // await this.collectOracleData();
   }
 
-  @Cron(CronExpression.EVERY_MINUTE)
+  // @Cron(CronExpression.EVERY_MINUTE)
   async collectOracleData() {
     this.logger.log('Starting oracle data collection...');
 

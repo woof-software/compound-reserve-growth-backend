@@ -20,18 +20,18 @@ export class HistoryGetCron implements OnModuleInit {
   onModuleInit() {
     const cronExpression = this.configService.get<TAppConfig>('app').cron;
 
-    const job = new CronJob(
-      cronExpression,
-      async () => {
-        await this.getHistoryTask();
-      },
-      null,
-      false,
-      'UTC',
-    );
+    // const job = new CronJob(
+    //   cronExpression,
+    //   async () => {
+    //     await this.getHistoryTask();
+    //   },
+    //   null,
+    //   false,
+    //   'UTC',
+    // );
 
-    this.schedulerRegistry.addCronJob('getHistory', job);
-    job.start();
+    // this.schedulerRegistry.addCronJob('getHistory', job);
+    // job.start();
   }
 
   async getHistoryTask() {
