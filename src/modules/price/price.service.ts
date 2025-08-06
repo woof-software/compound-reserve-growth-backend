@@ -327,7 +327,7 @@ export class PriceService implements OnModuleInit {
       normalizedDate.setUTCHours(0, 0, 0, 0);
 
       const priceEntity = new Price(symbol, price, normalizedDate);
-      await this.priceRepository.save(priceEntity);
+      await this.priceRepository.saveToDatabase(priceEntity);
       this.logger.debug(
         `Saved price to DB: ${symbol} @ ${normalizedDate.toISOString().slice(0, 10)} = ${price}`,
       );
