@@ -45,7 +45,7 @@ export class ContractService implements OnModuleInit {
     base: { avgBlockTime: 2, blocksPerDay: 43200 },
     optimism: { avgBlockTime: 2, blocksPerDay: 43200 },
     polygon: { avgBlockTime: 2, blocksPerDay: 43200 },
-    linea: { avgBlockTime: 2, blocksPerDay: 43200 },
+    linea: { avgBlockTime: 2.5, blocksPerDay: 34560 },
     ronin: { avgBlockTime: 3, blocksPerDay: 28800 },
     scroll: { avgBlockTime: 3, blocksPerDay: 28800 },
     unichain: { avgBlockTime: 1, blocksPerDay: 86400 },
@@ -374,7 +374,8 @@ export class ContractService implements OnModuleInit {
     // Check accuracy
     const estimatedBlockData = await this.getCachedBlock(network, provider, estimatedBlock);
 
-    if (Math.abs(estimatedBlockData.timestamp - targetTs) < 3600) {
+    const slip = network === 'linea' ? 600 : 3600; // 10 minutes for Linea, 1 hour for others
+    if (Math.abs(estimatedBlockData.timestamp - targetTs) < slip) {
       return estimatedBlock;
     }
 
