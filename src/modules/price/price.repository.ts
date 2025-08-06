@@ -12,6 +12,19 @@ export class PriceRepository {
     return this.priceRepository.save(price);
   }
 
+  async saveToDatabase(price: Price): Promise<Price> {
+    // Use insert with orIgnore for consistency with saveBatch
+    await this.priceRepository
+      .createQueryBuilder()
+      .insert()
+      .into(Price)
+      .values(price)
+      .orIgnore() // Ignore duplicates if they exist
+      .execute();
+
+    return price;
+  }
+
   async saveBatch(prices: Price[]): Promise<Price[]> {
     if (prices.length === 0) return [];
 
