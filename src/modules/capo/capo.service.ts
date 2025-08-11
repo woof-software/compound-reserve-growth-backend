@@ -15,6 +15,8 @@ import { DailyAggregation } from './daily.entity';
 export class CapoService implements OnModuleInit {
   private readonly logger = new Logger(CapoService.name);
 
+  private isCollecting = false;
+
   constructor(
     @InjectRepository(Snapshot)
     private snapshotRepository: Repository<Snapshot>,
@@ -28,13 +30,18 @@ export class CapoService implements OnModuleInit {
   ) {}
 
   async onModuleInit() {
-    // this.logger.log('CapoService initialized');
-    // await this.discoveryService.syncFromSources();
-    // await this.collectOracleData();
+    this.logger.log('CapoService initialized');
+    await this.discoveryService.syncFromSources();
+    await this.collectOracleData();
   }
 
-  // @Cron(CronExpression.EVERY_MINUTE)
+  @Cron(CronExpression.EVERY_MINUTE)
   async collectOracleData() {
+    if(this.isCollecting) {
+      this.logger.warn('Data collection already in progress, skipping this run');
+      return;
+    }
+    this.isCollecting = true;
     this.logger.log('Starting oracle data collection...');
 
     const oracles = await this.oracleRepository.find({ where: { isActive: true } });
@@ -134,6 +141,8 @@ export class CapoService implements OnModuleInit {
         },
       );
     }
+
+    this.isCollecting = false;
   }
 
   private async check24hPriceGrowth(oracle: Oracle, currentData: any) {
@@ -249,41 +258,6 @@ export class CapoService implements OnModuleInit {
     }
 
     this.logger.log(`Daily aggregation complete. Processed ${results.length} oracles.`);
-  }
-
-  private calculateAggregation(
-    oracle: Oracle,
-    snapshots: Snapshot[],
-    date: Date,
-  ): DailyAggregation {
-    const ratios = snapshots.map((s) => BigInt(s.ratio));
-    const prices = snapshots.map((s) => BigInt(s.price));
-
-    const avgRatio = ratios.reduce((a, b) => a + b, 0n) / BigInt(ratios.length);
-    const avgPrice = prices.reduce((a, b) => a + b, 0n) / BigInt(prices.length);
-
-    const minRatio = ratios.reduce((a, b) => (a < b ? a : b));
-    const maxRatio = ratios.reduce((a, b) => (a > b ? a : b));
-
-    const minPrice = prices.reduce((a, b) => (a < b ? a : b));
-    const maxPrice = prices.reduce((a, b) => (a > b ? a : b));
-
-    const cappedCount = snapshots.filter((s) => s.isCapped).length;
-
-    return this.aggregationRepository.create({
-      oracleAddress: oracle.address,
-      oracleName: oracle.description,
-      chainId: oracle.chainId,
-      date,
-      avgRatio: avgRatio.toString(),
-      minRatio: minRatio.toString(),
-      maxRatio: maxRatio.toString(),
-      avgPrice: avgPrice.toString(),
-      minPrice: minPrice.toString(),
-      maxPrice: maxPrice.toString(),
-      cappedCount,
-      totalCount: snapshots.length,
-    });
   }
 
   async listDailyAggregations(oracleAddress?: string): Promise<DailyAggregation[]> {
