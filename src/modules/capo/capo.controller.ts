@@ -11,7 +11,7 @@ export class CapoController {
   constructor(private readonly capoService: CapoService) {}
 
   @Throttle({ default: { limit: 15, ttl: 1000 } })
-  @ApiOperation({ summary: 'Get runway data' })
+  @ApiOperation({ summary: 'Get daily CAPO aggragetion' })
   @ApiResponse({ type: [DailyAggregation] })
   @HttpCode(HttpStatus.OK)
   @Get('daily')
