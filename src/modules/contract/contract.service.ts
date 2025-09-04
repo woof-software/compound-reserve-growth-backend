@@ -23,17 +23,18 @@ import LegacyRewardsABI from './abi/LegacyRewardsABI.json';
 import ERC20ABI from './abi/ERC20ABI.json';
 import Bytes32TokenABI from './abi/Bytes32TokenABI.json';
 import { MarketData, RootJson } from './contract.type';
+import { CachedBlock, ResponseAlgorithm } from './interface';
 
-import { DAY_IN_SEC, SEC_IN_MS, YEAR_IN_DAYS, YEAR_IN_SECONDS } from '@app/common/constants';
+import {
+  DAY_IN_SEC,
+  PERCENT_PRECISION_SCALE_BI,
+  SEC_IN_MS,
+  YEAR_IN_DAYS,
+  YEAR_IN_SECONDS,
+} from '@app/common/constants';
 import { Algorithm } from '@app/common/enum/algorithm.enum';
 import { scaleToDecimals } from '@app/common/utils/scale-to-decimals';
-
-interface CachedBlock {
-  blockNumber: number;
-  timestamp: number;
-  hash: string;
-  cachedAt: number;
-}
+import { percentToFp } from '@app/common/utils/percent-to-fp';
 
 @Injectable()
 export class ContractService implements OnModuleInit {
@@ -483,6 +484,126 @@ export class ContractService implements OnModuleInit {
     return this.arbitrumPeriods[this.arbitrumPeriods.length - 1];
   }
 
+  private getMarketAccounting(
+    reserves: bigint,
+    totalSupply: bigint,
+    totalBorrows: bigint,
+    earnApr: number,
+    borrowApr: number,
+    supplyCompRewards: number,
+    borrowCompRewards: number,
+  ): ResponseAlgorithm {
+    const borrowIncome =
+      (totalBorrows * percentToFp(borrowApr)) / (100n * PERCENT_PRECISION_SCALE_BI);
+    const borrowSpend =
+      (totalBorrows * percentToFp(borrowCompRewards)) / (100n * PERCENT_PRECISION_SCALE_BI);
+    const supplyIncome = (totalSupply * percentToFp(earnApr)) / (100n * PERCENT_PRECISION_SCALE_BI);
+    const supplySpend =
+      (totalSupply * percentToFp(supplyCompRewards)) / (100n * PERCENT_PRECISION_SCALE_BI);
+
+    return {
+      reserves,
+      incomes: { supply: supplyIncome, borrow: borrowIncome },
+      spends: { supply: supplySpend, borrow: borrowSpend },
+    };
+  }
+
+  private async cometAlgorithms(
+    contract: ethers.Contract,
+    blockTag: number,
+    decimals: number,
+  ): Promise<ResponseAlgorithm> {
+    const reserves: bigint = await contract.getReserves({ blockTag });
+    const totalSupply: bigint = await contract.totalSupply({ blockTag });
+    const totalBorrows: bigint = await contract.totalBorrow({ blockTag });
+    const utilization: bigint = await contract.utilization({ blockTag });
+    const supplyRatePerSec: bigint = await contract.getSupplyRate(utilization, { blockTag });
+    const borrowRatePerSec: bigint = await contract.getBorrowRate(utilization, { blockTag });
+    const earnApr = Number(
+      ethers.formatUnits(supplyRatePerSec * BigInt(YEAR_IN_SECONDS) * 100n, decimals),
+    );
+    const borrowApr = Number(
+      ethers.formatUnits(borrowRatePerSec * BigInt(YEAR_IN_SECONDS) * 100n, decimals),
+    );
+    const baseTrackingSupplySpeed: bigint = await contract.baseTrackingSupplySpeed({
+      blockTag,
+    });
+    const baseTrackingBorrowSpeed: bigint = await contract.baseTrackingBorrowSpeed({
+      blockTag,
+    });
+    const trackingIndexScale: bigint = await contract.trackingIndexScale({ blockTag });
+    const trackingIndexDecimals = scaleToDecimals(trackingIndexScale);
+    const supplyCompRewards = Number(
+      ethers.formatUnits(
+        baseTrackingSupplySpeed * BigInt(YEAR_IN_SECONDS) * 100n,
+        trackingIndexDecimals,
+      ),
+    );
+    const borrowCompRewards = Number(
+      ethers.formatUnits(
+        baseTrackingBorrowSpeed * BigInt(YEAR_IN_SECONDS) * 100n,
+        trackingIndexDecimals,
+      ),
+    );
+
+    return this.getMarketAccounting(
+      reserves,
+      totalSupply,
+      totalBorrows,
+      earnApr,
+      borrowApr,
+      supplyCompRewards,
+      borrowCompRewards,
+    );
+  }
+
+  private async marketV2Algorithms(
+    contract: ethers.Contract,
+    blockTag: number,
+    decimals: number,
+    provider: ethers.JsonRpcProvider,
+    contractAddress: string,
+    network: string,
+  ): Promise<ResponseAlgorithm> {
+    const reserves = await contract.totalReserves({ blockTag });
+    const totalSupply = await contract.totalSupply({ blockTag });
+    const totalBorrows = await contract.totalBorrows({ blockTag });
+    const supplyRatePerBlock: bigint = await contract.supplyRatePerBlock({ blockTag });
+    const borrowRatePerBlock: bigint = await contract.borrowRatePerBlock({ blockTag });
+    const networkConf = this.networkConfig[network];
+    const blocksPerYear = BigInt(networkConf.blocksPerDay) * BigInt(YEAR_IN_DAYS);
+    const earnApr = Number(ethers.formatUnits(supplyRatePerBlock * blocksPerYear * 100n, decimals));
+    const borrowApr = Number(
+      ethers.formatUnits(borrowRatePerBlock * blocksPerYear * 100n, decimals),
+    );
+    const comptrollerAddress = await contract.comptroller({ blockTag });
+    const comptroller = new ethers.Contract(comptrollerAddress, ComptrollerABI, provider);
+    const compAddress = await comptroller.getCompAddress();
+    const compSpeedPerBlock: bigint = await comptroller.compSpeeds(contractAddress, {
+      blockTag,
+    });
+    const compTokenContract = new ethers.Contract(compAddress, ERC20ABI, provider);
+    const compDecimals: number = await compTokenContract.decimals();
+    const compPerYearWei: bigint = compSpeedPerBlock * blocksPerYear;
+    const compPerYearTokens = Number(ethers.formatUnits(compPerYearWei, compDecimals));
+    const totalBorrowsTokens = Number(ethers.formatUnits(totalBorrows, decimals));
+    const totalSupplyTokens = Number(ethers.formatUnits(totalSupply, decimals));
+    const supplyCompRewards =
+      totalSupplyTokens > 0 ? (compPerYearTokens / totalSupplyTokens) * 100 : 0;
+    const borrowCompRewards =
+      totalBorrowsTokens > 0 ? (compPerYearTokens / totalBorrowsTokens) * 100 : 0;
+
+    return this.getMarketAccounting(
+      reserves,
+      totalSupply,
+      totalBorrows,
+      earnApr,
+      borrowApr,
+      supplyCompRewards,
+      borrowCompRewards,
+    );
+  }
+
   async getHistory(source: Source) {
     const { address: contractAddress, network, asset, algorithm } = source;
     const { address: assetAddress } = asset;
@@ -560,89 +681,29 @@ export class ContractService implements OnModuleInit {
           const blockTag = await this.findBlockByTimestamp(network, provider, targetTs, lastBlock);
           const { symbol, decimals } = asset;
 
-          let reserves: bigint;
-          let totalSupply: bigint;
-          let totalBorrows: bigint;
-          let earnApr: number;
-          let borrowApr: number;
-          let supplyCompRewards: number;
-          let borrowCompRewards: number;
+          let marketAccounting: ResponseAlgorithm;
           try {
             switch (algorithm) {
               case Algorithm.COMET:
-                reserves = await contract.getReserves({ blockTag });
-                totalSupply = await contract.totalSupply({ blockTag });
-                totalBorrows = await contract.totalBorrow({ blockTag });
-                const utilization: bigint = await contract.utilization({ blockTag });
-                const supplyRatePerSec = await contract.getSupplyRate(utilization, { blockTag });
-                const borrowRatePerSec = await contract.getBorrowRate(utilization, { blockTag });
-                earnApr = Number(
-                  ethers.formatUnits(supplyRatePerSec * BigInt(YEAR_IN_SECONDS) * 100n, decimals),
-                );
-                borrowApr = Number(
-                  ethers.formatUnits(borrowRatePerSec * BigInt(YEAR_IN_SECONDS) * 100n, decimals),
-                );
-                const baseTrackingSupplySpeed: bigint = await contract.baseTrackingSupplySpeed({
-                  blockTag,
-                });
-                const baseTrackingBorrowSpeed: bigint = await contract.baseTrackingBorrowSpeed({
-                  blockTag,
-                });
-                const trackingIndexScale: bigint = await contract.trackingIndexScale({ blockTag });
-                const trackingIndexDecimals = scaleToDecimals(trackingIndexScale);
-                supplyCompRewards = Number(
-                  ethers.formatUnits(
-                    baseTrackingSupplySpeed * BigInt(YEAR_IN_SECONDS) * 100n,
-                    trackingIndexDecimals,
-                  ),
-                );
-                borrowCompRewards = Number(
-                  ethers.formatUnits(
-                    baseTrackingBorrowSpeed * BigInt(YEAR_IN_SECONDS) * 100n,
-                    trackingIndexDecimals,
-                  ),
-                );
+                marketAccounting = await this.cometAlgorithms(contract, blockTag, decimals);
                 break;
               case Algorithm.MARKET_V2:
-                reserves = await contract.totalReserves({ blockTag });
-                totalSupply = await contract.totalSupply({ blockTag });
-                totalBorrows = await contract.totalBorrows({ blockTag });
-                const supplyRatePerBlock: bigint = await contract.supplyRatePerBlock({ blockTag });
-                const borrowRatePerBlock: bigint = await contract.borrowRatePerBlock({ blockTag });
-                const networkConf = this.networkConfig[network];
-                const blocksPerYear = BigInt(networkConf.blocksPerDay) * BigInt(YEAR_IN_DAYS);
-                earnApr = Number(
-                  ethers.formatUnits(supplyRatePerBlock * blocksPerYear * 100n, decimals),
-                );
-                borrowApr = Number(
-                  ethers.formatUnits(borrowRatePerBlock * blocksPerYear * 100n, decimals),
-                );
-                const comptrollerAddress = await contract.comptroller({ blockTag });
-                const comptroller = new ethers.Contract(
-                  comptrollerAddress,
-                  ComptrollerABI,
-                  provider,
-                );
-                const compAddress = await comptroller.getCompAddress();
-                const compSpeedPerBlock: bigint = await comptroller.compSpeeds(contractAddress, {
+                marketAccounting = await this.marketV2Algorithms(
+                  contract,
                   blockTag,
-                });
-                const compTokenContract = new ethers.Contract(compAddress, ERC20ABI, provider);
-                const compDecimals: number = await compTokenContract.decimals();
-                const compPerYearWei: bigint = compSpeedPerBlock * blocksPerYear;
-                const compPerYearTokens = Number(ethers.formatUnits(compPerYearWei, compDecimals));
-                const totalBorrowsTokens = Number(ethers.formatUnits(totalBorrows, decimals));
-                const totalSupplyTokens = Number(ethers.formatUnits(totalSupply, decimals));
-                supplyCompRewards =
-                  totalSupplyTokens > 0 ? (compPerYearTokens / totalSupplyTokens) * 100 : 0;
-                borrowCompRewards =
-                  totalBorrowsTokens > 0 ? (compPerYearTokens / totalBorrowsTokens) * 100 : 0;
+                  decimals,
+                  provider,
+                  contractAddress,
+                  network,
+                );
                 break;
               default:
                 if (asset.symbol === 'ETH' || asset.symbol === 'MNT') {
-                  reserves = await provider.getBalance(contractAddress, blockTag);
+                  marketAccounting.reserves = await provider.getBalance(contractAddress, blockTag);
                 } else {
-                  reserves = await assetContract.balanceOf(contractAddress, { blockTag });
+                  marketAccounting.reserves = await assetContract.balanceOf(contractAddress, {
+                    blockTag,
+                  });
                 }
                 break;
             }
@@ -681,7 +742,7 @@ export class ContractService implements OnModuleInit {
             return;
           }
 
-          const quantity = ethers.formatUnits(reserves, decimals);
+          const quantity = ethers.formatUnits(marketAccounting.reserves, decimals);
           const value = Number(quantity) * price;
 
           if (isNaN(value) || value < 0) {
@@ -691,7 +752,14 @@ export class ContractService implements OnModuleInit {
             continue;
           }
 
-          const newHistory = new History(source, blockTag, reserves.toString(), price, value, date);
+          const newHistory = new History(
+            source,
+            blockTag,
+            marketAccounting.reserves.toString(),
+            price,
+            value,
+            date,
+          );
 
           await this.historyService.createWithSource(newHistory);
 
