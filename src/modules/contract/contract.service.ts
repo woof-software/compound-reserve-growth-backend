@@ -24,8 +24,9 @@ import ERC20ABI from './abi/ERC20ABI.json';
 import Bytes32TokenABI from './abi/Bytes32TokenABI.json';
 import { MarketData, RootJson } from './contract.type';
 
-import { DAY_IN_SEC, SEC_IN_MS } from '@app/common/constants';
+import { DAY_IN_SEC, SEC_IN_MS, YEAR_IN_DAYS, YEAR_IN_SECONDS } from '@app/common/constants';
 import { Algorithm } from '@app/common/enum/algorithm.enum';
+import { scaleToDecimals } from '@app/common/utils/scale-to-decimals';
 
 interface CachedBlock {
   blockNumber: number;
@@ -557,15 +558,85 @@ export class ContractService implements OnModuleInit {
       for (const targetTs of dailyTs) {
         try {
           const blockTag = await this.findBlockByTimestamp(network, provider, targetTs, lastBlock);
+          const { symbol, decimals } = asset;
 
           let reserves: bigint;
+          let totalSupply: bigint;
+          let totalBorrows: bigint;
+          let earnApr: number;
+          let borrowApr: number;
+          let supplyCompRewards: number;
+          let borrowCompRewards: number;
           try {
             switch (algorithm) {
               case Algorithm.COMET:
                 reserves = await contract.getReserves({ blockTag });
+                totalSupply = await contract.totalSupply({ blockTag });
+                totalBorrows = await contract.totalBorrow({ blockTag });
+                const utilization: bigint = await contract.utilization({ blockTag });
+                const supplyRatePerSec = await contract.getSupplyRate(utilization, { blockTag });
+                const borrowRatePerSec = await contract.getBorrowRate(utilization, { blockTag });
+                earnApr = Number(
+                  ethers.formatUnits(supplyRatePerSec * BigInt(YEAR_IN_SECONDS) * 100n, decimals),
+                );
+                borrowApr = Number(
+                  ethers.formatUnits(borrowRatePerSec * BigInt(YEAR_IN_SECONDS) * 100n, decimals),
+                );
+                const baseTrackingSupplySpeed: bigint = await contract.baseTrackingSupplySpeed({
+                  blockTag,
+                });
+                const baseTrackingBorrowSpeed: bigint = await contract.baseTrackingBorrowSpeed({
+                  blockTag,
+                });
+                const trackingIndexScale: bigint = await contract.trackingIndexScale({ blockTag });
+                const trackingIndexDecimals = scaleToDecimals(trackingIndexScale);
+                supplyCompRewards = Number(
+                  ethers.formatUnits(
+                    baseTrackingSupplySpeed * BigInt(YEAR_IN_SECONDS) * 100n,
+                    trackingIndexDecimals,
+                  ),
+                );
+                borrowCompRewards = Number(
+                  ethers.formatUnits(
+                    baseTrackingBorrowSpeed * BigInt(YEAR_IN_SECONDS) * 100n,
+                    trackingIndexDecimals,
+                  ),
+                );
                 break;
               case Algorithm.MARKET_V2:
                 reserves = await contract.totalReserves({ blockTag });
+                totalSupply = await contract.totalSupply({ blockTag });
+                totalBorrows = await contract.totalBorrows({ blockTag });
+                const supplyRatePerBlock: bigint = await contract.supplyRatePerBlock({ blockTag });
+                const borrowRatePerBlock: bigint = await contract.borrowRatePerBlock({ blockTag });
+                const networkConf = this.networkConfig[network];
+                const blocksPerYear = BigInt(networkConf.blocksPerDay) * BigInt(YEAR_IN_DAYS);
+                earnApr = Number(
+                  ethers.formatUnits(supplyRatePerBlock * blocksPerYear * 100n, decimals),
+                );
+                borrowApr = Number(
+                  ethers.formatUnits(borrowRatePerBlock * blocksPerYear * 100n, decimals),
+                );
+                const comptrollerAddress = await contract.comptroller({ blockTag });
+                const comptroller = new ethers.Contract(
+                  comptrollerAddress,
+                  ComptrollerABI,
+                  provider,
+                );
+                const compAddress = await comptroller.getCompAddress();
+                const compSpeedPerBlock: bigint = await comptroller.compSpeeds(contractAddress, {
+                  blockTag,
+                });
+                const compTokenContract = new ethers.Contract(compAddress, ERC20ABI, provider);
+                const compDecimals: number = await compTokenContract.decimals();
+                const compPerYearWei: bigint = compSpeedPerBlock * blocksPerYear;
+                const compPerYearTokens = Number(ethers.formatUnits(compPerYearWei, compDecimals));
+                const totalBorrowsTokens = Number(ethers.formatUnits(totalBorrows, decimals));
+                const totalSupplyTokens = Number(ethers.formatUnits(totalSupply, decimals));
+                supplyCompRewards =
+                  totalSupplyTokens > 0 ? (compPerYearTokens / totalSupplyTokens) * 100 : 0;
+                borrowCompRewards =
+                  totalBorrowsTokens > 0 ? (compPerYearTokens / totalBorrowsTokens) * 100 : 0;
                 break;
               default:
                 if (asset.symbol === 'ETH' || asset.symbol === 'MNT') {
@@ -588,7 +659,6 @@ export class ContractService implements OnModuleInit {
             }
           }
 
-          const { symbol, decimals } = asset;
           const date = new Date(targetTs * 1000);
 
           // Get price using PriceService
