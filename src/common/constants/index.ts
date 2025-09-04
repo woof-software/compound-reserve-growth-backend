@@ -22,3 +22,4 @@ export const USD_DECIMALS = 8;
 export const BATCH_SIZE = 2000;
 export const PERCENT_PRECISION_SCALE = 1_000_000;
 export const PERCENT_PRECISION_SCALE_BI = BigInt(1_000_000);
+export const MARKET_DECIMALS = 18;

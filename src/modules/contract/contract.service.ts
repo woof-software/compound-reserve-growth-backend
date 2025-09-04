@@ -23,10 +23,17 @@ import LegacyRewardsABI from './abi/LegacyRewardsABI.json';
 import ERC20ABI from './abi/ERC20ABI.json';
 import Bytes32TokenABI from './abi/Bytes32TokenABI.json';
 import { MarketData, RootJson } from './contract.type';
-import { CachedBlock, ResponseAlgorithm } from './interface';
+import {
+  CachedBlock,
+  ResponseAlgorithm,
+  DailyProcessArgs,
+  DailyProcessOutcome,
+  MarketAccountingArgs,
+} from './interface';
 
 import {
   DAY_IN_SEC,
+  MARKET_DECIMALS,
   PERCENT_PRECISION_SCALE_BI,
   SEC_IN_MS,
   YEAR_IN_DAYS,
@@ -516,14 +523,16 @@ export class ContractService implements OnModuleInit {
     const reserves: bigint = await contract.getReserves({ blockTag });
     const totalSupply: bigint = await contract.totalSupply({ blockTag });
     const totalBorrows: bigint = await contract.totalBorrow({ blockTag });
-    const utilization: bigint = await contract.utilization({ blockTag });
+    const utilization: bigint = await contract.getUtilization({ blockTag });
     const supplyRatePerSec: bigint = await contract.getSupplyRate(utilization, { blockTag });
     const borrowRatePerSec: bigint = await contract.getBorrowRate(utilization, { blockTag });
+    const trackingIndexScale: bigint = await contract.trackingIndexScale({ blockTag });
+    const trackingIndexDecimals = scaleToDecimals(trackingIndexScale);
     const earnApr = Number(
-      ethers.formatUnits(supplyRatePerSec * BigInt(YEAR_IN_SECONDS) * 100n, decimals),
+      ethers.formatUnits(supplyRatePerSec * BigInt(YEAR_IN_SECONDS) * 100n, MARKET_DECIMALS),
     );
     const borrowApr = Number(
-      ethers.formatUnits(borrowRatePerSec * BigInt(YEAR_IN_SECONDS) * 100n, decimals),
+      ethers.formatUnits(borrowRatePerSec * BigInt(YEAR_IN_SECONDS) * 100n, MARKET_DECIMALS),
     );
     const baseTrackingSupplySpeed: bigint = await contract.baseTrackingSupplySpeed({
       blockTag,
@@ -531,20 +540,20 @@ export class ContractService implements OnModuleInit {
     const baseTrackingBorrowSpeed: bigint = await contract.baseTrackingBorrowSpeed({
       blockTag,
     });
-    const trackingIndexScale: bigint = await contract.trackingIndexScale({ blockTag });
-    const trackingIndexDecimals = scaleToDecimals(trackingIndexScale);
-    const supplyCompRewards = Number(
-      ethers.formatUnits(
-        baseTrackingSupplySpeed * BigInt(YEAR_IN_SECONDS) * 100n,
-        trackingIndexDecimals,
-      ),
+    const annualSupplyRewardTokens = Number(
+      ethers.formatUnits(baseTrackingSupplySpeed * BigInt(YEAR_IN_SECONDS), trackingIndexDecimals),
     );
-    const borrowCompRewards = Number(
-      ethers.formatUnits(
-        baseTrackingBorrowSpeed * BigInt(YEAR_IN_SECONDS) * 100n,
-        trackingIndexDecimals,
-      ),
+    const annualBorrowRewardTokens = Number(
+      ethers.formatUnits(baseTrackingBorrowSpeed * BigInt(YEAR_IN_SECONDS), trackingIndexDecimals),
     );
+    const totalSupplyQuantity = Number(ethers.formatUnits(totalSupply, decimals));
+    const totalBorrowsQuantity = Number(ethers.formatUnits(totalBorrows, decimals));
+
+    const supplyCompRewards =
+      totalSupplyQuantity > 0 ? (annualSupplyRewardTokens / totalSupplyQuantity) * 100 : 0;
+
+    const borrowCompRewards =
+      totalBorrowsQuantity > 0 ? (annualBorrowRewardTokens / totalBorrowsQuantity) * 100 : 0;
 
     return this.getMarketAccounting(
       reserves,
@@ -619,181 +628,68 @@ export class ContractService implements OnModuleInit {
       const startBlockData = await this.getCachedBlock(network, provider, lastBlock);
       const startTs = startBlockData.timestamp;
 
-      const firstMidnightUTC = Math.floor(startTs / DAY_IN_SEC + 1) * DAY_IN_SEC;
-      const now = Math.floor(Date.now() / SEC_IN_MS);
-      const todayMidnightUTC = Math.floor(now / DAY_IN_SEC) * DAY_IN_SEC;
+      const { firstMidnightUTC, todayMidnightUTC } = this.getDayBounds(startTs);
+      const dailyTs = this.buildDailyTimestamps(firstMidnightUTC, todayMidnightUTC);
 
-      // Check if we have any days to process
-      if (firstMidnightUTC > todayMidnightUTC) {
+      if (dailyTs.length === 0) {
         this.logger.log(`No historical data needed - source is already up to date`);
-
-        // Update the source with current timestamp
         await this.sourceService.updateWithSource({
           source,
           blockNumber: lastBlock,
           checkedAt: new Date(),
         });
-
         return;
-      }
-
-      const dailyTs: number[] = [];
-      for (let ts = firstMidnightUTC; ts <= todayMidnightUTC; ts += DAY_IN_SEC) {
-        dailyTs.push(ts);
       }
 
       this.logger.log(
         `Processing ${dailyTs.length} daily timestamps from ${new Date(firstMidnightUTC * 1000).toISOString().slice(0, 10)} to ${new Date(todayMidnightUTC * 1000).toISOString().slice(0, 10)}`,
       );
 
-      // Check if we have a reasonable number of days to process
-      if (dailyTs.length === 0) {
-        this.logger.warn(`No days to process for source ${source.id}`);
-        return;
-      }
-
-      // Prices preload
-      if (!STABLECOIN_PRICES[asset.symbol]) {
-        try {
-          const firstDate = new Date(firstMidnightUTC * 1000);
-          await this.priceService.getHistoricalPrice(
-            { address: asset.address, symbol: asset.symbol, decimals: asset.decimals },
-            firstDate,
-          );
-          this.logger.log(`Price data preloaded for ${asset.symbol}`);
-        } catch (error) {
-          this.logger.warn(`Failed to preload price data for ${asset.symbol}: ${error.message}`);
-        }
-      } else {
-        this.logger.log(`Skipping preload for stablecoin ${asset.symbol}`);
-      }
+      await this.preloadPrices(asset, firstMidnightUTC);
 
       let processedCount = 0;
       let skippedCount = 0;
 
-      const ABI = algorithm === Algorithm.COMET ? CometABI : MarketV2ABI;
-
-      const contract = new ethers.Contract(contractAddress, ABI, provider) as any;
+      const abi = this.getAlgorithmAbi(algorithm);
+      const contract = new ethers.Contract(contractAddress, abi, provider) as any;
       const assetContract = new ethers.Contract(assetAddress, ERC20ABI, provider) as any;
 
       for (const targetTs of dailyTs) {
         try {
-          const blockTag = await this.findBlockByTimestamp(network, provider, targetTs, lastBlock);
-          const { symbol, decimals } = asset;
-
-          let marketAccounting: ResponseAlgorithm;
-          try {
-            switch (algorithm) {
-              case Algorithm.COMET:
-                marketAccounting = await this.cometAlgorithms(contract, blockTag, decimals);
-                break;
-              case Algorithm.MARKET_V2:
-                marketAccounting = await this.marketV2Algorithms(
-                  contract,
-                  blockTag,
-                  decimals,
-                  provider,
-                  contractAddress,
-                  network,
-                );
-                break;
-              default:
-                if (asset.symbol === 'ETH' || asset.symbol === 'MNT') {
-                  marketAccounting.reserves = await provider.getBalance(contractAddress, blockTag);
-                } else {
-                  marketAccounting.reserves = await assetContract.balanceOf(contractAddress, {
-                    blockTag,
-                  });
-                }
-                break;
-            }
-          } catch (e: any) {
-            if (e.code === 'CALL_EXCEPTION') {
-              const message = `Skip ${new Date(targetTs * SEC_IN_MS).toISOString().slice(0, 10)} block number ${blockTag} — reserves unavailable for contract ${contractAddress} at network ${network}, algorithm ${algorithm}, asset ${asset.symbol}`;
-              this.logger.warn(message);
-              lastBlock = blockTag;
-              skippedCount++;
-              await this.mailService.notifyGetHistoryError(message);
-              continue;
-            } else {
-              throw e;
-            }
-          }
-
-          const date = new Date(targetTs * 1000);
-
-          // Get price using PriceService
-          let price = 1;
-          try {
-            price = await this.priceService.getHistoricalPrice(
-              { address: asset.address, symbol: asset.symbol, decimals: asset.decimals },
-              date,
-            );
-
-            if (price <= 0) {
-              throw new Error(`Invalid price received: ${price}`);
-            }
-          } catch (priceError) {
-            const message = `Price fetch failed for ${symbol} on ${date.toISOString().slice(0, 10)}: ${priceError.message}. Stopping to retry on next cron run.`;
-            this.logger.error(message);
-            await this.mailService.notifyGetHistoryError(message);
-
-            // Stop processing - will retry from this date on next cron run
-            return;
-          }
-
-          const quantity = ethers.formatUnits(marketAccounting.reserves, decimals);
-          const value = Number(quantity) * price;
-
-          if (isNaN(value) || value < 0) {
-            this.logger.warn(`Invalid value: ${value}, skipping`);
-            lastBlock = blockTag;
-            skippedCount++;
-            continue;
-          }
-
-          const newHistory = new History(
+          const result = await this.processOneDay({
+            targetTs,
+            lastBlock,
             source,
-            blockTag,
-            marketAccounting.reserves.toString(),
-            price,
-            value,
-            date,
-          );
-
-          await this.historyService.createWithSource(newHistory);
-
-          await this.sourceService.updateWithSource({
-            source,
-            blockNumber: blockTag,
-            checkedAt: new Date(),
+            network,
+            provider,
+            asset,
+            algorithm,
+            contract,
+            assetContract,
+            contractAddress,
           });
 
-          lastBlock = blockTag;
-          processedCount++;
+          if (result.stop) {
+            return; // Stop processing to retry on next cron run
+          }
 
-          if (processedCount % 50 === 0) {
+          lastBlock = result.lastBlock;
+          processedCount += result.processedDelta;
+          skippedCount += result.skippedDelta;
+
+          if (processedCount > 0 && processedCount % 50 === 0) {
             this.logger.log(
               `Progress: ${processedCount}/${dailyTs.length} days processed (${skippedCount} skipped)`,
             );
           }
         } catch (error) {
           this.logger.error(`Failed to process timestamp ${targetTs}: ${error.message}`);
-
-          // Fallback
-          if (network === 'arbitrum') {
-            const period = this.getArbitrumConfigForBlock(lastBlock);
-            lastBlock = lastBlock + period.blocksPerDay;
-          } else {
-            const networkConf = this.networkConfig[network];
-            lastBlock = lastBlock + (networkConf?.blocksPerDay || 43200);
-          }
+          lastBlock = this.advanceBlockOnError(network, lastBlock);
           skippedCount++;
           continue;
         }
       }
 
-      // Calculate final statistics
       const totalAttempted = dailyTs.length;
       const successRate =
         totalAttempted > 0 ? Math.round((processedCount / totalAttempted) * 100) : 0;
@@ -806,5 +702,197 @@ export class ContractService implements OnModuleInit {
       this.logger.error(message);
       await this.mailService.notifyGetHistoryError(message);
     }
+  }
+
+  private getDayBounds(startTs: number): { firstMidnightUTC: number; todayMidnightUTC: number } {
+    const firstMidnightUTC = Math.floor(startTs / DAY_IN_SEC + 1) * DAY_IN_SEC;
+    const now = Math.floor(Date.now() / SEC_IN_MS);
+    const todayMidnightUTC = Math.floor(now / DAY_IN_SEC) * DAY_IN_SEC;
+    return { firstMidnightUTC, todayMidnightUTC };
+  }
+
+  private buildDailyTimestamps(startTs: number, endTs: number): number[] {
+    const dailyTs: number[] = [];
+    for (let ts = startTs; ts <= endTs; ts += DAY_IN_SEC) {
+      dailyTs.push(ts);
+    }
+    return dailyTs;
+  }
+
+  private async preloadPrices(
+    asset: { address: string; symbol: string; decimals: number },
+    firstMidnightUTC: number,
+  ): Promise<void> {
+    if (!STABLECOIN_PRICES[asset.symbol]) {
+      try {
+        const firstDate = new Date(firstMidnightUTC * 1000);
+        await this.priceService.getHistoricalPrice(
+          { address: asset.address, symbol: asset.symbol, decimals: asset.decimals },
+          firstDate,
+        );
+        this.logger.log(`Price data preloaded for ${asset.symbol}`);
+      } catch (error: any) {
+        this.logger.warn(`Failed to preload price data for ${asset.symbol}: ${error.message}`);
+      }
+    } else {
+      this.logger.log(`Skipping preload for stablecoin ${asset.symbol}`);
+    }
+  }
+
+  private getAlgorithmAbi(algorithm: Algorithm | string): any {
+    return algorithm === Algorithm.COMET ? CometABI : MarketV2ABI;
+  }
+
+  private async computeMarketAccounting(params: MarketAccountingArgs): Promise<ResponseAlgorithm> {
+    const {
+      algorithm,
+      contract,
+      blockTag,
+      decimals,
+      provider,
+      contractAddress,
+      network,
+      asset,
+      assetContract,
+    } = params;
+
+    switch (algorithm) {
+      case Algorithm.COMET:
+        return this.cometAlgorithms(contract, blockTag, decimals);
+      case Algorithm.MARKET_V2:
+        return this.marketV2Algorithms(
+          contract,
+          blockTag,
+          decimals,
+          provider,
+          contractAddress,
+          network,
+        );
+      default: {
+        const reserves: bigint =
+          asset.symbol === 'ETH' || asset.symbol === 'MNT'
+            ? await provider.getBalance(contractAddress, blockTag)
+            : await assetContract.balanceOf(contractAddress, { blockTag });
+        return {
+          reserves,
+          incomes: { supply: 0n, borrow: 0n },
+          spends: { supply: 0n, borrow: 0n },
+        };
+      }
+    }
+  }
+
+  private async fetchPriceOrStop(
+    asset: { address: string; symbol: string; decimals: number },
+    date: Date,
+  ): Promise<number | null> {
+    try {
+      const price = await this.priceService.getHistoricalPrice(
+        { address: asset.address, symbol: asset.symbol, decimals: asset.decimals },
+        date,
+      );
+      if (price <= 0) {
+        throw new Error(`Invalid price received: ${price}`);
+      }
+      return price;
+    } catch (priceError: any) {
+      const message = `Price fetch failed for ${asset.symbol} on ${date.toISOString().slice(0, 10)}: ${priceError.message}. Stopping to retry on next cron run.`;
+      this.logger.error(message);
+      await this.mailService.notifyGetHistoryError(message);
+      return null;
+    }
+  }
+
+  private isInvalidValue(value: number): boolean {
+    return isNaN(value) || value < 0;
+  }
+
+  private advanceBlockOnError(network: string, lastBlock: number): number {
+    if (network === 'arbitrum') {
+      const period = this.getArbitrumConfigForBlock(lastBlock);
+      return lastBlock + period.blocksPerDay;
+    }
+    const networkConf = this.networkConfig[network];
+    return lastBlock + (networkConf?.blocksPerDay || 43200);
+  }
+
+  private async persistHistoryAndUpdate(
+    source: Source,
+    blockTag: number,
+    marketAccounting: ResponseAlgorithm,
+    price: number,
+    value: number,
+    date: Date,
+  ): Promise<void> {
+    const newHistory = new History(
+      source,
+      blockTag,
+      marketAccounting.reserves.toString(),
+      price,
+      value,
+      date,
+    );
+    await this.historyService.createWithSource(newHistory);
+    await this.sourceService.updateWithSource({
+      source,
+      blockNumber: blockTag,
+      checkedAt: new Date(),
+    });
+  }
+
+  private async processOneDay(params: DailyProcessArgs): Promise<DailyProcessOutcome> {
+    const {
+      targetTs,
+      lastBlock,
+      source,
+      network,
+      provider,
+      asset,
+      algorithm,
+      contract,
+      assetContract,
+      contractAddress,
+    } = params;
+
+    const blockTag = await this.findBlockByTimestamp(network, provider, targetTs, lastBlock);
+
+    let marketAccounting: ResponseAlgorithm;
+    try {
+      marketAccounting = await this.computeMarketAccounting({
+        algorithm,
+        contract,
+        blockTag,
+        decimals: asset.decimals,
+        provider,
+        contractAddress,
+        network,
+        asset,
+        assetContract,
+      });
+    } catch (e: any) {
+      if (e.code === 'CALL_EXCEPTION') {
+        const message = `Skip ${new Date(targetTs * SEC_IN_MS).toISOString().slice(0, 10)} block number ${blockTag} — reserves unavailable for contract ${contractAddress} at network ${network}, algorithm ${algorithm}, asset ${asset.symbol}`;
+        this.logger.warn(message);
+        await this.mailService.notifyGetHistoryError(message);
+        return { lastBlock: blockTag, processedDelta: 0, skippedDelta: 1, stop: false };
+      }
+      throw e;
+    }
+
+    const date = new Date(targetTs * 1000);
+    const price = await this.fetchPriceOrStop(asset, date);
+    if (price === null) {
+      return { lastBlock, processedDelta: 0, skippedDelta: 0, stop: true };
+    }
+
+    const quantity = ethers.formatUnits(marketAccounting.reserves, asset.decimals);
+    const value = Number(quantity) * price;
+    if (this.isInvalidValue(value)) {
+      this.logger.warn(`Invalid value: ${value}, skipping`);
+      return { lastBlock: blockTag, processedDelta: 0, skippedDelta: 1, stop: false };
+    }
+
+    await this.persistHistoryAndUpdate(source, blockTag, marketAccounting, price, value, date);
+    return { lastBlock: blockTag, processedDelta: 1, skippedDelta: 0, stop: false };
   }
 }
