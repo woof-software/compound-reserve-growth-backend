@@ -6,7 +6,7 @@ import { ReservesRepository } from './reserves-repository.service';
 import { IncomesRepository } from './incomes-repository.service';
 import { SpendsRepository } from './spends-repository.service';
 import { CreateHistoryDto } from './dto/create-history.dto';
-import { Reserve, Incomes, Spends } from './entity';
+import { Reserve, Incomes, Spends, StatsHistory } from './entity';
 import { PaginationDto } from './dto/pagination.dto';
 import { OffsetDto } from './dto/offset.dto';
 
@@ -102,5 +102,96 @@ export class HistoryService {
       throw new NotFoundException('No treasury holdings found');
     }
     return holdings;
+  }
+
+  async getOffsetStatsHistory(dto: OffsetDto): Promise<OffsetDataDto<StatsHistory>> {
+    const [incomesData, spendsData] = await Promise.all([
+      this.IncomesRepo.getOffsetStats(dto),
+      this.SpendsRepo.getOffsetStats(dto),
+    ]);
+
+    // Create a map to group incomes and spends by date and source
+    const statsMap = new Map<string, StatsHistory>();
+
+    // Process incomes data
+    incomesData.data.forEach((income) => {
+      const key = `${income.date.getTime()}-${income.source.id}`;
+      if (!statsMap.has(key)) {
+        statsMap.set(key, {
+          incomes: {
+            id: income.id,
+            valueSupply: income.valueSupply,
+            valueBorrow: income.valueBorrow,
+            date: income.date,
+          },
+          spends: {
+            id: 0,
+            valueSupply: 0,
+            valueBorrow: 0,
+            date: income.date,
+          },
+          sourceId: income.source.id,
+        });
+      } else {
+        const existing = statsMap.get(key)!;
+        existing.incomes = {
+          id: income.id,
+          valueSupply: income.valueSupply,
+          valueBorrow: income.valueBorrow,
+          date: income.date,
+        };
+      }
+    });
+
+    // Process spends data
+    spendsData.data.forEach((spend) => {
+      const key = `${spend.date.getTime()}-${spend.source.id}`;
+      if (!statsMap.has(key)) {
+        statsMap.set(key, {
+          incomes: {
+            id: 0,
+            valueSupply: 0,
+            valueBorrow: 0,
+            date: spend.date,
+          },
+          spends: {
+            id: spend.id,
+            valueSupply: spend.valueSupply,
+            valueBorrow: spend.valueBorrow,
+            date: spend.date,
+          },
+          sourceId: spend.source.id,
+        });
+      } else {
+        const existing = statsMap.get(key)!;
+        existing.spends = {
+          id: spend.id,
+          valueSupply: spend.valueSupply,
+          valueBorrow: spend.valueBorrow,
+          date: spend.date,
+        };
+      }
+    });
+
+    // Convert map to array and sort by date
+    const statsHistory = Array.from(statsMap.values()).sort((a, b) => {
+      return new Date(a.incomes.date).getTime() - new Date(b.incomes.date).getTime();
+    });
+
+    // Apply offset and limit
+    const total = statsHistory.length;
+    const offset = dto.offset ?? 0;
+    const limit = dto.limit;
+
+    const paginatedData = limit
+      ? statsHistory.slice(offset, offset + limit)
+      : statsHistory.slice(offset);
+
+    return new OffsetDataDto<StatsHistory>(
+      paginatedData,
+      dto.limit ?? null,
+      dto.offset ?? 0,
+      total,
+    );
   }
 }

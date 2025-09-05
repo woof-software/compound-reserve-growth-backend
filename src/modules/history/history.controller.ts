@@ -8,6 +8,7 @@ import { PaginationDto } from './dto/pagination.dto';
 import { PaginationRequest } from './request/pagination.request';
 import { RevenueHistoryResponse } from './response/revenue-history.response';
 import { RevenueHistoryFullResponse } from './response/revenue-history-full.response';
+import { StatsHistoryResponse } from './response/stats-history.response';
 import { HistoryFullResponse } from './response/history-full.response';
 import { OffsetRequest } from './request/offset.request';
 import { OffsetDto } from './dto/offset.dto';
@@ -96,6 +97,25 @@ export class HistoryController {
     return new OffsetDataResponse<RevenueHistoryResponse>(
       paginatedData.data.map((history) => {
         return new RevenueHistoryResponse(history);
+      }),
+      new OffsetnMetaResponse(paginatedData.limit, paginatedData.offset, paginatedData.total),
+    );
+  }
+
+  @Throttle({ default: { limit: 15, ttl: 1000 } })
+  @ApiOperation({ summary: 'Get statistics on FE' })
+  @ApiOffsetResponse(StatsHistoryResponse)
+  @HttpCode(HttpStatus.OK)
+  @Get('/stats')
+  async getStatsHistory(
+    @Query() request: OffsetRequest,
+  ): Promise<OffsetDataResponse<StatsHistoryResponse>> {
+    const paginatedData = await this.historyService.getOffsetStatsHistory(
+      new OffsetDto(request?.limit, request?.offset, request?.order),
+    );
+    return new OffsetDataResponse<StatsHistoryResponse>(
+      paginatedData.data.map((data) => {
+        return new StatsHistoryResponse(data);
       }),
       new OffsetnMetaResponse(paginatedData.limit, paginatedData.offset, paginatedData.total),
     );

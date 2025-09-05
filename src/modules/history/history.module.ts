@@ -5,7 +5,7 @@ import { AssetModule } from 'modules/asset/asset.module';
 import { SourceModule } from 'modules/source/source.module';
 import { ContractModule } from 'modules/contract/contract.module';
 
-import { Reserve } from './entity';
+import { Reserve, Incomes, Spends } from './entity';
 import { ReservesRepository } from './reserves-repository.service';
 import { HistoryService } from './history.service';
 import { HistoryGetCommand } from './cli/history-get.command';
@@ -17,7 +17,7 @@ import { SpendsRepository } from './spends-repository.service';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Reserve]),
+    TypeOrmModule.forFeature([Reserve, Incomes, Spends]),
     SourceModule,
     AssetModule,
     forwardRef(() => ContractModule),
