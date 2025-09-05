@@ -3,8 +3,10 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { SourceRepository } from 'modules/source/source.repository';
 
 import { ReservesRepository } from './reserves-repository.service';
+import { IncomesRepository } from './incomes-repository.service';
+import { SpendsRepository } from './spends-repository.service';
 import { CreateHistoryDto } from './dto/create-history.dto';
-import { Reserve } from './reserve.entity';
+import { Reserve, Incomes, Spends } from './entity';
 import { PaginationDto } from './dto/pagination.dto';
 import { OffsetDto } from './dto/offset.dto';
 
@@ -15,6 +17,8 @@ import { OffsetDataDto } from '@app/common/dto/offset-data.dto';
 export class HistoryService {
   constructor(
     private readonly reservesRepo: ReservesRepository,
+    private readonly IncomesRepo: IncomesRepository,
+    private readonly SpendsRepo: SpendsRepository,
     private readonly sourceRepo: SourceRepository,
   ) {}
 
@@ -32,12 +36,28 @@ export class HistoryService {
     );
     return this.reservesRepo.save(reserve);
   }
-  async createWithSource(reserve: Reserve): Promise<Reserve> {
+  async createReservesWithSource(reserve: Reserve): Promise<Reserve> {
     return this.reservesRepo.save(reserve);
   }
 
-  async findById(id: number): Promise<Reserve> {
+  async createIncomesWithSource(incomes: Incomes): Promise<Incomes> {
+    return this.IncomesRepo.save(incomes);
+  }
+
+  async createSpendsWithSource(spends: Spends): Promise<Spends> {
+    return this.SpendsRepo.save(spends);
+  }
+
+  async findReservesById(id: number): Promise<Reserve> {
     return this.reservesRepo.findById(id);
+  }
+
+  async findIncomesById(id: number): Promise<Incomes> {
+    return this.IncomesRepo.findById(id);
+  }
+
+  async findSpendsById(id: number): Promise<Spends> {
+    return this.SpendsRepo.findById(id);
   }
 
   async getTreasuryHistory(): Promise<Reserve[]> {

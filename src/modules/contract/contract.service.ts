@@ -7,7 +7,7 @@ import type { Redis } from 'ioredis';
 import { REDIS_CLIENT } from 'modules/redis/redis.module';
 import { ProviderFactory } from 'modules/network/provider.factory';
 import { HistoryService } from 'modules/history/history.service';
-import { Reserve } from 'modules/history/reserve.entity';
+import { Reserve, Spends, Incomes } from 'modules/history/entity';
 import { Source } from 'modules/source/source.entity';
 import { SourceService } from 'modules/source/source.service';
 import { PriceService } from 'modules/price/price.service';
@@ -29,6 +29,7 @@ import {
   DailyProcessArgs,
   DailyProcessOutcome,
   MarketAccountingArgs,
+  PersistAccountingArgs,
 } from './interface';
 
 import {
@@ -807,6 +808,27 @@ export class ContractService implements OnModuleInit {
     return isNaN(value) || value < 0;
   }
 
+  private validateAndCalculateQuantity(
+    amount: bigint,
+    decimals: number,
+    price: number,
+    fieldName: string,
+  ): { value: number; isValid: boolean } {
+    const quantity = ethers.formatUnits(amount, decimals);
+    const value = Number(quantity) * price;
+
+    this.logger.debug(
+      `Calculating ${fieldName}: amount=${amount}, quantity=${quantity}, price=${price}, value=${value}`,
+    );
+
+    if (this.isInvalidValue(value)) {
+      this.logger.warn(`Invalid ${fieldName} value: ${value}, skipping`);
+      return { value, isValid: false };
+    }
+
+    return { value, isValid: true };
+  }
+
   private advanceBlockOnError(network: string, lastBlock: number): number {
     if (network === 'arbitrum') {
       const period = this.getArbitrumConfigForBlock(lastBlock);
@@ -817,22 +839,53 @@ export class ContractService implements OnModuleInit {
   }
 
   private async persistCreateAndUpdate(
-    source: Source,
-    blockTag: number,
-    marketAccounting: ResponseAlgorithm,
-    price: number,
-    value: number,
-    date: Date,
+    persistAccountingArgs: PersistAccountingArgs,
   ): Promise<void> {
+    const {
+      source,
+      blockTag,
+      marketAccounting,
+      price,
+      reserveValue,
+      incomeSupplyValue,
+      incomeBorrowValue,
+      spendSupplyValue,
+      spendBorrowValue,
+      date,
+    } = persistAccountingArgs;
+
     const newReserve = new Reserve(
       source,
       blockTag,
       marketAccounting.reserves.toString(),
       price,
-      value,
+      reserveValue,
       date,
     );
-    await this.historyService.createWithSource(newReserve);
+    const newIncomes = new Incomes(
+      source,
+      blockTag,
+      marketAccounting.incomes.supply.toString(),
+      marketAccounting.incomes.borrow.toString(),
+      price,
+      incomeSupplyValue,
+      incomeBorrowValue,
+      date,
+    );
+    const newSpends = new Spends(
+      source,
+      blockTag,
+      marketAccounting.spends.supply.toString(),
+      marketAccounting.spends.borrow.toString(),
+      price,
+      spendSupplyValue,
+      spendBorrowValue,
+      date,
+    );
+
+    await this.historyService.createReservesWithSource(newReserve);
+    await this.historyService.createIncomesWithSource(newIncomes);
+    await this.historyService.createSpendsWithSource(newSpends);
     await this.sourceService.updateWithSource({
       source,
       blockNumber: blockTag,
@@ -885,14 +938,72 @@ export class ContractService implements OnModuleInit {
       return { lastBlock, processedDelta: 0, skippedDelta: 0, stop: true };
     }
 
-    const quantity = ethers.formatUnits(marketAccounting.reserves, asset.decimals);
-    const value = Number(quantity) * price;
-    if (this.isInvalidValue(value)) {
-      this.logger.warn(`Invalid value: ${value}, skipping`);
+    // Validate and calculate all quantity
+    const reserveQuantity = this.validateAndCalculateQuantity(
+      marketAccounting.reserves,
+      asset.decimals,
+      price,
+      'reserve',
+    );
+    if (!reserveQuantity.isValid) {
+      this.logger.warn(
+        `Reserve validation failed, skipping day ${new Date(targetTs * SEC_IN_MS).toISOString().slice(0, 10)}`,
+      );
       return { lastBlock: blockTag, processedDelta: 0, skippedDelta: 1, stop: false };
     }
 
-    await this.persistCreateAndUpdate(source, blockTag, marketAccounting, price, value, date);
+    const incomeSupplyQuantity = this.validateAndCalculateQuantity(
+      marketAccounting.incomes.supply,
+      asset.decimals,
+      price,
+      'supply income',
+    );
+    if (!incomeSupplyQuantity.isValid) {
+      return { lastBlock: blockTag, processedDelta: 0, skippedDelta: 1, stop: false };
+    }
+
+    const incomeBorrowQuantity = this.validateAndCalculateQuantity(
+      marketAccounting.incomes.borrow,
+      asset.decimals,
+      price,
+      'borrow income',
+    );
+    if (!incomeBorrowQuantity.isValid) {
+      return { lastBlock: blockTag, processedDelta: 0, skippedDelta: 1, stop: false };
+    }
+
+    const spendSupplyQuantity = this.validateAndCalculateQuantity(
+      marketAccounting.spends.supply,
+      asset.decimals,
+      price,
+      'supply spend',
+    );
+    if (!spendSupplyQuantity.isValid) {
+      return { lastBlock: blockTag, processedDelta: 0, skippedDelta: 1, stop: false };
+    }
+
+    const spendBorrowQuantity = this.validateAndCalculateQuantity(
+      marketAccounting.spends.borrow,
+      asset.decimals,
+      price,
+      'borrow spend',
+    );
+    if (!spendBorrowQuantity.isValid) {
+      return { lastBlock: blockTag, processedDelta: 0, skippedDelta: 1, stop: false };
+    }
+
+    await this.persistCreateAndUpdate({
+      source,
+      blockTag,
+      marketAccounting,
+      price,
+      reserveValue: reserveQuantity.value,
+      incomeSupplyValue: incomeSupplyQuantity.value,
+      incomeBorrowValue: incomeBorrowQuantity.value,
+      spendSupplyValue: spendSupplyQuantity.value,
+      spendBorrowValue: spendBorrowQuantity.value,
+      date,
+    });
     return { lastBlock: blockTag, processedDelta: 1, skippedDelta: 0, stop: false };
   }
 }

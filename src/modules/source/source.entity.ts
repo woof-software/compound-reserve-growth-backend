@@ -1,6 +1,6 @@
 import { Column, Entity, ManyToOne, OneToMany, PrimaryGeneratedColumn } from 'typeorm';
 
-import { Reserve } from 'modules/history/reserve.entity';
+import { Reserve, Incomes, Spends } from 'modules/history/entity';
 import { Revenue } from 'modules/revenue/revenue.entity';
 import { Treasury } from 'modules/treasury/treasury.entity';
 import { Asset } from 'modules/asset/asset.entity';
@@ -45,6 +45,12 @@ export class Source {
 
   @OneToMany(() => Revenue, (revenues) => revenues.source)
   public revenues: Revenue[];
+
+  @OneToMany(() => Incomes, (incomes) => incomes.source)
+  public incomes: Incomes[];
+
+  @OneToMany(() => Spends, (spends) => spends.source)
+  public spends: Spends[];
 
   constructor(
     address: string,
