@@ -12,6 +12,7 @@ import { CapoService } from './capo.service';
 import { Oracle } from '../oracle/oracle.entity';
 import { Snapshot } from './snapshot.entity';
 import { DailyAggregation } from './daily.entity';
+import { Source } from 'modules/source/source.entity';
 
 @Module({
   imports: [
@@ -20,7 +21,7 @@ import { DailyAggregation } from './daily.entity';
     MailModule,
     OracleModule,
     AlertModule,
-    TypeOrmModule.forFeature([Snapshot, DailyAggregation]),
+    TypeOrmModule.forFeature([Snapshot, DailyAggregation, Source]),
     TypeOrmModule.forFeature([Oracle])
   ],
   controllers: [CapoController],

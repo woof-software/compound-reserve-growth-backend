@@ -41,86 +41,97 @@ export class DiscoveryService implements OnModuleInit {
   ) {}
 
   async onModuleInit() {
-    // if (process.env.MOCK_CAPO === 'true') {
-    //   await this.oracleRepository.upsert(
-    //     {
-    //       address: '0x1111111111111111111111111111111111111111',
-    //       chainId: 1,
-    //       network: 'mainnet',
-    //       description: 'Mock CAPO',
-    //       maxYearlyRatioGrowthPercent: 500,
-    //       snapshotRatio: '1000000000000000000',
-    //       snapshotTimestamp: Math.floor(Date.now() / 1_000),
-    //       decimals: 18,
-    //       isActive: true,
-    //     },
-    //     ['address'],
-    //   );
-    // }
-    // this.logger.log('DiscoveryService initialized');
+    if (process.env.MOCK_CAPO === 'true') {
+      await this.oracleRepository.upsert(
+        {
+          address: '0x1111111111111111111111111111111111111111',
+          chainId: 1,
+          network: 'mainnet',
+          description: 'Mock CAPO',
+          maxYearlyRatioGrowthPercent: 500,
+          snapshotRatio: '1000000000000000000',
+          snapshotTimestamp: Math.floor(Date.now() / 1_000),
+          decimals: 18,
+          isActive: true,
+        },
+        ['address'],
+      );
+    }
+    this.logger.log('DiscoveryService initialized');
 
-    // const standaloneOracleAddress = '0xdd5b1151ef4808137b0b6e80765192b62968e643'.toLowerCase();
+    const standaloneOracleAddress = '0xdd5b1151ef4808137b0b6e80765192b62968e643'.toLowerCase();
 
-    // try {
-    //   await this.oracleRepository.upsert(
-    //     {
-    //       address: standaloneOracleAddress,
-    //       chainId: 1,
-    //       network: 'mainnet',
-    //       description: 'wstETH / USD Oracle',
-    //       isActive: true,
-    //     },
-    //     ['address'],
+    try {
+      await this.oracleRepository.upsert(
+        {
+          address: standaloneOracleAddress,
+          chainId: 1,
+          network: 'mainnet',
+          description: 'wstETH / USD Oracle',
+          isActive: true,
+        },
+        ['address'],
+      );
 
-    //   const oracleRow = await this.oracleRepository.findOne({
-    //     where: { address: standaloneOracleAddress },
-    //   });
+      const oracleRow = await this.oracleRepository.findOne({
+        where: { address: standaloneOracleAddress },
+      });
 
-    //   if (oracleRow && (!oracleRow.snapshotRatio || !oracleRow.decimals)) {
-    //     try {
-    //       const provider = this.providerFactory.get('mainnet');
-    //       const oracleContract = new ethers.Contract(standaloneOracleAddress, CapoABI, provider);
+      if (oracleRow && (!oracleRow.snapshotRatio || !oracleRow.decimals)) {
+        try {
+          const provider = this.providerFactory.get('mainnet');
+          const oracleContract = new ethers.Contract(standaloneOracleAddress, CapoABI, provider);
+          console.log('Fetching on-chain data for standalone oracle...');
+          const [
+            snapshotRatioBn,
+            snapshotTimestampBn,
+            decimals,
+            minDelay,
+            ratioProvider,
+            baseAgg,
+            maxYearlyRatioGrowthPercent,
+            snapshotTimestamp,
+          ] = await Promise.all([
+            oracleContract.snapshotRatio(),
+            oracleContract.snapshotTimestamp(),
+            oracleContract.decimals(),
+            oracleContract.minimumSnapshotDelay(),
+            oracleContract.ratioProvider(),
+            oracleContract.assetToBaseAggregator(),
+            oracleContract.maxYearlyRatioGrowthPercent(),
+            oracleContract.snapshotTimestamp(),
+          ]);
 
-    //       const [
-    //         snapshotRatioBn,
-    //         snapshotTimestampBn,
-    //         decimals,
-    //         minDelay,
-    //         ratioProvider,
-    //         baseAgg,
-    //         maxYearlyRatioGrowthPercent,
-    //         snapshotTimestamp,
-    //       ] = await Promise.all([
-    //         oracleContract.snapshotRatio(),
-    //         oracleContract.snapshotTimestamp(),
-    //         oracleContract.decimals(),
-    //         oracleContract.minimumSnapshotDelay(),
-    //         oracleContract.ratioProvider(),
-    //         oracleContract.assetToBaseAggregator(),
-    //         oracleContract.maxYearlyRatioGrowthPercent(),
-    //         oracleContract.snapshotTimestamp(),
-    //       ]);
+          console.log('On-chain data fetched:', {
+            snapshotRatio: snapshotRatioBn.toString(),
+            snapshotTimestamp: snapshotTimestampBn.toString(),
+            decimals: decimals.toString(),
+            minDelay: minDelay.toString(),
+            ratioProvider,
+            baseAgg,
+            maxYearlyRatioGrowthPercent: maxYearlyRatioGrowthPercent.toString(),
+          });
 
-    //       oracleRow.snapshotRatio = snapshotRatioBn.toString();
-    //       oracleRow.snapshotTimestamp = Number(snapshotTimestampBn);
-    //       oracleRow.decimals = Number(decimals);
-    //       oracleRow.minimumSnapshotDelay = Number(minDelay);
-    //       oracleRow.ratioProvider = ratioProvider.toLowerCase();
-    //       oracleRow.baseAggregator = baseAgg.toLowerCase();
-    //       oracleRow.maxYearlyRatioGrowthPercent = Number(maxYearlyRatioGrowthPercent);
-    //       oracleRow.snapshotTimestamp = Number(snapshotTimestamp);
+          oracleRow.snapshotRatio = snapshotRatioBn.toString();
+          oracleRow.snapshotTimestamp = Number(snapshotTimestampBn);
+          oracleRow.decimals = Number(decimals);
+          oracleRow.minimumSnapshotDelay = Number(minDelay);
+          oracleRow.ratioProvider = ratioProvider.toLowerCase();
+          oracleRow.baseAggregator = baseAgg.toLowerCase();
+          oracleRow.maxYearlyRatioGrowthPercent = Number(maxYearlyRatioGrowthPercent);
+          oracleRow.snapshotTimestamp = Number(snapshotTimestamp);
 
-    //       await this.oracleRepository.save(oracleRow);
-    //       this.logger.log(`Oracle ${standaloneOracleAddress} initialised from on-chain data`);
-    //     } catch (e) {
-    //       this.logger.warn(`Could not fetch on-chain oracle data: ${e.message}`);
-    //     }
-    //   }
+          await this.oracleRepository.save(oracleRow);
+          this.logger.log(`Oracle ${standaloneOracleAddress} initialised from on-chain data`);
+        } catch (e) {
+          this.logger.warn(`Could not fetch on-chain oracle data: ${e.message}`);
+        }
+      }
 
-    //   this.logger.log(`Standalone oracle ${standaloneOracleAddress} upserted`);
-    // } catch (e) {
-    //   this.logger.error(`Failed to upsert standalone oracle: ${e.message}`);
-    // }
+      this.logger.log(`Standalone oracle ${standaloneOracleAddress} upserted`);
+    } catch (e) {
+      this.logger.error(`Failed to upsert standalone oracle: ${e.message}`);
+    }
     await this.syncFromSources();
     this.logger.log('Initial discovery completed');
   }

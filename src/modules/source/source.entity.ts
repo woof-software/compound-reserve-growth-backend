@@ -4,6 +4,7 @@ import { History } from 'modules/history/history.entity';
 import { Revenue } from 'modules/revenue/revenue.entity';
 import { Treasury } from 'modules/treasury/treasury.entity';
 import { Asset } from 'modules/asset/asset.entity';
+import { DailyAggregation } from 'modules/capo/daily.entity';
 
 @Entity({ name: 'source' })
 export class Source {
@@ -45,6 +46,9 @@ export class Source {
 
   @OneToMany(() => Revenue, (revenues) => revenues.source)
   public revenues: Revenue[];
+
+  @OneToMany(() => DailyAggregation, (dailyAggregations) => dailyAggregations.source)
+  public dailyAggregations: DailyAggregation[];
 
   constructor(
     address: string,
