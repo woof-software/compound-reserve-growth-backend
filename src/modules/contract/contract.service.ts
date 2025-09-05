@@ -582,9 +582,11 @@ export class ContractService implements OnModuleInit {
     const borrowRatePerBlock: bigint = await contract.borrowRatePerBlock({ blockTag });
     const networkConf = this.networkConfig[network];
     const blocksPerYear = BigInt(networkConf.blocksPerDay) * BigInt(YEAR_IN_DAYS);
-    const earnApr = Number(ethers.formatUnits(supplyRatePerBlock * blocksPerYear * 100n, decimals));
+    const earnApr = Number(
+      ethers.formatUnits(supplyRatePerBlock * blocksPerYear * 100n, MARKET_DECIMALS),
+    );
     const borrowApr = Number(
-      ethers.formatUnits(borrowRatePerBlock * blocksPerYear * 100n, decimals),
+      ethers.formatUnits(borrowRatePerBlock * blocksPerYear * 100n, MARKET_DECIMALS),
     );
     const comptrollerAddress = await contract.comptroller({ blockTag });
     const comptroller = new ethers.Contract(comptrollerAddress, ComptrollerABI, provider);
