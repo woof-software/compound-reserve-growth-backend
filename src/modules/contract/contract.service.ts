@@ -7,7 +7,7 @@ import type { Redis } from 'ioredis';
 import { REDIS_CLIENT } from 'modules/redis/redis.module';
 import { ProviderFactory } from 'modules/network/provider.factory';
 import { HistoryService } from 'modules/history/history.service';
-import { History } from 'modules/history/history.entity';
+import { Reserve } from 'modules/history/reserve.entity';
 import { Source } from 'modules/source/source.entity';
 import { SourceService } from 'modules/source/source.service';
 import { PriceService } from 'modules/price/price.service';
@@ -816,7 +816,7 @@ export class ContractService implements OnModuleInit {
     return lastBlock + (networkConf?.blocksPerDay || 43200);
   }
 
-  private async persistHistoryAndUpdate(
+  private async persistCreateAndUpdate(
     source: Source,
     blockTag: number,
     marketAccounting: ResponseAlgorithm,
@@ -824,7 +824,7 @@ export class ContractService implements OnModuleInit {
     value: number,
     date: Date,
   ): Promise<void> {
-    const newHistory = new History(
+    const newReserve = new Reserve(
       source,
       blockTag,
       marketAccounting.reserves.toString(),
@@ -832,7 +832,7 @@ export class ContractService implements OnModuleInit {
       value,
       date,
     );
-    await this.historyService.createWithSource(newHistory);
+    await this.historyService.createWithSource(newReserve);
     await this.sourceService.updateWithSource({
       source,
       blockNumber: blockTag,
@@ -892,7 +892,7 @@ export class ContractService implements OnModuleInit {
       return { lastBlock: blockTag, processedDelta: 0, skippedDelta: 1, stop: false };
     }
 
-    await this.persistHistoryAndUpdate(source, blockTag, marketAccounting, price, value, date);
+    await this.persistCreateAndUpdate(source, blockTag, marketAccounting, price, value, date);
     return { lastBlock: blockTag, processedDelta: 1, skippedDelta: 0, stop: false };
   }
 }

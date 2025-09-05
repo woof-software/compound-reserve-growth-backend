@@ -21,7 +21,7 @@ import { DailyAggregation } from './daily.entity';
     OracleModule,
     AlertModule,
     TypeOrmModule.forFeature([Snapshot, DailyAggregation]),
-    TypeOrmModule.forFeature([Oracle])
+    TypeOrmModule.forFeature([Oracle]),
   ],
   controllers: [CapoController],
   providers: [CapoService],

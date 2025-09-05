@@ -37,7 +37,7 @@ export class CapoService implements OnModuleInit {
 
   @Cron(CronExpression.EVERY_MINUTE)
   async collectOracleData() {
-    if(this.isCollecting) {
+    if (this.isCollecting) {
       this.logger.warn('Data collection already in progress, skipping this run');
       return;
     }

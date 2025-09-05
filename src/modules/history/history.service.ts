@@ -2,9 +2,9 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 
 import { SourceRepository } from 'modules/source/source.repository';
 
-import { HistoryRepository } from './history.repository';
+import { ReservesRepository } from './reserves-repository.service';
 import { CreateHistoryDto } from './dto/create-history.dto';
-import { History } from './history.entity';
+import { Reserve } from './reserve.entity';
 import { PaginationDto } from './dto/pagination.dto';
 import { OffsetDto } from './dto/offset.dto';
 
@@ -14,15 +14,15 @@ import { OffsetDataDto } from '@app/common/dto/offset-data.dto';
 @Injectable()
 export class HistoryService {
   constructor(
-    private readonly historyRepo: HistoryRepository,
+    private readonly reservesRepo: ReservesRepository,
     private readonly sourceRepo: SourceRepository,
   ) {}
 
-  async create(dto: CreateHistoryDto): Promise<History> {
+  async create(dto: CreateHistoryDto): Promise<Reserve> {
     const source = await this.sourceRepo.findById(dto.sourceId);
     if (!source) throw new NotFoundException(`Source ${dto.sourceId} not found`);
 
-    const history = new History(
+    const reserve = new Reserve(
       source,
       dto.blockNumber,
       dto.quantity,
@@ -30,54 +30,54 @@ export class HistoryService {
       dto.value,
       dto.date,
     );
-    return this.historyRepo.save(history);
+    return this.reservesRepo.save(reserve);
   }
-  async createWithSource(history: History): Promise<History> {
-    return this.historyRepo.save(history);
-  }
-
-  async findById(id: number): Promise<History> {
-    return this.historyRepo.findById(id);
+  async createWithSource(reserve: Reserve): Promise<Reserve> {
+    return this.reservesRepo.save(reserve);
   }
 
-  async getTreasuryHistory(): Promise<History[]> {
-    const history = await this.historyRepo.getTreasuryHistory();
-    if (!history || history.length === 0) {
+  async findById(id: number): Promise<Reserve> {
+    return this.reservesRepo.findById(id);
+  }
+
+  async getTreasuryHistory(): Promise<Reserve[]> {
+    const reserves = await this.reservesRepo.getTreasuryReserves();
+    if (!reserves || reserves.length === 0) {
       throw new NotFoundException('No treasury history found');
     }
-    return history;
+    return reserves;
   }
 
   async getPaginatedTreasuryHistory(
     paginationDto: PaginationDto,
-  ): Promise<PaginatedDataDto<History>> {
-    return this.historyRepo.getPaginatedTreasuryHistory(paginationDto);
+  ): Promise<PaginatedDataDto<Reserve>> {
+    return this.reservesRepo.getPaginatedTreasuryReserves(paginationDto);
   }
 
-  async getOffsetTreasuryHistory(dto: OffsetDto): Promise<OffsetDataDto<History>> {
-    return this.historyRepo.getOffsetTreasuryHistory(dto);
+  async getOffsetTreasuryHistory(dto: OffsetDto): Promise<OffsetDataDto<Reserve>> {
+    return this.reservesRepo.getOffsetTreasuryReserves(dto);
   }
 
-  async getRevenueHistory(): Promise<History[]> {
-    const history = await this.historyRepo.getRevenueHistory();
-    if (!history || history.length === 0) {
+  async getRevenueHistory(): Promise<Reserve[]> {
+    const reserves = await this.reservesRepo.getRevenueReserves();
+    if (!reserves || reserves.length === 0) {
       throw new NotFoundException('No revenue history found');
     }
-    return history;
+    return reserves;
   }
 
   async getPaginatedRevenueHistory(
     paginationDto: PaginationDto,
-  ): Promise<PaginatedDataDto<History>> {
-    return this.historyRepo.getPaginatedRevenueHistory(paginationDto);
+  ): Promise<PaginatedDataDto<Reserve>> {
+    return this.reservesRepo.getPaginatedRevenueReserves(paginationDto);
   }
 
-  async getOffsetRevenueHistory(dto: OffsetDto): Promise<OffsetDataDto<History>> {
-    return this.historyRepo.getOffsetRevenueHistory(dto);
+  async getOffsetRevenueHistory(dto: OffsetDto): Promise<OffsetDataDto<Reserve>> {
+    return this.reservesRepo.getOffsetRevenueReserves(dto);
   }
 
-  async getTreasuryHoldings(): Promise<History[]> {
-    const holdings = await this.historyRepo.getTreasuryHoldings();
+  async getTreasuryHoldings(): Promise<Reserve[]> {
+    const holdings = await this.reservesRepo.getTreasuryHoldings();
     if (!holdings || holdings.length === 0) {
       throw new NotFoundException('No treasury holdings found');
     }

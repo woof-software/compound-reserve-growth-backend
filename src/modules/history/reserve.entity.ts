@@ -2,8 +2,8 @@ import { Column, Entity, ManyToOne, PrimaryGeneratedColumn } from 'typeorm';
 
 import { Source } from 'modules/source/source.entity';
 
-@Entity({ name: 'history' })
-export class History {
+@Entity({ name: 'reserves' })
+export class Reserve {
   @PrimaryGeneratedColumn()
   public id: number;
 
@@ -25,7 +25,7 @@ export class History {
   @Column()
   public createdAt: Date;
 
-  @ManyToOne(() => Source, (source) => source.histories)
+  @ManyToOne(() => Source, (source) => source.reserves)
   public source: Source;
 
   constructor(
