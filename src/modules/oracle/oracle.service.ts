@@ -33,15 +33,17 @@ export class OracleService {
       const latestRoundData = await oracleContract.latestRoundData();
       const ratio = await oracleContract.getRatio();
       const isCapped = await oracleContract.isCapped();
+      const decimals = await oracleContract.decimals();
       const snapshotRatio = await oracleContract.snapshotRatio();
       const snapshotTimestamp = await oracleContract.snapshotTimestamp();
       const maxYearlyGrowthPercent = await oracleContract.maxYearlyRatioGrowthPercent();
 
       const price = latestRoundData.answer;
 
+        this.logger.log("PRIIIIIIIICEEEEEEEEEEEEE", ethers.formatUnits(price, decimals));
       return {
         ratio: ratio.toString(),
-        price: price.toString(),
+        price: ethers.formatUnits(price, decimals),
         snapshotRatio: snapshotRatio.toString(),
         snapshotTimestamp: Number(snapshotTimestamp),
         maxYearlyGrowthPercent: Number(maxYearlyGrowthPercent),

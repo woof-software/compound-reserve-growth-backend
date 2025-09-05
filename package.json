@@ -22,7 +22,10 @@
     "cli:source-fill": "nest build && node dist/src/cli.js source:fill",
     "cli:history-get": "nest build && node dist/src/cli.js history:get",
     "cli:event-fill": "nest build && node dist/src/cli.js event:fill",
-    "cli:price-preload": "nest build && node dist/src/cli.js price:preload"
+    "cli:price-preload": "nest build && node dist/src/cli.js price:preload",
+    "docker:up": "docker-compose up -d",
+    "docker:down": "docker-compose down",
+    "docker:clean": "docker volume prune -f && docker system prune -f"
   },
   "dependencies": {
     "@nestjs-modules/mailer": "^2.0.2",

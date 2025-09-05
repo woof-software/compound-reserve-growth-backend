@@ -1,47 +1,56 @@
-import { Entity, Column, PrimaryGeneratedColumn, CreateDateColumn, Index } from 'typeorm';
+import { Entity, Column, PrimaryGeneratedColumn, CreateDateColumn, Index, JoinColumn } from 'typeorm';
+import { ManyToOne } from 'typeorm';
+import { Source } from 'modules/source/source.entity';
 
 @Entity()
 @Index(['oracleAddress', 'date'])
 export class DailyAggregation {
   @PrimaryGeneratedColumn()
-  id: number;
+  public id: number;
 
   @Column()
-  oracleAddress: string;
+  public oracleAddress: string;
 
   @Column()
-  oracleName: string;
+  public oracleName: string;
 
   @Column()
-  chainId: number;
+  public chainId: number;
 
   @Column('date')
-  date: Date;
+  public date: Date;
 
   @Column('decimal', { precision: 78, scale: 0 })
-  avgRatio: string;
+  public avgRatio: string;
 
   @Column('decimal', { precision: 78, scale: 0 })
-  minRatio: string;
+  public minRatio: string;
 
   @Column('decimal', { precision: 78, scale: 0 })
-  maxRatio: string;
+  public maxRatio: string;
 
   @Column('decimal', { precision: 78, scale: 0 })
-  avgPrice: string;
+  public avgPrice: string;
 
   @Column('decimal', { precision: 78, scale: 0 })
-  minPrice: string;
+  public minPrice: string;
 
   @Column('decimal', { precision: 78, scale: 0 })
-  maxPrice: string;
+  public maxPrice: string;
 
   @Column()
-  cappedCount: number;
+  public cappedCount: number;
 
   @Column()
-  totalCount: number;
+  public totalCount: number;
 
   @CreateDateColumn()
-  createdAt: Date;
+  public createdAt: Date;
+
+  @Column({ nullable: true })
+  public sourceId: number;
+
+  @ManyToOne(() => Source, (source) => source.dailyAggregations, { eager: true })
+  @JoinColumn({ name: 'sourceId' })
+  public source: Source;
 }

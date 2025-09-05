@@ -71,6 +71,7 @@ export class DiscoveryService implements OnModuleInit {
     //       isActive: true,
     //     },
     //     ['address'],
+    //   );
 
     //   const oracleRow = await this.oracleRepository.findOne({
     //     where: { address: standaloneOracleAddress },
@@ -80,7 +81,6 @@ export class DiscoveryService implements OnModuleInit {
     //     try {
     //       const provider = this.providerFactory.get('mainnet');
     //       const oracleContract = new ethers.Contract(standaloneOracleAddress, CapoABI, provider);
-
     //       const [
     //         snapshotRatioBn,
     //         snapshotTimestampBn,
