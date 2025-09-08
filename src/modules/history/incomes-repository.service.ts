@@ -4,7 +4,7 @@ import { Repository } from 'typeorm';
 
 import { OffsetDto } from 'modules/history/dto/offset.dto';
 
-import { Incomes } from './entity';
+import { Incomes } from './entities';
 
 import { OffsetDataDto } from '@app/common/dto/offset-data.dto';
 import { Algorithm } from '@app/common/enum/algorithm.enum';

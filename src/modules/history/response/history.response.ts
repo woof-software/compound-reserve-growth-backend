@@ -1,6 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 
-import { Reserve } from 'modules/history/entity';
+import { Reserve } from 'modules/history/entities';
 
 export class HistoryResponse {
   @ApiProperty({ example: 1 })

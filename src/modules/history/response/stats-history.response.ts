@@ -1,6 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 
-import { StatsHistory } from 'modules/history/entity';
+import { StatsHistory } from 'modules/history/entities';
 
 export class StatsHistoryResponse {
   @ApiProperty({

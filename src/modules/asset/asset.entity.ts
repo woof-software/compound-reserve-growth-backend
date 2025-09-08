@@ -1,4 +1,4 @@
-import { Column, Entity, OneToMany, PrimaryGeneratedColumn } from 'typeorm';
+import { Column, CreateDateColumn, Entity, OneToMany, PrimaryGeneratedColumn } from 'typeorm';
 
 import { Source } from 'modules/source/source.entity';
 
@@ -22,7 +22,7 @@ export class Asset {
   @Column({ nullable: true })
   public type: string;
 
-  @Column()
+  @CreateDateColumn({ type: 'timestamp with time zone' })
   public createdAt: Date;
 
   @OneToMany(() => Source, (sources) => sources.asset)
@@ -34,6 +34,5 @@ export class Asset {
     this.symbol = symbol;
     this.network = network;
     this.type = type;
-    this.createdAt = new Date();
   }
 }

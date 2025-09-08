@@ -1,9 +1,9 @@
-import { Column, Entity, ManyToOne, PrimaryGeneratedColumn } from 'typeorm';
+import { Column, CreateDateColumn, Entity, ManyToOne, PrimaryGeneratedColumn } from 'typeorm';
 
 import { Source } from 'modules/source/source.entity';
 
-@Entity({ name: 'incomes' })
-export class Incomes {
+@Entity({ name: 'spends' })
+export class Spends {
   @PrimaryGeneratedColumn()
   public id: number;
 
@@ -28,10 +28,10 @@ export class Incomes {
   @Column()
   public date: Date;
 
-  @Column()
+  @CreateDateColumn({ type: 'timestamp with time zone' })
   public createdAt: Date;
 
-  @ManyToOne(() => Source, (source) => source.incomes)
+  @ManyToOne(() => Source, (source) => source.spends)
   public source: Source;
 
   constructor(
@@ -52,6 +52,5 @@ export class Incomes {
     this.valueSupply = valueSupply;
     this.valueBorrow = valueBorrow;
     this.date = date;
-    this.createdAt = new Date();
   }
 }

@@ -1,4 +1,4 @@
-import { Column, Entity, PrimaryGeneratedColumn } from 'typeorm';
+import { Column, CreateDateColumn, Entity, PrimaryGeneratedColumn } from 'typeorm';
 
 @Entity({ name: 'price' })
 export class Price {
@@ -14,13 +14,12 @@ export class Price {
   @Column()
   public date: Date;
 
-  @Column()
+  @CreateDateColumn({ type: 'timestamp with time zone' })
   public createdAt: Date;
 
   constructor(symbol: string, price: number, date: Date) {
     this.symbol = symbol;
     this.price = price;
     this.date = date;
-    this.createdAt = new Date();
   }
 }

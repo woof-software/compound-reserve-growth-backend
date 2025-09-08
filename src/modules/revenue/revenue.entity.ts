@@ -1,4 +1,4 @@
-import { Column, Entity, ManyToOne, PrimaryGeneratedColumn } from 'typeorm';
+import { Column, CreateDateColumn, Entity, ManyToOne, PrimaryGeneratedColumn } from 'typeorm';
 
 import { Source } from 'modules/source/source.entity';
 
@@ -19,7 +19,7 @@ export class Revenue {
   @Column({ type: 'double precision' })
   public value: number; // USD
 
-  @Column()
+  @CreateDateColumn({ type: 'timestamp with time zone' })
   public date: Date;
 
   @Column()
@@ -42,6 +42,5 @@ export class Revenue {
     this.price = price;
     this.value = value;
     this.date = date;
-    this.createdAt = new Date();
   }
 }

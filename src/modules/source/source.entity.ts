@@ -1,6 +1,6 @@
-import { Column, Entity, ManyToOne, OneToMany, PrimaryGeneratedColumn } from 'typeorm';
+import { Column, CreateDateColumn, Entity, ManyToOne, OneToMany, PrimaryGeneratedColumn } from 'typeorm';
 
-import { Reserve, Incomes, Spends } from 'modules/history/entity';
+import { Reserve, Incomes, Spends } from 'modules/history/entities';
 import { Revenue } from 'modules/revenue/revenue.entity';
 import { Treasury } from 'modules/treasury/treasury.entity';
 import { Asset } from 'modules/asset/asset.entity';
@@ -29,7 +29,7 @@ export class Source {
   @Column()
   public blockNumber: number;
 
-  @Column()
+  @CreateDateColumn({ type: 'timestamp with time zone' })
   public createdAt: Date;
 
   @Column({ nullable: true })
@@ -72,6 +72,5 @@ export class Source {
     this.blockNumber = blockNumber;
     this.asset = asset;
     this.market = market;
-    this.createdAt = new Date();
   }
 }

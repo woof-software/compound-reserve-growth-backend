@@ -7,7 +7,7 @@ import type { Redis } from 'ioredis';
 import { REDIS_CLIENT } from 'modules/redis/redis.module';
 import { ProviderFactory } from 'modules/network/provider.factory';
 import { HistoryService } from 'modules/history/history.service';
-import { Reserve, Spends, Incomes } from 'modules/history/entity';
+import { Reserve, Spends, Incomes } from 'modules/history/entities';
 import { Source } from 'modules/source/source.entity';
 import { SourceService } from 'modules/source/source.service';
 import { PriceService } from 'modules/price/price.service';

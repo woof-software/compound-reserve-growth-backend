@@ -1,6 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 
-import { Reserve } from 'modules/history/entity';
+import { Reserve } from 'modules/history/entities';
 import { SourceFullResponse } from 'modules/source/response/source-full.response';
 
 export class RevenueHistoryFullResponse {

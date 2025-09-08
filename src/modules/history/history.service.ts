@@ -6,7 +6,7 @@ import { ReservesRepository } from './reserves-repository.service';
 import { IncomesRepository } from './incomes-repository.service';
 import { SpendsRepository } from './spends-repository.service';
 import { CreateHistoryDto } from './dto/create-history.dto';
-import { Reserve, Incomes, Spends, StatsHistory } from './entity';
+import { Reserve, Incomes, Spends, StatsHistory } from './entities';
 import { PaginationDto } from './dto/pagination.dto';
 import { OffsetDto } from './dto/offset.dto';
 
