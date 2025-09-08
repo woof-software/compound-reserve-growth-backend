@@ -179,7 +179,7 @@ export class HistoryService {
     });
 
     // Apply offset and limit
-    const total = incomesData.total;
+    const total = Math.min(incomesData.total, spendsData.total);
     const offset = dto.offset ?? 0;
     const limit = dto.limit;
 
