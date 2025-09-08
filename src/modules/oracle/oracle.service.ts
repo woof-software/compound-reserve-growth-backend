@@ -39,8 +39,6 @@ export class OracleService {
       const maxYearlyGrowthPercent = await oracleContract.maxYearlyRatioGrowthPercent();
 
       const price = latestRoundData.answer;
-
-        this.logger.log("PRIIIIIIIICEEEEEEEEEEEEE", ethers.formatUnits(price, decimals));
       return {
         ratio: ratio.toString(),
         price: ethers.formatUnits(price, decimals),

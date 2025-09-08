@@ -12,6 +12,11 @@ import { Snapshot } from './snapshot.entity';
 import { DailyAggregation } from './daily.entity';
 import { Source } from 'modules/source/source.entity';
 import { DailyAggregationResponse } from './response/daily.response';
+import { OffsetDataDto } from '@app/common/dto/offset-data.dto';
+import { OffsetRequest } from 'modules/history/request/offset.request';
+import { Order } from '@app/common/enum/order.enum';
+import { PaginatedDataDto } from '@app/common/dto/paginated-data.dto';
+import { PaginationRequest } from 'modules/history/request/pagination.request';
 
 @Injectable()
 export class CapoService {
@@ -237,12 +242,15 @@ export class CapoService {
           where: { address: row.oracleAddress }
         });
 
-        let sourceId = null;
+        let source;
+        let sourceId;
+        let assetId
         if (oracle) {
-          const source = await this.sourceRepository.findOne({
+          source = await this.sourceRepository.findOne({
             where: { network: oracle.network }
           });
           sourceId = source?.id || null;
+          assetId = source?.assetId || null; 
         }
 
         const aggregation = this.aggregationRepository.create({
@@ -258,7 +266,8 @@ export class CapoService {
           maxPrice: row.maxPrice,
           cappedCount: Number(row.cappedCount ?? 0),
           totalCount: Number(row.totalCount ?? 0),
-          sourceId: sourceId
+          sourceId: sourceId,
+          assetId: assetId
         });
 
         await this.aggregationRepository.save(aggregation);
@@ -271,45 +280,92 @@ export class CapoService {
     this.logger.log(`Daily aggregation complete. Processed ${results.length} oracles.`);
   }
 
-  async listDailyAggregations(params?: { sourceAddress?: string; assetId?: number }) {
-    const qb = this.aggregationRepository
-      .createQueryBuilder('agg')
-      .leftJoinAndSelect('agg.source', 'source')
-      .leftJoinAndSelect('source.asset', 'asset')
-      .orderBy('agg.date', 'DESC');
+  async listDailyAggregations(params?: {
+    sourceId?: number;
+    assetId?: number;
+  }): Promise<DailyAggregationResponse[]> {
+    const qb = this.aggregationRepository.createQueryBuilder('agg');
 
-    if (params?.sourceAddress) {
-      qb.andWhere('LOWER(source.address) = LOWER(:address)', { address: params.sourceAddress });
+    if (params?.sourceId !== undefined) {
+      qb.andWhere('agg.sourceId = :sourceId', { sourceId: params.sourceId });
     }
-
     if (params?.assetId !== undefined) {
-      qb.andWhere('asset.id = :assetId', { assetId: params.assetId });
+      qb.andWhere('agg.assetId = :assetId', { assetId: params.assetId });
     }
 
-    const aggregations = await qb.getMany();
+    qb.orderBy('agg.date', 'DESC');
 
-    return aggregations.map(aggregation => ({
-      oracleAddress: aggregation.oracleAddress,
-      oracleName: aggregation.oracleName,
-      chainId: aggregation.chainId,
-      date: aggregation.date.toISOString().split('T')[0],
-      avgRatio: aggregation.avgRatio,
-      minRatio: aggregation.minRatio,
-      maxRatio: aggregation.maxRatio,
-      avgPrice: aggregation.avgPrice,
-      minPrice: aggregation.minPrice,
-      maxPrice: aggregation.maxPrice,
-      cappedCount: aggregation.cappedCount,
-      totalCount: aggregation.totalCount,
-      source: aggregation.source ? {
-        id: aggregation.source.id,
-        address: aggregation.source.address,
-        network: aggregation.source.network,
-        algorithm: aggregation.source.algorithm,
-        type: aggregation.source.type,
-        market: aggregation.source.market,
-        assetId: aggregation.source.asset.id
-      } : null
-    }));
+    const rows = await qb.getMany();
+
+    return rows.map((r) => this.toResponse(r));
+  }
+
+  async getPaginatedDailyAggregations(
+    dto: PaginationRequest & { sourceId?: number; assetId?: number },
+  ): Promise<PaginatedDataDto<DailyAggregationResponse>> {
+    const { page = 1, perPage, order = Order.DESC, sourceId, assetId } = dto;
+
+    const qb = this.aggregationRepository.createQueryBuilder('agg');
+
+    if (sourceId !== undefined) qb.andWhere('agg.sourceId = :sourceId', { sourceId });
+    if (assetId !== undefined) qb.andWhere('agg.assetId = :assetId', { assetId });
+
+    const total = await qb.getCount();
+
+    qb.orderBy('agg.date', order).skip((page - 1) * (perPage ?? total));
+    if (perPage) qb.take(perPage);
+
+    const rows = await qb.getMany();
+
+    return new PaginatedDataDto<DailyAggregationResponse>(
+      rows.map((r) => this.toResponse(r)),
+      page,
+      perPage ?? total,
+      total,
+    );
+  }
+
+  async getOffsetDailyAggregations(
+    dto: OffsetRequest& { sourceId?: number; assetId?: number },
+  ): Promise<OffsetDataDto<DailyAggregationResponse>> {
+    const { offset = 0, limit = null, order = Order.DESC, sourceId, assetId } = dto;
+
+    const qb = this.aggregationRepository.createQueryBuilder('agg');
+
+    if (sourceId !== undefined) qb.andWhere('agg.sourceId = :sourceId', { sourceId });
+    if (assetId !== undefined) qb.andWhere('agg.assetId = :assetId', { assetId });
+
+    const total = await qb.getCount();
+
+    qb.orderBy('agg.date', order).offset(offset);
+    if (limit !== null) qb.limit(limit);
+
+    const rows = await qb.getMany();
+
+    return new OffsetDataDto<DailyAggregationResponse>(
+      rows.map((r) => this.toResponse(r)),
+      limit,
+      offset,
+      total,
+    );
+  }
+
+  private toResponse(entity: DailyAggregation): DailyAggregationResponse {
+    return {
+      oracleAddress: entity.oracleAddress,
+      oracleName: entity.oracleName,
+      chainId: entity.chainId,
+      date: entity.date.toISOString().split('T')[0],
+      avgRatio: entity.avgRatio,
+      minRatio: entity.minRatio,
+      maxRatio: entity.maxRatio,
+      avgPrice: entity.avgPrice,
+      minPrice: entity.minPrice,
+      maxPrice: entity.maxPrice,
+      cappedCount: entity.cappedCount,
+      totalCount: entity.totalCount,
+      sourceId: entity.sourceId,
+      assetId: entity.assetId,
+    };
   }
 }

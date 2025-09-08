@@ -1,39 +1,38 @@
-import { Entity, Column, PrimaryGeneratedColumn, CreateDateColumn, Index, JoinColumn } from 'typeorm';
-import { ManyToOne } from 'typeorm';
+import { Entity, Column, PrimaryGeneratedColumn, CreateDateColumn, Index, JoinColumn, ManyToOne } from 'typeorm';
 import { Source } from 'modules/source/source.entity';
 
 @Entity()
 @Index(['oracleAddress', 'date'])
 export class DailyAggregation {
   @PrimaryGeneratedColumn()
-  public id: number;
+  id: number;
 
   @Column()
-  public oracleAddress: string;
+  oracleAddress: string;
 
   @Column()
-  public oracleName: string;
+  oracleName: string;
 
   @Column()
-  public chainId: number;
+  chainId: number;
 
   @Column('date')
-  public date: Date;
+  date: Date;
 
-  @Column('decimal', { precision: 78, scale: 0 })
-  public avgRatio: string;
+  @Column('decimal', { precision: 78, scale: 8 })
+  avgRatio: string;
 
-  @Column('decimal', { precision: 78, scale: 0 })
-  public minRatio: string;
+  @Column('decimal', { precision: 78, scale: 8 })
+  minRatio: string;
 
-  @Column('decimal', { precision: 78, scale: 0 })
-  public maxRatio: string;
+  @Column('decimal', { precision: 78, scale: 8 })
+  maxRatio: string;
 
-  @Column('decimal', { precision: 78, scale: 0 })
-  public avgPrice: string;
+  @Column('decimal', { precision: 78, scale: 8 })
+  avgPrice: string;
 
-  @Column('decimal', { precision: 78, scale: 0 })
-  public minPrice: string;
+  @Column('decimal', { precision: 78, scale: 8 })
+  minPrice: string;
 
   @Column('decimal', { precision: 78, scale: 0 })
   public maxPrice: string;
@@ -48,9 +47,12 @@ export class DailyAggregation {
   public createdAt: Date;
 
   @Column({ nullable: true })
-  public sourceId: number;
+  public sourceId: number | null;
+  
+  @Column({ nullable: true })
+  public assetId: number | null;
 
-  @ManyToOne(() => Source, (source) => source.dailyAggregations, { eager: true })
+  @ManyToOne(() => Source, (source) => source.dailyAggregations, { eager: false, nullable: true })
   @JoinColumn({ name: 'sourceId' })
-  public source: Source;
+  public source?: Source | null;
 }

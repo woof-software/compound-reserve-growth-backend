@@ -1,5 +1,4 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { SourceResponse } from 'modules/source/response/source.response';
 
 
 export class DailyAggregationResponse {
@@ -39,6 +38,9 @@ export class DailyAggregationResponse {
   @ApiProperty({ description: 'Total count of entries', example: 100 })
   totalCount: number;
 
-  @ApiProperty({ type: SourceResponse })
-    public source: SourceResponse;
+  @ApiProperty({ description: 'Source ID', example: 1, nullable: true })
+  sourceId: number | null;
+
+  @ApiProperty({ description: 'Asset ID', example: 1, nullable: true })
+  assetId: number | null;
 }
