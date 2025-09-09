@@ -5,6 +5,7 @@
     "removeComments": true,
     "emitDecoratorMetadata": true,
     "experimentalDecorators": true,
+    "isolatedModules": true,
     "esModuleInterop": true,
     "moduleResolution": "NodeNext",
     "allowSyntheticDefaultImports": true,
@@ -14,6 +15,7 @@
     "outDir": "./dist",
     "baseUrl": "src",
     "paths": {
+      "@/*": ["*"],
       "modules/*": ["modules/*"],
       "infrastructure/*": ["infrastructure/*"],
       "@app/*": ["*"]
