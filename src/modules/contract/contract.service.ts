@@ -541,20 +541,20 @@ export class ContractService implements OnModuleInit {
     const baseTrackingBorrowSpeed: bigint = await contract.baseTrackingBorrowSpeed({
       blockTag,
     });
-    const annualSupplyRewardTokens = Number(
+    const annualSupplyRewardCompTokens = Number(
       ethers.formatUnits(baseTrackingSupplySpeed * BigInt(YEAR_IN_SECONDS), trackingIndexDecimals),
     );
-    const annualBorrowRewardTokens = Number(
+    const annualBorrowRewardCompTokens = Number(
       ethers.formatUnits(baseTrackingBorrowSpeed * BigInt(YEAR_IN_SECONDS), trackingIndexDecimals),
     );
     const totalSupplyQuantity = Number(ethers.formatUnits(totalSupply, decimals));
     const totalBorrowsQuantity = Number(ethers.formatUnits(totalBorrows, decimals));
 
     const supplyCompRewards =
-      totalSupplyQuantity > 0 ? (annualSupplyRewardTokens / totalSupplyQuantity) * 100 : 0;
+      totalSupplyQuantity > 0 ? (annualSupplyRewardCompTokens / totalSupplyQuantity) * 100 : 0;
 
     const borrowCompRewards =
-      totalBorrowsQuantity > 0 ? (annualBorrowRewardTokens / totalBorrowsQuantity) * 100 : 0;
+      totalBorrowsQuantity > 0 ? (annualBorrowRewardCompTokens / totalBorrowsQuantity) * 100 : 0;
 
     return this.getMarketAccounting(
       reserves,
@@ -577,6 +577,7 @@ export class ContractService implements OnModuleInit {
   ): Promise<ResponseAlgorithm> {
     const reserves = await contract.totalReserves({ blockTag });
     const totalSupply = await contract.totalSupply({ blockTag });
+    const exchangeRate = await contract.exchangeRateStored({ blockTag });
     const totalBorrows = await contract.totalBorrows({ blockTag });
     const supplyRatePerBlock: bigint = await contract.supplyRatePerBlock({ blockTag });
     const borrowRatePerBlock: bigint = await contract.borrowRatePerBlock({ blockTag });
@@ -599,7 +600,9 @@ export class ContractService implements OnModuleInit {
     const compPerYearWei: bigint = compSpeedPerBlock * blocksPerYear;
     const compPerYearTokens = Number(ethers.formatUnits(compPerYearWei, compDecimals));
     const totalBorrowsTokens = Number(ethers.formatUnits(totalBorrows, decimals));
-    const totalSupplyTokens = Number(ethers.formatUnits(totalSupply, decimals));
+    const exchangeRateConvertor = ethers.formatUnits(exchangeRate, MARKET_DECIMALS);
+    const totalSupplyCTokens = Number(ethers.formatUnits(totalSupply, decimals));
+    const totalSupplyTokens = Number(totalSupplyCTokens) * Number(exchangeRateConvertor);
     const supplyCompRewards =
       totalSupplyTokens > 0 ? (compPerYearTokens / totalSupplyTokens) * 100 : 0;
     const borrowCompRewards =
