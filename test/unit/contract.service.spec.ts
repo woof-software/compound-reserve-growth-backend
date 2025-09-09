@@ -14,6 +14,11 @@ import { REDIS_CLIENT } from '../../src/modules/redis/redis.module';
 
 import { ethers } from 'ethers';
 
+// Fix BigInt serialization for Jest
+BigInt.prototype.toJSON = function () {
+  return this.toString();
+};
+
 jest.mock('ethers', () => {
   const actual = jest.requireActual('ethers');
 
@@ -210,9 +215,11 @@ describe('ContractService', () => {
       };
       const res = await (service as any).computeMarketAccounting(params);
       expect(mockProvider.getBalance).toHaveBeenCalledWith('0xVault', 123);
-      expect(res.reserves).toBe(1000n);
-      expect(res.incomes.supply).toBe(0n);
-      expect(res.spends.borrow).toBe(0n);
+      expect(res.reserves).toBe(0.000000000000001); // 1000n / 10^18
+      expect(res.incomes.supply).toBe(0);
+      expect(res.incomes.borrow).toBe(0);
+      expect(res.spends.supplyUsd).toBe(0);
+      expect(res.spends.borrowUsd).toBe(0);
     });
 
     it('uses ERC20.balanceOf for non-native assets', async () => {
@@ -221,7 +228,7 @@ describe('ContractService', () => {
         algorithm: 'OTHER',
         contract: {},
         blockTag: 456,
-        decimals: 18,
+        decimals: 6,
         provider: { getBalance: jest.fn() },
         contractAddress: '0xVault',
         network: 'base',
@@ -230,7 +237,7 @@ describe('ContractService', () => {
       };
       const res = await (service as any).computeMarketAccounting(params);
       expect(assetContract.balanceOf).toHaveBeenCalledWith('0xVault', { blockTag: 456 });
-      expect(res.reserves).toBe(2000n);
+      expect(res.reserves).toBe(0.002); // 2000n / 10^6
     });
   });
 

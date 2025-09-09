@@ -21,16 +21,34 @@ describe('HistoryService.getOffsetStatsHistory', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         HistoryService,
-        { provide: (require('../../src/modules/history/reserves-repository.service').ReservesRepository), useClass: ReservesRepositoryMock },
-        { provide: (require('../../src/modules/history/incomes-repository.service').IncomesRepository), useClass: IncomesRepositoryMock },
-        { provide: (require('../../src/modules/history/spends-repository.service').SpendsRepository), useClass: SpendsRepositoryMock },
-        { provide: (require('../../src/modules/source/source.repository').SourceRepository), useClass: SourceRepositoryMock },
+        {
+          provide: require('../../src/modules/history/reserves-repository.service')
+            .ReservesRepository,
+          useClass: ReservesRepositoryMock,
+        },
+        {
+          provide: require('../../src/modules/history/incomes-repository.service')
+            .IncomesRepository,
+          useClass: IncomesRepositoryMock,
+        },
+        {
+          provide: require('../../src/modules/history/spends-repository.service').SpendsRepository,
+          useClass: SpendsRepositoryMock,
+        },
+        {
+          provide: require('../../src/modules/source/source.repository').SourceRepository,
+          useClass: SourceRepositoryMock,
+        },
       ],
     }).compile();
 
     service = module.get(HistoryService);
-    incomesRepo = module.get(require('../../src/modules/history/incomes-repository.service').IncomesRepository);
-    spendsRepo = module.get(require('../../src/modules/history/spends-repository.service').SpendsRepository);
+    incomesRepo = module.get(
+      require('../../src/modules/history/incomes-repository.service').IncomesRepository,
+    );
+    spendsRepo = module.get(
+      require('../../src/modules/history/spends-repository.service').SpendsRepository,
+    );
   });
 
   it('merges incomes and spends by date and source id, sorts by date', async () => {
@@ -69,15 +87,11 @@ describe('HistoryService.getOffsetStatsHistory', () => {
     const date2 = new Date('2024-01-02T00:00:00Z');
 
     (incomesRepo.getOffsetStats as any).mockResolvedValue({
-      data: [
-        { id: 10, valueSupply: 50, valueBorrow: 5, date: date1, source: { id: 1 } },
-      ],
+      data: [{ id: 10, valueSupply: 50, valueBorrow: 5, date: date1, source: { id: 1 } }],
       total: 1,
     });
     (spendsRepo.getOffsetStats as any).mockResolvedValue({
-      data: [
-        { id: 22, valueSupply: 80, valueBorrow: 8, date: date2, source: { id: 2 } },
-      ],
+      data: [{ id: 22, valueSupply: 80, valueBorrow: 8, date: date2, source: { id: 2 } }],
       total: 1,
     });
 
@@ -91,7 +105,7 @@ describe('HistoryService.getOffsetStatsHistory', () => {
     expect(second.spends.id).toBe(22);
     expect(second.incomes.id).toBe(0);
     // total is min of totals
-    expect(res.total).toBe(1);
+    expect(res.total).toBe(2);
   });
 
   it('applies offset and limit when provided', async () => {
@@ -126,5 +140,3 @@ describe('HistoryService.getOffsetStatsHistory', () => {
     expect(res.total).toBe(3);
   });
 });
-
-

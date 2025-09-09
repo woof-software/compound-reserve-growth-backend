@@ -6,7 +6,9 @@
     "**/?(*.)spec.ts"
   ],
   "transform": {
-    "^.+\\.(t|j)s$": "ts-jest"
+    "^.+\\.(t|j)s$": ["ts-jest", {
+      "tsconfig": "tsconfig.json"
+    }]
   },
   "moduleNameMapper": {
     "^@/(.*)$": "<rootDir>/src/$1",
@@ -14,5 +16,7 @@
     "^modules/(.*)$": "<rootDir>/src/modules/$1",
     "^infrastructure/(.*)$": "<rootDir>/src/infrastructure/$1",
     "^config/(.*)$": "<rootDir>/src/config/$1"
-  }
+  },
+  "setupFilesAfterEnv": ["<rootDir>/test/setup.ts"],
+  "maxWorkers": 1
 }
