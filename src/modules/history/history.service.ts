@@ -105,9 +105,10 @@ export class HistoryService {
   }
 
   async getOffsetStatsHistory(dto: OffsetDto): Promise<OffsetDataDto<StatsHistory>> {
+    // Get all data without offset/limit first to properly merge and calculate total
     const [incomesData, spendsData] = await Promise.all([
-      this.IncomesRepo.getOffsetStats(dto),
-      this.SpendsRepo.getOffsetStats(dto),
+      this.IncomesRepo.getOffsetStats(new OffsetDto(undefined, 0, dto.order)),
+      this.SpendsRepo.getOffsetStats(new OffsetDto(undefined, 0, dto.order)),
     ]);
 
     // Create a map to group incomes and spends by date and source
@@ -178,8 +179,8 @@ export class HistoryService {
       return new Date(a.incomes.date).getTime() - new Date(b.incomes.date).getTime();
     });
 
-    // Apply offset and limit
-    const total = Math.min(incomesData.total, spendsData.total);
+    // Apply offset and limit to the merged and sorted data
+    const total = statsHistory.length;
     const offset = dto.offset ?? 0;
     const limit = dto.limit;
 
