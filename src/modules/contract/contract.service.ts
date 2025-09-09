@@ -35,14 +35,12 @@ import {
 import {
   DAY_IN_SEC,
   MARKET_DECIMALS,
-  PERCENT_PRECISION_SCALE_BI,
   SEC_IN_MS,
   YEAR_IN_DAYS,
   YEAR_IN_SECONDS,
 } from '@app/common/constants';
 import { Algorithm } from '@app/common/enum/algorithm.enum';
 import { scaleToDecimals } from '@app/common/utils/scale-to-decimals';
-import { percentToFp } from '@app/common/utils/percent-to-fp';
 
 @Injectable()
 export class ContractService implements OnModuleInit {
@@ -492,34 +490,11 @@ export class ContractService implements OnModuleInit {
     return this.arbitrumPeriods[this.arbitrumPeriods.length - 1];
   }
 
-  private getMarketAccounting(
-    reserves: bigint,
-    totalSupply: bigint,
-    totalBorrows: bigint,
-    earnApr: number,
-    borrowApr: number,
-    supplyCompRewards: number,
-    borrowCompRewards: number,
-  ): ResponseAlgorithm {
-    const borrowIncome =
-      (totalBorrows * percentToFp(borrowApr)) / (100n * PERCENT_PRECISION_SCALE_BI);
-    const borrowSpend =
-      (totalBorrows * percentToFp(borrowCompRewards)) / (100n * PERCENT_PRECISION_SCALE_BI);
-    const supplyIncome = (totalSupply * percentToFp(earnApr)) / (100n * PERCENT_PRECISION_SCALE_BI);
-    const supplySpend =
-      (totalSupply * percentToFp(supplyCompRewards)) / (100n * PERCENT_PRECISION_SCALE_BI);
-
-    return {
-      reserves,
-      incomes: { supply: supplyIncome, borrow: borrowIncome },
-      spends: { supply: supplySpend, borrow: borrowSpend },
-    };
-  }
-
   private async cometAlgorithms(
     contract: ethers.Contract,
     blockTag: number,
     decimals: number,
+    priceComp: number,
   ): Promise<ResponseAlgorithm> {
     const reserves: bigint = await contract.getReserves({ blockTag });
     const totalSupply: bigint = await contract.totalSupply({ blockTag });
@@ -535,6 +510,7 @@ export class ContractService implements OnModuleInit {
     const borrowApr = Number(
       ethers.formatUnits(borrowRatePerSec * BigInt(YEAR_IN_SECONDS) * 100n, MARKET_DECIMALS),
     );
+
     const baseTrackingSupplySpeed: bigint = await contract.baseTrackingSupplySpeed({
       blockTag,
     });
@@ -547,24 +523,23 @@ export class ContractService implements OnModuleInit {
     const annualBorrowRewardCompTokens = Number(
       ethers.formatUnits(baseTrackingBorrowSpeed * BigInt(YEAR_IN_SECONDS), trackingIndexDecimals),
     );
-    const totalSupplyQuantity = Number(ethers.formatUnits(totalSupply, decimals));
-    const totalBorrowsQuantity = Number(ethers.formatUnits(totalBorrows, decimals));
+    const supplyRewardsUSD = annualSupplyRewardCompTokens * priceComp;
+    const borrowRewardsUSD = annualBorrowRewardCompTokens * priceComp;
 
-    const supplyCompRewards =
-      totalSupplyQuantity > 0 ? (annualSupplyRewardCompTokens / totalSupplyQuantity) * 100 : 0;
+    const reservesToken = Number(ethers.formatUnits(reserves, decimals));
+    const totalSupplyTokens = Number(ethers.formatUnits(totalSupply, decimals));
+    const totalBorrowsTokens = Number(ethers.formatUnits(totalBorrows, decimals));
+    const supplyIncome = (totalSupplyTokens * earnApr) / 100;
+    const borrowIncome = (totalBorrowsTokens * borrowApr) / 100;
 
-    const borrowCompRewards =
-      totalBorrowsQuantity > 0 ? (annualBorrowRewardCompTokens / totalBorrowsQuantity) * 100 : 0;
-
-    return this.getMarketAccounting(
-      reserves,
-      totalSupply,
-      totalBorrows,
-      earnApr,
-      borrowApr,
-      supplyCompRewards,
-      borrowCompRewards,
-    );
+    return {
+      reserves: reservesToken,
+      incomes: {
+        supply: supplyIncome,
+        borrow: borrowIncome,
+      },
+      spends: { supplyUsd: supplyRewardsUSD, borrowUsd: borrowRewardsUSD },
+    };
   }
 
   private async marketV2Algorithms(
@@ -574,6 +549,7 @@ export class ContractService implements OnModuleInit {
     provider: ethers.JsonRpcProvider,
     contractAddress: string,
     network: string,
+    priceComp: number,
   ): Promise<ResponseAlgorithm> {
     const reserves = await contract.totalReserves({ blockTag });
     const totalSupply = await contract.totalSupply({ blockTag });
@@ -592,31 +568,42 @@ export class ContractService implements OnModuleInit {
     const comptrollerAddress = await contract.comptroller({ blockTag });
     const comptroller = new ethers.Contract(comptrollerAddress, ComptrollerABI, provider);
     const compAddress = await comptroller.getCompAddress();
-    const compSpeedPerBlock: bigint = await comptroller.compSpeeds(contractAddress, {
+    const compSupplySpeedPerBlock: bigint = await comptroller.compSupplySpeeds(contractAddress, {
+      blockTag,
+    });
+    const compSpeedBorrowPerBlock: bigint = await comptroller.compBorrowSpeeds(contractAddress, {
       blockTag,
     });
     const compTokenContract = new ethers.Contract(compAddress, ERC20ABI, provider);
     const compDecimals: number = await compTokenContract.decimals();
-    const compPerYearWei: bigint = compSpeedPerBlock * blocksPerYear;
-    const compPerYearTokens = Number(ethers.formatUnits(compPerYearWei, compDecimals));
-    const totalBorrowsTokens = Number(ethers.formatUnits(totalBorrows, decimals));
-    const exchangeRateConvertor = ethers.formatUnits(exchangeRate, MARKET_DECIMALS);
-    const totalSupplyCTokens = Number(ethers.formatUnits(totalSupply, decimals));
-    const totalSupplyTokens = Number(totalSupplyCTokens) * Number(exchangeRateConvertor);
-    const supplyCompRewards =
-      totalSupplyTokens > 0 ? (compPerYearTokens / totalSupplyTokens) * 100 : 0;
-    const borrowCompRewards =
-      totalBorrowsTokens > 0 ? (compPerYearTokens / totalBorrowsTokens) * 100 : 0;
-
-    return this.getMarketAccounting(
-      reserves,
-      totalSupply,
-      totalBorrows,
-      earnApr,
-      borrowApr,
-      supplyCompRewards,
-      borrowCompRewards,
+    const compSupplyPerYearWei: bigint = compSupplySpeedPerBlock * blocksPerYear;
+    const compBorrowPerYearWei: bigint = compSpeedBorrowPerBlock * blocksPerYear;
+    const compSupplyPerYearCompTokens = Number(
+      ethers.formatUnits(compSupplyPerYearWei, compDecimals),
     );
+    const compBorrowPerYearCompTokens = Number(
+      ethers.formatUnits(compBorrowPerYearWei, compDecimals),
+    );
+    const totalBorrowsTokens = Number(ethers.formatUnits(totalBorrows, decimals));
+    const totalSupplyCTokens = Number(ethers.formatUnits(totalSupply, decimals));
+    const exchangeRateConvertor = ethers.formatUnits(exchangeRate, MARKET_DECIMALS);
+    const totalSupplyTokens = Number(totalSupplyCTokens) * Number(exchangeRateConvertor);
+    const supplyRewardsUSD = compSupplyPerYearCompTokens * priceComp;
+    const borrowRewardsUSD = compBorrowPerYearCompTokens * priceComp;
+
+    const supplyIncome = (totalSupplyTokens * earnApr) / 100;
+    const borrowIncome = (totalBorrowsTokens * borrowApr) / 100;
+
+    const reservesToken = Number(ethers.formatUnits(reserves, decimals));
+
+    return {
+      reserves: reservesToken,
+      incomes: {
+        supply: supplyIncome,
+        borrow: borrowIncome,
+      },
+      spends: { supplyUsd: supplyRewardsUSD, borrowUsd: borrowRewardsUSD },
+    };
   }
 
   async getHistory(source: Source) {
@@ -760,12 +747,17 @@ export class ContractService implements OnModuleInit {
       network,
       asset,
       assetContract,
+      date,
     } = params;
+    const assetCompToken = { address: null, symbol: 'COMP', decimals: null };
+    let priceComp: number;
 
     switch (algorithm) {
       case Algorithm.COMET:
-        return this.cometAlgorithms(contract, blockTag, decimals);
+        priceComp = await this.fetchPriceOrStop(assetCompToken, date);
+        return this.cometAlgorithms(contract, blockTag, decimals, priceComp);
       case Algorithm.MARKET_V2:
+        priceComp = await this.fetchPriceOrStop(assetCompToken, date);
         return this.marketV2Algorithms(
           contract,
           blockTag,
@@ -773,16 +765,18 @@ export class ContractService implements OnModuleInit {
           provider,
           contractAddress,
           network,
+          priceComp,
         );
       default: {
         const reserves: bigint =
           asset.symbol === 'ETH' || asset.symbol === 'MNT'
             ? await provider.getBalance(contractAddress, blockTag)
             : await assetContract.balanceOf(contractAddress, { blockTag });
+        const reservesToken = Number(ethers.formatUnits(reserves, decimals));
         return {
-          reserves,
-          incomes: { supply: 0n, borrow: 0n },
-          spends: { supply: 0n, borrow: 0n },
+          reserves: reservesToken,
+          incomes: { supply: 0, borrow: 0 },
+          spends: { supplyUsd: 0, borrowUsd: 0 },
         };
       }
     }
@@ -880,8 +874,8 @@ export class ContractService implements OnModuleInit {
     const newSpends = new Spends(
       source,
       blockTag,
-      marketAccounting.spends.supply.toString(),
-      marketAccounting.spends.borrow.toString(),
+      marketAccounting.spends.supplyUsd.toString(),
+      marketAccounting.spends.borrowUsd.toString(),
       price,
       spendSupplyValue,
       spendBorrowValue,
@@ -913,6 +907,7 @@ export class ContractService implements OnModuleInit {
     } = params;
 
     const blockTag = await this.findBlockByTimestamp(network, provider, targetTs, lastBlock);
+    const date = new Date(targetTs * 1000);
 
     let marketAccounting: ResponseAlgorithm;
     try {
@@ -926,6 +921,7 @@ export class ContractService implements OnModuleInit {
         network,
         asset,
         assetContract,
+        date,
       });
     } catch (e: any) {
       if (e.code === 'CALL_EXCEPTION') {
@@ -937,76 +933,27 @@ export class ContractService implements OnModuleInit {
       throw e;
     }
 
-    const date = new Date(targetTs * 1000);
     const price = await this.fetchPriceOrStop(asset, date);
     if (price === null) {
       return { lastBlock, processedDelta: 0, skippedDelta: 0, stop: true };
     }
 
-    // Validate and calculate all quantity
-    const reserveQuantity = this.validateAndCalculateQuantity(
-      marketAccounting.reserves,
-      asset.decimals,
-      price,
-      'reserve',
-    );
-    if (!reserveQuantity.isValid) {
-      this.logger.warn(
-        `Reserve validation failed, skipping day ${new Date(targetTs * SEC_IN_MS).toISOString().slice(0, 10)}`,
-      );
-      return { lastBlock: blockTag, processedDelta: 0, skippedDelta: 1, stop: false };
-    }
-
-    const incomeSupplyQuantity = this.validateAndCalculateQuantity(
-      marketAccounting.incomes.supply,
-      asset.decimals,
-      price,
-      'supply income',
-    );
-    if (!incomeSupplyQuantity.isValid) {
-      return { lastBlock: blockTag, processedDelta: 0, skippedDelta: 1, stop: false };
-    }
-
-    const incomeBorrowQuantity = this.validateAndCalculateQuantity(
-      marketAccounting.incomes.borrow,
-      asset.decimals,
-      price,
-      'borrow income',
-    );
-    if (!incomeBorrowQuantity.isValid) {
-      return { lastBlock: blockTag, processedDelta: 0, skippedDelta: 1, stop: false };
-    }
-
-    const spendSupplyQuantity = this.validateAndCalculateQuantity(
-      marketAccounting.spends.supply,
-      asset.decimals,
-      price,
-      'supply spend',
-    );
-    if (!spendSupplyQuantity.isValid) {
-      return { lastBlock: blockTag, processedDelta: 0, skippedDelta: 1, stop: false };
-    }
-
-    const spendBorrowQuantity = this.validateAndCalculateQuantity(
-      marketAccounting.spends.borrow,
-      asset.decimals,
-      price,
-      'borrow spend',
-    );
-    if (!spendBorrowQuantity.isValid) {
-      return { lastBlock: blockTag, processedDelta: 0, skippedDelta: 1, stop: false };
-    }
+    const reserveQuantity = marketAccounting.reserves * price;
+    const incomeSupplyQuantity = marketAccounting.incomes.supply * price;
+    const incomeBorrowQuantity = marketAccounting.incomes.borrow * price;
+    const spendSupplyQuantity = marketAccounting.spends.supplyUsd;
+    const spendBorrowQuantity = marketAccounting.spends.borrowUsd;
 
     await this.persistCreateAndUpdate({
       source,
       blockTag,
       marketAccounting,
       price,
-      reserveValue: reserveQuantity.value,
-      incomeSupplyValue: incomeSupplyQuantity.value,
-      incomeBorrowValue: incomeBorrowQuantity.value,
-      spendSupplyValue: spendSupplyQuantity.value,
-      spendBorrowValue: spendBorrowQuantity.value,
+      reserveValue: reserveQuantity,
+      incomeSupplyValue: incomeSupplyQuantity,
+      incomeBorrowValue: incomeBorrowQuantity,
+      spendSupplyValue: spendSupplyQuantity,
+      spendBorrowValue: spendBorrowQuantity,
       date,
     });
     return { lastBlock: blockTag, processedDelta: 1, skippedDelta: 0, stop: false };

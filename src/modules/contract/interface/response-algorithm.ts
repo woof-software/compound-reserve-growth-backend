@@ -1,11 +1,11 @@
 export interface ResponseAlgorithm {
-  reserves: bigint;
+  reserves: number;
   incomes: {
-    supply: bigint;
-    borrow: bigint;
+    supply: number;
+    borrow: number;
   };
   spends: {
-    supply: bigint;
-    borrow: bigint;
+    supplyUsd: number;
+    borrowUsd: number;
   };
 }

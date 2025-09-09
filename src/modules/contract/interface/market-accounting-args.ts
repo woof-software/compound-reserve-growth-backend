@@ -12,4 +12,5 @@ export interface MarketAccountingArgs {
   network: string;
   asset: { symbol: string };
   assetContract: ethers.Contract;
+  date: Date;
 }
