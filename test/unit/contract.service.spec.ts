@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Logger } from '@nestjs/common';
 import type { Cache } from 'cache-manager';
+import { ethers } from 'ethers';
 
 import { ContractService } from '../../src/modules/contract/contract.service';
 import { ProviderFactory } from '../../src/modules/network/provider.factory';
@@ -9,10 +10,7 @@ import { HistoryService } from '../../src/modules/history/history.service';
 import { SourceService } from '../../src/modules/source/source.service';
 import { PriceService } from '../../src/modules/price/price.service';
 import { MailService } from '../../src/modules/mail/mail.service';
-import { Algorithm } from '../../src/common/enum/algorithm.enum';
 import { REDIS_CLIENT } from '../../src/modules/redis/redis.module';
-
-import { ethers } from 'ethers';
 
 // Fix BigInt serialization for Jest
 BigInt.prototype.toJSON = function () {
@@ -188,12 +186,7 @@ describe('ContractService', () => {
       };
       (ethers as any).Contract.__setNextInstances([rewardsInstance]);
 
-      const token = await service.getRewardsCompToken(
-        '0xRewards',
-        '0xComet',
-        'base',
-        mockProvider,
-      );
+      const token = await service.getRewardsCompToken('0xRewards', '0xComet', 'base', mockProvider);
       expect(rewardsInstance.rewardConfig).toHaveBeenCalledWith('0xComet');
       expect(token).toBe('0xComp');
     });
@@ -255,12 +248,7 @@ describe('ContractService', () => {
           return { blockNumber, timestamp: 1000, hash: '0x' };
         });
 
-      const result = await (service as any).findBlockByTimestamp(
-        'base',
-        mockProvider,
-        1120,
-        100,
-      );
+      const result = await (service as any).findBlockByTimestamp('base', mockProvider, 1120, 100);
       expect(result).toBe(160);
       expect(getCachedBlockSpy).toHaveBeenCalled();
     });
@@ -285,9 +273,7 @@ describe('ContractService', () => {
         timestamp: 1_700_000_000,
         hash: '0x',
       });
-      jest
-        .spyOn<any, any>(service as any, 'buildDailyTimestamps')
-        .mockReturnValue([]);
+      jest.spyOn<any, any>(service as any, 'buildDailyTimestamps').mockReturnValue([]);
 
       await service.getHistory(baseSource);
 
@@ -332,5 +318,3 @@ describe('ContractService', () => {
     });
   });
 });
-
-
