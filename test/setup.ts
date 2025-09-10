@@ -2,14 +2,19 @@
 // This fixes the "Do not know how to serialize a BigInt" error
 
 // Add BigInt support to JSON.stringify
-BigInt.prototype.toJSON = function () {
+(BigInt.prototype as any).toJSON = function () {
   return this.toString();
 };
 
 // Override the default serializer for Jest
 expect.addSnapshotSerializer({
   test: (val) => typeof val === 'bigint',
-  print: (val) => `BigInt(${val.toString()})`,
+  print: (val: unknown) => {
+    if (typeof val === 'bigint') {
+      return `BigInt(${val.toString()})`;
+    }
+    return String(val);
+  },
 });
 
 // Handle BigInt in expect.toEqual and other matchers
@@ -50,3 +55,5 @@ JSON.stringify = function (value, replacer, space) {
   };
   return originalStringify.call(this, value, customReplacer, space);
 };
+
+export {};

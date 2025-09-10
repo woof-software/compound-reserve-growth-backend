@@ -13,7 +13,7 @@ import { MailService } from '../../src/modules/mail/mail.service';
 import { REDIS_CLIENT } from '../../src/modules/redis/redis.module';
 
 // Fix BigInt serialization for Jest
-BigInt.prototype.toJSON = function () {
+(BigInt.prototype as any).toJSON = function () {
   return this.toString();
 };
 
