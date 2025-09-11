@@ -24,30 +24,35 @@ export class OracleService {
   constructor(private readonly providerFactory: ProviderFactory) {}
 
   async getOracleData(oracle: Oracle): Promise<OracleData> {
-    const provider = this.providerFactory.get(oracle.network);
-    const oracleContract = new ethers.Contract(oracle.address, CapoABI, provider);
+    try {
+      const provider = this.providerFactory.get(oracle.network);
+      const oracleContract = new ethers.Contract(oracle.address, CapoABI, provider);
 
-    const currentBlock = await provider.getBlock('latest');
+      const currentBlock = await provider.getBlock('latest');
 
-    const latestRoundData = await oracleContract.latestRoundData();
-    const ratio = await oracleContract.getRatio();
-    const isCapped = await oracleContract.isCapped();
-    const decimals = await oracleContract.decimals();
-    const snapshotRatio = await oracleContract.snapshotRatio();
-    const snapshotTimestamp = await oracleContract.snapshotTimestamp();
-    const maxYearlyGrowthPercent = await oracleContract.maxYearlyRatioGrowthPercent();
+      const latestRoundData = await oracleContract.latestRoundData();
+      const ratio = await oracleContract.getRatio();
+      const isCapped = await oracleContract.isCapped();
+      const decimals = await oracleContract.decimals();
+      const snapshotRatio = await oracleContract.snapshotRatio();
+      const snapshotTimestamp = await oracleContract.snapshotTimestamp();
+      const maxYearlyGrowthPercent = await oracleContract.maxYearlyRatioGrowthPercent();
 
-    const price = latestRoundData.answer;
-    return {
-      ratio: ratio.toString(),
-      price: ethers.formatUnits(price, decimals),
-      snapshotRatio: snapshotRatio.toString(),
-      snapshotTimestamp: Number(snapshotTimestamp),
-      maxYearlyGrowthPercent: Number(maxYearlyGrowthPercent),
-      isCapped,
-      blockNumber: currentBlock.number,
-      timestamp: currentBlock.timestamp,
-    };
+      const price = latestRoundData.answer;
+      return {
+        ratio: ratio.toString(),
+        price: ethers.formatUnits(price, decimals),
+        snapshotRatio: snapshotRatio.toString(),
+        snapshotTimestamp: Number(snapshotTimestamp),
+        maxYearlyGrowthPercent: Number(maxYearlyGrowthPercent),
+        isCapped,
+        blockNumber: currentBlock.number,
+        timestamp: currentBlock.timestamp,
+      };
+    } catch (error) {
+      this.logger.error(`Failed to get oracle data for ${oracle.address}:`, error);
+      throw error;
+    }
   }
 
   calculateCapoValues(oracleData: OracleData) {
@@ -94,7 +99,7 @@ export class OracleService {
     };
   }
 
-  private calculateMaxRatio(
+  public calculateMaxRatio(
     snapshotRatio: string,
     maxYearlyGrowthPercentBps: number,
     timeDiff: number,
@@ -138,13 +143,13 @@ export class OracleService {
     maxRatio: string,
   ): number {
     const snapshot = BigInt(snapshotRatio);
-    const current  = BigInt(currentRatio);
-    const max      = BigInt(maxRatio);
+    const current = BigInt(currentRatio);
+    const max = BigInt(maxRatio);
 
     if (max <= snapshot) return 0;
 
     const used = current > snapshot ? current - snapshot : 0n;
-    const cap  = max - snapshot;
+    const cap = max - snapshot;
 
     const utilBps = (used * 10_000n) / cap;
     return Number(utilBps) / 100;

@@ -23,6 +23,9 @@ export class DailyAggregationResponse {
   @ApiProperty({ description: 'Maximum ratio', example: '1100000000000000000' })
   maxRatio: string;
 
+  @ApiProperty({ description: 'Cap value', example: '1200000000000000000' })
+  cap: string;
+
   @ApiProperty({ description: 'Average price', example: '2000000000' })
   avgPrice: string;
 

@@ -5,37 +5,40 @@ import { Source } from 'modules/source/source.entity';
 @Index(['oracleAddress', 'date'])
 export class DailyAggregation {
   @PrimaryGeneratedColumn()
-  id: number;
+  public id: number;
 
   @Column()
-  oracleAddress: string;
+  public oracleAddress: string;
 
   @Column()
-  oracleName: string;
+  public oracleName: string;
 
   @Column()
-  chainId: number;
+  public chainId: number;
 
   @Column('date')
-  date: Date;
-
-  @Column('decimal', { precision: 78, scale: 8 })
-  avgRatio: string;
-
-  @Column('decimal', { precision: 78, scale: 8 })
-  minRatio: string;
-
-  @Column('decimal', { precision: 78, scale: 8 })
-  maxRatio: string;
-
-  @Column('decimal', { precision: 78, scale: 8 })
-  avgPrice: string;
-
-  @Column('decimal', { precision: 78, scale: 8 })
-  minPrice: string;
+  public date: Date;
 
   @Column('decimal', { precision: 78, scale: 0 })
+  public avgRatio: string;
+
+  @Column('decimal', { precision: 78, scale: 0 })
+  public minRatio: string;
+
+  @Column('decimal', { precision: 78, scale: 0 })
+  public maxRatio: string;
+
+  @Column('decimal', { precision: 78, scale: 8 })
+  public avgPrice: string;
+
+  @Column('decimal', { precision: 78, scale: 8 })
+  public minPrice: string;
+
+  @Column('decimal', { precision: 78, scale: 8 })
   public maxPrice: string;
+
+  @Column('decimal', { precision: 78, scale: 8, nullable: true })
+  public cap: string;
 
   @Column()
   public cappedCount: number;
