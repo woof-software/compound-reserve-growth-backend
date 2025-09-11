@@ -198,7 +198,7 @@ export class CapoService {
     }
   }
 
-  @Cron("0 */3 * * * *")
+  @Cron(CronExpression.EVERY_DAY_AT_MIDNIGHT)
   async aggregateDailyData() {
     this.logger.log('Starting daily aggregation...');
 
