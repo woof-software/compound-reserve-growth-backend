@@ -21,6 +21,7 @@ import { PaginationMetaResponse } from '@app/common/response/pagination-meta.res
 import { OffsetDataResponse } from '@app/common/response/offset-data.response';
 import { OffsetMetaResponse } from '@app/common/response/offset-meta.response';
 import { ApiOffsetResponse } from '@app/common/swagger/api-offset-response.decorator';
+import { HOUR_IN_SEC } from '@app/common/constants';
 
 @Injectable()
 @Controller('history')
@@ -78,7 +79,7 @@ export class HistoryController {
     @Query() request: OffsetRequest,
   ): Promise<OffsetDataResponse<HistoryResponse>> {
     const key = `history:v2:treasury:${request.limit ?? 'null'}:${request.offset ?? 0}:${request.order ?? 'DESC'}`;
-    const ttl = 600; // 10 minutes
+    const ttl = HOUR_IN_SEC;
 
     const cached = await this.redisClient.get(key);
     if (cached) return JSON.parse(cached) as OffsetDataResponse<HistoryResponse>;
@@ -105,7 +106,7 @@ export class HistoryController {
     @Query() request: OffsetRequest,
   ): Promise<OffsetDataResponse<RevenueHistoryResponse>> {
     const key = `history:v2:revenue:${request.limit ?? 'null'}:${request.offset ?? 0}:${request.order ?? 'DESC'}`;
-    const ttl = 600; // 10 minutes
+    const ttl = HOUR_IN_SEC;
 
     const cached = await this.redisClient.get(key);
     if (cached) return JSON.parse(cached) as OffsetDataResponse<RevenueHistoryResponse>;
