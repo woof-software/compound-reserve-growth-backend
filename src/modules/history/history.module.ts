@@ -4,6 +4,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { AssetModule } from 'modules/asset/asset.module';
 import { SourceModule } from 'modules/source/source.module';
 import { ContractModule } from 'modules/contract/contract.module';
+import { RedisModule } from 'modules/redis/redis.module';
 
 import { History } from './history.entity';
 import { HistoryRepository } from './history.repository';
@@ -19,6 +20,7 @@ import { GetHistoryService } from './cron/history-get.service';
     SourceModule,
     AssetModule,
     forwardRef(() => ContractModule),
+    RedisModule,
   ],
   providers: [
     HistoryRepository,

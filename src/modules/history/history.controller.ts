@@ -1,6 +1,9 @@
 import { ApiOperation } from '@nestjs/swagger';
-import { Controller, Injectable, HttpStatus, HttpCode, Get, Query } from '@nestjs/common';
+import { Controller, Injectable, HttpStatus, HttpCode, Get, Query, Inject } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
+import Redis from 'ioredis';
+
+import { REDIS_CLIENT } from 'modules/redis/redis.module';
 
 import { HistoryService } from './history.service';
 import { HistoryResponse } from './response/history.response';
@@ -16,13 +19,16 @@ import { ApiPaginatedResponse } from '@app/common/swagger/api-paginated-response
 import { PaginatedDataResponse } from '@app/common/response/paginated-data.response';
 import { PaginationMetaResponse } from '@app/common/response/pagination-meta.response';
 import { OffsetDataResponse } from '@app/common/response/offset-data.response';
-import { OffsetnMetaResponse } from '@app/common/response/offset-meta.response';
+import { OffsetMetaResponse } from '@app/common/response/offset-meta.response';
 import { ApiOffsetResponse } from '@app/common/swagger/api-offset-response.decorator';
 
 @Injectable()
 @Controller('history')
 export class HistoryController {
-  constructor(private readonly historyService: HistoryService) {}
+  constructor(
+    private readonly historyService: HistoryService,
+    @Inject(REDIS_CLIENT) private readonly redisClient: Redis,
+  ) {}
 
   @Throttle({ default: { limit: 15, ttl: 1000 } })
   @ApiOperation({ summary: 'Get treasury history full response' })
@@ -71,15 +77,23 @@ export class HistoryController {
   async getTreasuryHistory(
     @Query() request: OffsetRequest,
   ): Promise<OffsetDataResponse<HistoryResponse>> {
+    const key = `history:v2:treasury:${request.limit ?? 'null'}:${request.offset ?? 0}:${request.order ?? 'DESC'}`;
+    const ttl = 600; // 10 minutes
+
+    const cached = await this.redisClient.get(key);
+    if (cached) return JSON.parse(cached) as OffsetDataResponse<HistoryResponse>;
+
     const paginatedData = await this.historyService.getOffsetTreasuryHistory(
       new OffsetDto(request?.limit, request?.offset, request?.order),
     );
-    return new OffsetDataResponse<HistoryResponse>(
+    const res = new OffsetDataResponse<HistoryResponse>(
       paginatedData.data.map((history) => {
         return new HistoryResponse(history);
       }),
-      new OffsetnMetaResponse(paginatedData.limit, paginatedData.offset, paginatedData.total),
+      new OffsetMetaResponse(paginatedData.limit, paginatedData.offset, paginatedData.total),
     );
+    await this.redisClient.set(key, JSON.stringify(res), 'EX', ttl);
+    return res;
   }
 
   @Throttle({ default: { limit: 15, ttl: 1000 } })
@@ -90,14 +104,22 @@ export class HistoryController {
   async getRevenueHistory(
     @Query() request: OffsetRequest,
   ): Promise<OffsetDataResponse<RevenueHistoryResponse>> {
+    const key = `history:v2:revenue:${request.limit ?? 'null'}:${request.offset ?? 0}:${request.order ?? 'DESC'}`;
+    const ttl = 600; // 10 minutes
+
+    const cached = await this.redisClient.get(key);
+    if (cached) return JSON.parse(cached) as OffsetDataResponse<RevenueHistoryResponse>;
+
     const paginatedData = await this.historyService.getOffsetRevenueHistory(
       new OffsetDto(request?.limit, request?.offset, request?.order),
     );
-    return new OffsetDataResponse<RevenueHistoryResponse>(
+    const res = new OffsetDataResponse<RevenueHistoryResponse>(
       paginatedData.data.map((history) => {
         return new RevenueHistoryResponse(history);
       }),
-      new OffsetnMetaResponse(paginatedData.limit, paginatedData.offset, paginatedData.total),
+      new OffsetMetaResponse(paginatedData.limit, paginatedData.offset, paginatedData.total),
     );
+    await this.redisClient.set(key, JSON.stringify(res), 'EX', ttl);
+    return res;
   }
 }
