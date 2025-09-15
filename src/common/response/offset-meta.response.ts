@@ -1,6 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 
-export class OffsetnMetaResponse {
+export class OffsetMetaResponse {
   @ApiProperty({
     example: 1,
   })
