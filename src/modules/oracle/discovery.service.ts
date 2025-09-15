@@ -27,6 +27,7 @@ interface CapoOracleInfo {
   minimumSnapshotDelay: number;
   decimals: number;
   manager: string;
+  isActive: boolean;
 }
 
 @Injectable()
@@ -255,6 +256,7 @@ export class DiscoveryService implements OnModuleInit {
         minimumSnapshotDelay: Number(minimumSnapshotDelay),
         decimals: Number(decimals),
         manager,
+        isActive: true,
       };
 
       return oracleInfo;

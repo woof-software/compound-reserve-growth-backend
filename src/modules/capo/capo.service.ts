@@ -166,13 +166,12 @@ export class CapoService {
         return;
       }
 
-      const currentPrice = BigInt(currentData.price);
-      const oldPrice = BigInt(oldSnapshot.price);
+      const currentPrice = Number(currentData.price);
+      const oldPrice = Number(oldSnapshot.price);
 
-      if (oldPrice === 0n) return;
+      if (oldPrice === 0) return;
 
-      const priceChange = ((currentPrice - oldPrice) * 10000n) / oldPrice;
-      const priceChangePercent = Number(priceChange) / 100;
+      const priceChangePercent = ((currentPrice - oldPrice) / oldPrice) * 100;
 
       this.logger.log(`${oracle.description} 24h price change: ${priceChangePercent.toFixed(2)}%`);
 
