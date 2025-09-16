@@ -2,13 +2,13 @@ import { Controller, Injectable, Get, HttpCode, HttpStatus, Query } from '@nestj
 import { Throttle } from '@nestjs/throttler';
 import { ApiOkResponse, ApiOperation } from '@nestjs/swagger';
 
-import { CapoService } from './capo.service';
-import { DailyAggregationResponse } from './response/daily.response';
-import { DailyAggregationRequest } from './request/daily.request';
-
-import { PaginationRequest } from 'common/request/pagination.request';
 import { OffsetRequest } from 'modules/history/request/offset.request';
 
+import { PaginationRequest } from 'common/request/pagination.request';
+
+import { DailyAggregationResponse } from './response/daily.response';
+import { DailyAggregationRequest } from './request/daily.request';
+import { CapoService } from './capo.service';
 
 import { ApiPaginatedResponse } from '@app/common/swagger/api-paginated-response.decorator';
 import { ApiOffsetResponse } from '@app/common/swagger/api-offset-response.decorator';
@@ -41,9 +41,7 @@ export class CapoController {
   async getDailyPaginated(
     @Query() request: PaginationRequest & DailyAggregationRequest,
   ): Promise<PaginatedDataResponse<DailyAggregationResponse>> {
-    const paginated = await this.capoService.getPaginatedDailyAggregations(
-      { ...request },
-    );
+    const paginated = await this.capoService.getPaginatedDailyAggregations({ ...request });
     return new PaginatedDataResponse<DailyAggregationResponse>(
       paginated.data,
       new PaginationMetaResponse(paginated.page, paginated.perPage, paginated.total),
@@ -58,9 +56,7 @@ export class CapoController {
   async getDailyOffset(
     @Query() request: OffsetRequest & DailyAggregationRequest,
   ): Promise<OffsetDataResponse<DailyAggregationResponse>> {
-    const offsetData = await this.capoService.getOffsetDailyAggregations(
-      { ...request },
-    );
+    const offsetData = await this.capoService.getOffsetDailyAggregations({ ...request });
     return new OffsetDataResponse<DailyAggregationResponse>(
       offsetData.data,
       new OffsetnMetaResponse(offsetData.limit, offsetData.offset, offsetData.total),

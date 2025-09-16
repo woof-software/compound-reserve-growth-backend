@@ -6,7 +6,8 @@ export default registerAs('networks', (): NetworkConfig[] => [
   {
     network: 'mainnet',
     chainId: 1,
-    url: `http://18.198.202.237:8545`,
+    // url: `http://18.198.202.237:8545`,
+    url: 'http://127.0.0.1:8545',
   },
   {
     network: 'sepolia',

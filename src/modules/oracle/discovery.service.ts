@@ -168,6 +168,7 @@ export class DiscoveryService implements OnModuleInit {
         const cometContract = new ethers.Contract(comet.address, CometABI, provider);
 
         const baseTokenPriceFeed = await cometContract.baseTokenPriceFeed();
+        this.logger.log('Base token price feed:', baseTokenPriceFeed);
 
         if (!checkedAddresses.has(baseTokenPriceFeed.toLowerCase())) {
           checkedAddresses.add(baseTokenPriceFeed.toLowerCase());
@@ -177,6 +178,8 @@ export class DiscoveryService implements OnModuleInit {
             comet.chainId,
             comet.network,
           );
+
+          this.logger.log('Oracle info:', oracleInfo);
 
           if (oracleInfo) {
             await this.oracleRepository.upsert(oracleInfo, ['address']);
