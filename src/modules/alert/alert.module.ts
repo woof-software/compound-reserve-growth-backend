@@ -12,4 +12,4 @@ import { TelegramService } from './telegram.service';
   providers: [AlertService, TelegramService],
   exports: [AlertService],
 })
-export class AlertModule {} 
+export class AlertModule {}

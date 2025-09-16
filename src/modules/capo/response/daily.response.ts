@@ -1,6 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
 
-
 export class DailyAggregationResponse {
   @ApiProperty({ description: 'Oracle address', example: '0x1234567890abcdef' })
   oracleAddress: string;

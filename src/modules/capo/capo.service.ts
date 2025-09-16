@@ -1,11 +1,10 @@
-import { Injectable, OnModuleInit, Logger } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Cron, CronExpression } from '@nestjs/schedule';
 
 import { Oracle } from 'modules/oracle/oracle.entity';
 import { OracleService } from 'modules/oracle/oracle.service';
-import { DiscoveryService } from 'modules/oracle/discovery.service';
 import { AlertService } from 'modules/alert/alert.service';
 import { Source } from 'modules/source/source.entity';
 import { OffsetRequest } from 'modules/history/request/offset.request';
