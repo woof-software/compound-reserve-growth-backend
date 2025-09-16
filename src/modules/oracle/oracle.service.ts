@@ -83,10 +83,10 @@ export class OracleService {
 
     this.logger.log(
       `Oracle ${oracleData.snapshotRatio} - ${oracleData.ratio} | dt=${timeDiff}s | ` +
-      `Current growth: ${currentGrowthRate.toFixed(4)}% | ` +
-      `Max allowed: ${maxGrowthFraction} (fraction) ≈ ${maxGrowthPercent}% | ` +
-      `Utilization: ${utilization.toFixed(2)}% | ` +
-      `Capped: ${oracleData.isCapped}`
+        `Current growth: ${currentGrowthRate.toFixed(4)}% | ` +
+        `Max allowed: ${maxGrowthFraction} (fraction) ≈ ${maxGrowthPercent}% | ` +
+        `Utilization: ${utilization.toFixed(2)}% | ` +
+        `Capped: ${oracleData.isCapped}`,
     );
 
     return {
@@ -112,8 +112,7 @@ export class OracleService {
     const growthBps = BigInt(maxYearlyGrowthPercentBps);
     const dt = BigInt(Math.max(0, timeDiff));
 
-    const maxPerSec =
-      (ratio * growthBps * GROWTH_RATIO_SCALE) / BASIS_POINTS / SECONDS_PER_YEAR;
+    const maxPerSec = (ratio * growthBps * GROWTH_RATIO_SCALE) / BASIS_POINTS / SECONDS_PER_YEAR;
 
     return ratio + (maxPerSec * dt) / GROWTH_RATIO_SCALE;
   }
@@ -126,7 +125,7 @@ export class OracleService {
     if (timeDiff <= 0) return 0;
 
     const snapshot = BigInt(snapshotRatio);
-    const current  = BigInt(currentRatio);
+    const current = BigInt(currentRatio);
     if (snapshot === 0n || current <= snapshot) return 0;
 
     const diff = current - snapshot;
