@@ -421,6 +421,11 @@ export class CapoService {
     qb.orderBy('agg.date', 'DESC');
 
     const rows = await qb.getMany();
+
+    if (rows.length === 0) {
+      this.logger.log('No daily aggregations found for the given parameters');
+      return [];
+    }
     return rows.map((r) => this.toResponse(r));
   }
 
@@ -440,6 +445,11 @@ export class CapoService {
     if (perPage) qb.take(perPage);
 
     const rows = await qb.getMany();
+
+    if (rows.length === 0) {
+      this.logger.log('No daily aggregations found for the given parameters');
+      return new PaginatedDataDto<DailyAggregationResponse>([], page, perPage ?? 0, 0);
+    }
 
     return new PaginatedDataDto<DailyAggregationResponse>(
       rows.map((r) => this.toResponse(r)),
@@ -465,6 +475,11 @@ export class CapoService {
     if (limit !== null) qb.limit(limit);
 
     const rows = await qb.getMany();
+
+    if (rows.length === 0) {
+      this.logger.log('No daily aggregations found for the given parameters');
+      return new OffsetDataDto<DailyAggregationResponse>([], limit, offset, 0);
+    }
 
     return new OffsetDataDto<DailyAggregationResponse>(
       rows.map((r) => this.toResponse(r)),
