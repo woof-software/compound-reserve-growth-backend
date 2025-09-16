@@ -26,7 +26,7 @@ export class CapoController {
   @ApiOperation({ summary: 'Get daily CAPO aggregations (plain list)' })
   @ApiOkResponse({ type: [DailyAggregationResponse] })
   @HttpCode(HttpStatus.OK)
-  @Get('daily/plain')
+  @Get('daily')
   async getDailyPlain(
     @Query() request: DailyAggregationRequest,
   ): Promise<DailyAggregationResponse[]> {
@@ -37,7 +37,7 @@ export class CapoController {
   @ApiOperation({ summary: 'Get daily CAPO aggregations (paginated)' })
   @ApiPaginatedResponse(DailyAggregationResponse)
   @HttpCode(HttpStatus.OK)
-  @Get('daily')
+  @Get('daily/paginated')
   async getDailyPaginated(
     @Query() request: PaginationRequest & DailyAggregationRequest,
   ): Promise<PaginatedDataResponse<DailyAggregationResponse>> {

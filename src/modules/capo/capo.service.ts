@@ -476,21 +476,21 @@ export class CapoService {
 
   private toResponse(entity: DailyAggregation): DailyAggregationResponse {
     return {
-      oracleAddress: entity.oracleAddress,
-      oracleName: entity.oracleName,
-      chainId: entity.chainId,
-      date: entity.date instanceof Date ? entity.date.toISOString() : entity.date,
-      avgRatio: entity.avgRatio,
-      minRatio: entity.minRatio,
-      maxRatio: entity.maxRatio,
-      avgPrice: entity.avgPrice,
-      minPrice: entity.minPrice,
-      maxPrice: entity.maxPrice,
-      cap: entity.cap,
-      cappedCount: entity.cappedCount,
-      totalCount: entity.totalCount,
-      sourceId: entity.sourceId,
-      assetId: entity.assetId,
+      oa: entity.oracleAddress,
+      on: entity.oracleName,
+      cId: entity.chainId,
+      d: entity.date instanceof Date ? entity.date.toISOString().split('T')[0] : entity.date,
+      ar: entity.avgRatio,
+      mr: entity.minRatio,
+      xr: entity.maxRatio,
+      ap: entity.avgPrice,
+      mp: entity.minPrice,
+      xp: entity.maxPrice,
+      cp: entity.cap,
+      cc: entity.cappedCount,
+      tc: entity.totalCount,
+      sId: entity.sourceId,
+      aId: entity.assetId,
     };
   }
 }
