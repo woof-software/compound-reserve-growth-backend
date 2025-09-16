@@ -3,13 +3,13 @@ import { Controller, Injectable, HttpStatus, HttpCode, Get, Query } from '@nestj
 import { Throttle } from '@nestjs/throttler';
 
 import { HistoryService } from './history.service';
-import { HistoryResponse } from './response/history.response';
+import { ReserveResponse } from './response/reserve.response';
 import { PaginationDto } from './dto/pagination.dto';
 import { PaginationRequest } from './request/pagination.request';
 import { RevenueHistoryResponse } from './response/revenue-history.response';
 import { RevenueHistoryFullResponse } from './response/revenue-history-full.response';
 import { StatsHistoryResponse } from './response/stats-history.response';
-import { HistoryFullResponse } from './response/history-full.response';
+import { ReserveFullResponse } from './response/reserve-full.response';
 import { OffsetRequest } from './request/offset.request';
 import { OffsetDto } from './dto/offset.dto';
 
@@ -27,18 +27,18 @@ export class HistoryController {
 
   @Throttle({ default: { limit: 15, ttl: 1000 } })
   @ApiOperation({ summary: 'Get treasury history full response' })
-  @ApiPaginatedResponse(HistoryFullResponse)
+  @ApiPaginatedResponse(ReserveFullResponse)
   @HttpCode(HttpStatus.OK)
   @Get('treasury')
   async getTreasuryHistoryFull(
     @Query() request: PaginationRequest,
-  ): Promise<PaginatedDataResponse<HistoryFullResponse>> {
+  ): Promise<PaginatedDataResponse<ReserveFullResponse>> {
     const paginatedData = await this.historyService.getPaginatedTreasuryHistory(
       new PaginationDto(request?.page, request?.perPage, request?.order),
     );
-    return new PaginatedDataResponse<HistoryFullResponse>(
-      paginatedData.data.map((history) => {
-        return new HistoryFullResponse(history);
+    return new PaginatedDataResponse<ReserveFullResponse>(
+      paginatedData.data.map((reserve) => {
+        return new ReserveFullResponse(reserve);
       }),
       new PaginationMetaResponse(paginatedData.page, paginatedData.perPage, paginatedData.total),
     );
@@ -56,8 +56,8 @@ export class HistoryController {
       new PaginationDto(request?.page, request?.perPage, request?.order),
     );
     const paginatedResponse = new PaginatedDataResponse<RevenueHistoryFullResponse>(
-      paginatedData.data.map((history) => {
-        return new RevenueHistoryFullResponse(history);
+      paginatedData.data.map((reserve) => {
+        return new RevenueHistoryFullResponse(reserve);
       }),
       new PaginationMetaResponse(paginatedData.page, paginatedData.perPage, paginatedData.total),
     );
@@ -66,18 +66,18 @@ export class HistoryController {
 
   @Throttle({ default: { limit: 15, ttl: 1000 } })
   @ApiOperation({ summary: 'Get treasury history reduced response' })
-  @ApiOffsetResponse(HistoryResponse)
+  @ApiOffsetResponse(ReserveResponse)
   @HttpCode(HttpStatus.OK)
   @Get('v2/treasury')
   async getTreasuryHistory(
     @Query() request: OffsetRequest,
-  ): Promise<OffsetDataResponse<HistoryResponse>> {
+  ): Promise<OffsetDataResponse<ReserveResponse>> {
     const paginatedData = await this.historyService.getOffsetTreasuryHistory(
       new OffsetDto(request?.limit, request?.offset, request?.order),
     );
-    return new OffsetDataResponse<HistoryResponse>(
-      paginatedData.data.map((history) => {
-        return new HistoryResponse(history);
+    return new OffsetDataResponse<ReserveResponse>(
+      paginatedData.data.map((reserve) => {
+        return new ReserveResponse(reserve);
       }),
       new OffsetnMetaResponse(paginatedData.limit, paginatedData.offset, paginatedData.total),
     );
@@ -106,7 +106,7 @@ export class HistoryController {
   @ApiOperation({ summary: 'Get statistics on FE' })
   @ApiOffsetResponse(StatsHistoryResponse)
   @HttpCode(HttpStatus.OK)
-  @Get('/stats')
+  @Get('v2/stats')
   async getStatsHistory(
     @Query() request: OffsetRequest,
   ): Promise<OffsetDataResponse<StatsHistoryResponse>> {

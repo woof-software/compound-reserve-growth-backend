@@ -3,7 +3,7 @@ import { Controller, Injectable, HttpStatus, HttpCode, Get } from '@nestjs/commo
 import { Throttle } from '@nestjs/throttler';
 
 import { HistoryService } from 'modules/history/history.service';
-import { HistoryResponse } from 'modules/history/response/history.response';
+import { ReserveResponse } from 'modules/history/response/reserve.response';
 
 @Injectable()
 @Controller('treasury')
@@ -12,11 +12,11 @@ export class TreasuryController {
 
   @Throttle({ default: { limit: 15, ttl: 1000 } })
   @ApiOperation({ summary: 'Get treasury holdings' })
-  @ApiResponse({ type: [HistoryResponse] })
+  @ApiResponse({ type: [ReserveResponse] })
   @HttpCode(HttpStatus.OK)
   @Get('holdings')
-  async getTreasuryHistory(): Promise<HistoryResponse[]> {
+  async getTreasuryHistory(): Promise<ReserveResponse[]> {
     const response = await this.historyService.getTreasuryHoldings();
-    return response.map((history) => new HistoryResponse(history));
+    return response.map((history) => new ReserveResponse(history));
   }
 }

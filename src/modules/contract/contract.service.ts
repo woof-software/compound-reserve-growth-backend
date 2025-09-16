@@ -40,7 +40,9 @@ import {
   YEAR_IN_SECONDS,
 } from '@app/common/constants';
 import { Algorithm } from '@app/common/enum/algorithm.enum';
-import { scaleToDecimals } from '@app/common/utils/scale-to-decimals';
+import { scaleToDecimals } from '@/common/utils/scale-to-decimals';
+import { dayBounds } from '@/common/utils/day-bounds';
+import { buildDailyTimestamps } from '@/common/utils/build-daily-timestamps';
 
 @Injectable()
 export class ContractService implements OnModuleInit {
@@ -621,8 +623,8 @@ export class ContractService implements OnModuleInit {
       const startBlockData = await this.getCachedBlock(network, provider, lastBlock);
       const startTs = startBlockData.timestamp;
 
-      const { firstMidnightUTC, todayMidnightUTC } = this.getDayBounds(startTs);
-      const dailyTs = this.buildDailyTimestamps(firstMidnightUTC, todayMidnightUTC);
+      const { firstMidnightUTC, todayMidnightUTC } = dayBounds(startTs);
+      const dailyTs = buildDailyTimestamps(firstMidnightUTC, todayMidnightUTC);
 
       if (dailyTs.length === 0) {
         this.logger.log(`No historical data needed - source is already up to date`);
@@ -643,7 +645,7 @@ export class ContractService implements OnModuleInit {
       let processedCount = 0;
       let skippedCount = 0;
 
-      const abi = this.getAlgorithmAbi(algorithm);
+      const abi = algorithm === Algorithm.COMET ? CometABI : MarketV2ABI;
       const contract = new ethers.Contract(contractAddress, abi, provider) as any;
       const assetContract = new ethers.Contract(assetAddress, ERC20ABI, provider) as any;
 
@@ -697,21 +699,6 @@ export class ContractService implements OnModuleInit {
     }
   }
 
-  private getDayBounds(startTs: number): { firstMidnightUTC: number; todayMidnightUTC: number } {
-    const firstMidnightUTC = Math.floor(startTs / DAY_IN_SEC + 1) * DAY_IN_SEC;
-    const now = Math.floor(Date.now() / SEC_IN_MS);
-    const todayMidnightUTC = Math.floor(now / DAY_IN_SEC) * DAY_IN_SEC;
-    return { firstMidnightUTC, todayMidnightUTC };
-  }
-
-  private buildDailyTimestamps(startTs: number, endTs: number): number[] {
-    const dailyTs: number[] = [];
-    for (let ts = startTs; ts <= endTs; ts += DAY_IN_SEC) {
-      dailyTs.push(ts);
-    }
-    return dailyTs;
-  }
-
   private async preloadPrices(
     asset: { address: string; symbol: string; decimals: number },
     firstMidnightUTC: number,
@@ -730,10 +717,6 @@ export class ContractService implements OnModuleInit {
     } else {
       this.logger.log(`Skipping preload for stablecoin ${asset.symbol}`);
     }
-  }
-
-  private getAlgorithmAbi(algorithm: Algorithm | string): any {
-    return algorithm === Algorithm.COMET ? CometABI : MarketV2ABI;
   }
 
   private async computeMarketAccounting(params: MarketAccountingArgs): Promise<ResponseAlgorithm> {
@@ -801,31 +784,6 @@ export class ContractService implements OnModuleInit {
       await this.mailService.notifyGetHistoryError(message);
       return null;
     }
-  }
-
-  private isInvalidValue(value: number): boolean {
-    return isNaN(value) || value < 0;
-  }
-
-  private validateAndCalculateQuantity(
-    amount: bigint,
-    decimals: number,
-    price: number,
-    fieldName: string,
-  ): { value: number; isValid: boolean } {
-    const quantity = ethers.formatUnits(amount, decimals);
-    const value = Number(quantity) * price;
-
-    this.logger.debug(
-      `Calculating ${fieldName}: amount=${amount}, quantity=${quantity}, price=${price}, value=${value}`,
-    );
-
-    if (this.isInvalidValue(value)) {
-      this.logger.warn(`Invalid ${fieldName} value: ${value}, skipping`);
-      return { value, isValid: false };
-    }
-
-    return { value, isValid: true };
   }
 
   private advanceBlockOnError(network: string, lastBlock: number): number {

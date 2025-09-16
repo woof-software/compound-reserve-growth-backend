@@ -3,7 +3,7 @@ import { ApiProperty } from '@nestjs/swagger';
 import { Reserve } from 'modules/history/entities';
 import { SourceFullResponse } from 'modules/source/response/source-full.response';
 
-export class HistoryFullResponse {
+export class ReserveFullResponse {
   @ApiProperty({ example: 1 })
   public id: number;
 
