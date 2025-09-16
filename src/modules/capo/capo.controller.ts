@@ -39,7 +39,7 @@ export class CapoController {
   @HttpCode(HttpStatus.OK)
   @Get('daily/paginated')
   async getDailyPaginated(
-    @Query() request: PaginationRequest & DailyAggregationRequest,
+    @Query() request: PaginationRequest,
   ): Promise<PaginatedDataResponse<DailyAggregationResponse>> {
     const paginated = await this.capoService.getPaginatedDailyAggregations({ ...request });
     return new PaginatedDataResponse<DailyAggregationResponse>(
@@ -54,7 +54,7 @@ export class CapoController {
   @HttpCode(HttpStatus.OK)
   @Get('daily/offset')
   async getDailyOffset(
-    @Query() request: OffsetRequest & DailyAggregationRequest,
+    @Query() request: OffsetRequest,
   ): Promise<OffsetDataResponse<DailyAggregationResponse>> {
     const offsetData = await this.capoService.getOffsetDailyAggregations({ ...request });
     return new OffsetDataResponse<DailyAggregationResponse>(
