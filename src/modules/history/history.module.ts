@@ -4,6 +4,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { AssetModule } from 'modules/asset/asset.module';
 import { SourceModule } from 'modules/source/source.module';
 import { ContractModule } from 'modules/contract/contract.module';
+import { RedisModule } from 'modules/redis/redis.module';
 
 import { Reserve, Incomes, Spends } from './entities';
 import { ReservesRepository } from './reserves-repository.service';
@@ -21,6 +22,7 @@ import { SpendsRepository } from './spends-repository.service';
     SourceModule,
     AssetModule,
     forwardRef(() => ContractModule),
+    RedisModule,
   ],
   providers: [
     ReservesRepository,

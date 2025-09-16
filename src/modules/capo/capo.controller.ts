@@ -2,20 +2,20 @@ import { Controller, Injectable, Get, HttpCode, HttpStatus, Query } from '@nestj
 import { Throttle } from '@nestjs/throttler';
 import { ApiOkResponse, ApiOperation } from '@nestjs/swagger';
 
+import { OffsetRequest } from 'modules/history/request/offset.request';
+
+import { PaginationRequest } from 'common/request/pagination.request';
+
 import { CapoService } from './capo.service';
 import { DailyAggregationResponse } from './response/daily.response';
 import { DailyAggregationRequest } from './request/daily.request';
-
-import { PaginationRequest } from 'common/request/pagination.request';
-import { OffsetRequest } from 'modules/history/request/offset.request';
-
 
 import { ApiPaginatedResponse } from '@app/common/swagger/api-paginated-response.decorator';
 import { ApiOffsetResponse } from '@app/common/swagger/api-offset-response.decorator';
 import { PaginatedDataResponse } from '@app/common/response/paginated-data.response';
 import { PaginationMetaResponse } from '@app/common/response/pagination-meta.response';
 import { OffsetDataResponse } from '@app/common/response/offset-data.response';
-import { OffsetnMetaResponse } from '@app/common/response/offset-meta.response';
+import { OffsetMetaResponse } from '@app/common/response/offset-meta.response';
 
 @Injectable()
 @Controller('capo')
@@ -41,9 +41,7 @@ export class CapoController {
   async getDailyPaginated(
     @Query() request: PaginationRequest & DailyAggregationRequest,
   ): Promise<PaginatedDataResponse<DailyAggregationResponse>> {
-    const paginated = await this.capoService.getPaginatedDailyAggregations(
-      { ...request },
-    );
+    const paginated = await this.capoService.getPaginatedDailyAggregations({ ...request });
     return new PaginatedDataResponse<DailyAggregationResponse>(
       paginated.data,
       new PaginationMetaResponse(paginated.page, paginated.perPage, paginated.total),
@@ -58,12 +56,10 @@ export class CapoController {
   async getDailyOffset(
     @Query() request: OffsetRequest & DailyAggregationRequest,
   ): Promise<OffsetDataResponse<DailyAggregationResponse>> {
-    const offsetData = await this.capoService.getOffsetDailyAggregations(
-      { ...request },
-    );
+    const offsetData = await this.capoService.getOffsetDailyAggregations({ ...request });
     return new OffsetDataResponse<DailyAggregationResponse>(
       offsetData.data,
-      new OffsetnMetaResponse(offsetData.limit, offsetData.offset, offsetData.total),
+      new OffsetMetaResponse(offsetData.limit, offsetData.offset, offsetData.total),
     );
   }
 }
