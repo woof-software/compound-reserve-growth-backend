@@ -72,11 +72,8 @@ export class OracleService {
     );
 
     const bps = oracleData.maxYearlyGrowthPercent;
-    this.logger.debug(`Max yearly growth percent (bps): ${bps}`);
     const maxGrowthFraction = bps / 10_000;
-    this.logger.debug(`Max growth fraction: ${maxGrowthFraction}`);
     const maxGrowthPercent = bps / 100;
-    this.logger.debug(`Max growth percent: ${maxGrowthPercent}%`);
 
     const utilization = this.calculateUtilization(
       oracleData.snapshotRatio,

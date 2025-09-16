@@ -6,8 +6,8 @@ export default registerAs('networks', (): NetworkConfig[] => [
   {
     network: 'mainnet',
     chainId: 1,
-    // url: `http://18.198.202.237:8545`,
-    url: 'http://127.0.0.1:8545',
+    url: `http://18.198.202.237:8545`,
+    //url: 'http://127.0.0.1:8545',
   },
   {
     network: 'sepolia',
@@ -23,7 +23,7 @@ export default registerAs('networks', (): NetworkConfig[] => [
     network: 'polygon',
     chainId: 137,
     // url: `https://polygon.drpc.org`,
-    url: `https://rpc.ankr.com/polygon/${process.env.ANKR_KEY}`,
+    url: `1${process.env.ANKR_KEY}`,
   },
   {
     network: 'optimism',
