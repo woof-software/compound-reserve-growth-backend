@@ -32,6 +32,14 @@ export class SourceRepository {
     });
   }
 
+  async listByAlgorithm(algorithm: string): Promise<Source[]> {
+    return this.sourceRepository.find({
+      where: { algorithm },
+      relations: { asset: true },
+      order: { id: 'ASC' },
+    });
+  }
+
   async save(source: Source): Promise<Source> {
     return this.sourceRepository.save(source);
   }

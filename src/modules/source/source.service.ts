@@ -13,6 +13,8 @@ import { SourcesWithAssetsResponse } from './response/sourcesWithAssets.response
 import { SourceResponse } from './response/source.response';
 import { FindSourceDto } from './dto/find-source.dto';
 
+import { Algorithm } from '@/common/enum/algorithm.enum';
+
 @Injectable()
 export class SourceService {
   constructor(
@@ -72,6 +74,10 @@ export class SourceService {
 
   async listAll(): Promise<Source[]> {
     return this.sourceRepository.list();
+  }
+
+  async listByAlgorithm(algorithm: Algorithm): Promise<Source[]> {
+    return this.sourceRepository.listByAlgorithm(algorithm);
   }
 
   async listSourcesWithAssets(): Promise<SourcesWithAssetsResponse> {

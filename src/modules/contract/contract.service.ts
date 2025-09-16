@@ -7,12 +7,13 @@ import type { Redis } from 'ioredis';
 import { REDIS_CLIENT } from 'modules/redis/redis.module';
 import { ProviderFactory } from 'modules/network/provider.factory';
 import { HistoryService } from 'modules/history/history.service';
-import { Reserve, Spends, Incomes } from 'modules/history/entities';
+import { Reserve, Spends, Incomes, LiquidationEvent } from 'modules/history/entities';
 import { Source } from 'modules/source/source.entity';
 import { SourceService } from 'modules/source/source.service';
 import { PriceService } from 'modules/price/price.service';
 import { MailService } from 'modules/mail/mail.service';
 import { STABLECOIN_PRICES } from 'modules/price/constants';
+import { LiquidationEventService } from 'modules/history/liquidation-event.service';
 
 import CometABI from './abi/CometABI.json';
 import CometExtensionABI from './abi/CometExtensionABI.json';
@@ -89,6 +90,7 @@ export class ContractService implements OnModuleInit {
     @Inject(REDIS_CLIENT) private readonly redisClient: Redis,
     private readonly providerFactory: ProviderFactory,
     private readonly historyService: HistoryService,
+    private readonly liqEventService: LiquidationEventService,
     private readonly sourceService: SourceService,
     private readonly priceService: PriceService,
     private readonly mailService: MailService,
@@ -957,5 +959,153 @@ export class ContractService implements OnModuleInit {
       date,
     });
     return { lastBlock: blockTag, processedDelta: 1, skippedDelta: 0, stop: false };
+  }
+
+  public async getLiquidationsEvent(source: Source) {
+    const provider = this.providerFactory.get(source.network);
+    const comet = new ethers.Contract(source.address, CometABI, provider);
+
+    const latest = await provider.getBlockNumber();
+
+    const lastEvent = await this.liqEventService.findBySource(source);
+    let fromBlock: number;
+    if (lastEvent) {
+      fromBlock = lastEvent.blockNumber + 1;
+    } else {
+      try {
+        // Start from the contract creation block if we have no prior events
+        const creationBlock = await this.getContractCreationBlock(source.address, source.network);
+        // In case source.blockNumber is ahead (e.g., seeded), start from the earliest meaningful point
+        fromBlock = Math.max(creationBlock, 0);
+        this.logger.log(
+          `No previous liquidation events. Starting scan from creation block ${fromBlock} for ${source.address} on ${source.network}`,
+        );
+      } catch (e: any) {
+        // Fallback: if creation block discovery fails, fall back to the source's known blockNumber
+        fromBlock = Math.max(source.blockNumber, 0);
+        this.logger.warn(
+          `Failed to determine creation block for ${source.address} on ${source.network}: ${e?.message}. Fallback to source.blockNumber=${fromBlock}`,
+        );
+      }
+    }
+    if (fromBlock > latest) return;
+
+    const numAssets: bigint = await comet.numAssets();
+    const assetScaleByAddress = new Map<string, bigint>();
+    const priceFeedByAsset = new Map<string, string>();
+    for (let i = 0n; i < numAssets; i++) {
+      const info = await comet.getAssetInfo(i);
+      assetScaleByAddress.set(
+        String(info.asset).toLowerCase(),
+        BigInt(info.scale ?? info.assetScale ?? 1n),
+      );
+      if (info.priceFeed) {
+        priceFeedByAsset.set(
+          String(info.asset).toLowerCase(),
+          String(info.priceFeed).toLowerCase(),
+        );
+      }
+    }
+
+    // Build interface and static topic for AbsorbCollateral
+    const iface = new ethers.Interface(CometABI);
+    const absorbCollateralTopic = ethers.id(
+      'AbsorbCollateral(address,address,address,uint256,uint256)',
+    );
+
+    // Query logs in chunks with adaptive backoff to avoid provider limits
+    let step = 8_000;
+    for (let start = fromBlock; start <= latest; start += step + 1) {
+      let end = Math.min(start + step, latest);
+      let collateralLogs: ethers.Log[] = [];
+
+      // Adaptive retry: shrink range on transient RPC failures
+      let attempt = 0;
+      const minStep = 500;
+      while (attempt < 4) {
+        try {
+          collateralLogs = await provider.getLogs({
+            address: (comet.target as string) || source.address,
+            topics: [absorbCollateralTopic],
+            fromBlock: start,
+            toBlock: end,
+          });
+          break;
+        } catch (e: any) {
+          const msg = e?.shortMessage || e?.message || String(e);
+          this.logger.warn(
+            `getLogs failed [${start}-${end}] step=${step} attempt=${attempt + 1}: ${msg}`,
+          );
+          if (
+            e?.code === 'SERVER_ERROR' ||
+            e?.code === 'TIMEOUT' ||
+            e?.code === 'UNSUPPORTED_OPERATION' ||
+            /body is not valid JSON|429|busy|overloaded|rate/i.test(msg)
+          ) {
+            step = Math.max(minStep, Math.floor(step / 2));
+            end = Math.min(start + step, latest);
+            attempt++;
+            await new Promise((r) => setTimeout(r, 150));
+            continue;
+          }
+          throw e;
+        }
+      }
+
+      if (collateralLogs.length === 0) {
+        continue;
+      }
+      const logs = collateralLogs.sort((a, b) =>
+        a.blockNumber === b.blockNumber ? a.index - b.index : a.blockNumber - b.blockNumber,
+      );
+
+      // cache decimals per price feed to avoid repetitive RPC calls
+      const decimalsByFeed = new Map<string, number>();
+
+      for (const log of logs) {
+        const parsed = iface.parseLog({ topics: log.topics, data: log.data });
+        const block = await provider.getBlock(log.blockNumber);
+        const date = new Date(Number(block.timestamp) * 1000);
+
+        if (parsed.name === 'AbsorbCollateral') {
+          const absorber = parsed.args.absorber as string;
+          const asset = (parsed.args.asset as string).toLowerCase();
+          const usdValue = parsed.args.usdValue as bigint;
+          const priceFeedAddress = priceFeedByAsset.get(asset) ?? null;
+
+          let feedDecimals: number;
+          if (priceFeedAddress) {
+            if (decimalsByFeed.has(priceFeedAddress)) {
+              feedDecimals = decimalsByFeed.get(priceFeedAddress)!;
+            } else {
+              try {
+                const aggregator = new ethers.Contract(asset, ERC20ABI, provider);
+                const d: number = Number(await aggregator.decimals());
+                if (!Number.isNaN(d) && d > 0 && d <= 36) {
+                  feedDecimals = d;
+                }
+              } catch (_) {
+                feedDecimals = 8;
+              }
+              decimalsByFeed.set(priceFeedAddress, feedDecimals);
+            }
+          }
+
+          const collateralUsd = Number(ethers.formatUnits(usdValue, feedDecimals));
+
+          const entity = new LiquidationEvent(
+            source,
+            log.blockNumber,
+            log.transactionHash,
+            absorber,
+            asset,
+            priceFeedAddress,
+            collateralUsd,
+            date,
+          );
+          await this.liqEventService.createWithSource(entity);
+        }
+      }
+    }
   }
 }

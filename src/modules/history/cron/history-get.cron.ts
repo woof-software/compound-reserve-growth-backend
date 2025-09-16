@@ -20,7 +20,7 @@ export class HistoryGetCron implements OnModuleInit {
   onModuleInit() {
     const cronExpression = this.configService.get<TAppConfig>('app').cron;
 
-    const job = new CronJob(
+    const jobHistory = new CronJob(
       cronExpression,
       async () => {
         await this.getHistoryTask();
@@ -30,8 +30,21 @@ export class HistoryGetCron implements OnModuleInit {
       'UTC',
     );
 
-    this.schedulerRegistry.addCronJob('getHistory', job);
-    job.start();
+    const jobLiquidationsEvent = new CronJob(
+      '22 13 * * *',
+      async () => {
+        await this.getLiquidationsEventTask();
+      },
+      null,
+      false,
+      'UTC',
+    );
+
+    this.schedulerRegistry.addCronJob('getHistory', jobHistory);
+    this.schedulerRegistry.addCronJob('getLiquidationsEvent', jobLiquidationsEvent);
+
+    jobHistory.start();
+    jobLiquidationsEvent.start();
   }
 
   async getHistoryTask() {
@@ -40,6 +53,16 @@ export class HistoryGetCron implements OnModuleInit {
       return;
     } catch (error) {
       this.logger.error('An error occurred while running getting history task:', error);
+      return;
+    }
+  }
+
+  async getLiquidationsEventTask() {
+    try {
+      await this.getHistoryService.getLiquidationsEvent();
+      return;
+    } catch (error) {
+      this.logger.error('An error occurred while running getting liquidations event task:', error);
       return;
     }
   }
