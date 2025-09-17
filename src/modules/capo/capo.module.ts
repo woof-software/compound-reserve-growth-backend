@@ -4,15 +4,15 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { NetworkModule } from 'modules/network/network.module';
 import { SourceModule } from 'modules/source/source.module';
 import { MailModule } from 'modules/mail/mail.module';
+import { Source } from 'modules/source/source.entity';
+import { OracleModule } from 'modules/oracle/oracle.module';
+import { AlertModule } from 'modules/alert/alert.module';
+import { Oracle } from 'modules/oracle/oracle.entity';
 
-import { OracleModule } from '../oracle/oracle.module';
-import { AlertModule } from '../alert/alert.module';
 import { CapoController } from './capo.controller';
 import { CapoService } from './capo.service';
-import { Oracle } from '../oracle/oracle.entity';
 import { Snapshot } from './snapshot.entity';
 import { DailyAggregation } from './daily.entity';
-import { Source } from 'modules/source/source.entity';
 
 @Module({
   imports: [
