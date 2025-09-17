@@ -15,7 +15,7 @@ import { ApiOffsetResponse } from '@app/common/swagger/api-offset-response.decor
 import { PaginatedDataResponse } from '@app/common/response/paginated-data.response';
 import { PaginationMetaResponse } from '@app/common/response/pagination-meta.response';
 import { OffsetDataResponse } from '@app/common/response/offset-data.response';
-import { OffsetnMetaResponse } from '@app/common/response/offset-meta.response';
+import { OffsetMetaResponse } from '@app/common/response/offset-meta.response';
 
 @Injectable()
 @Controller('capo')
@@ -59,7 +59,7 @@ export class CapoController {
     const offsetData = await this.capoService.getOffsetDailyAggregations({ ...request });
     return new OffsetDataResponse<DailyAggregationResponse>(
       offsetData.data,
-      new OffsetnMetaResponse(offsetData.limit, offsetData.offset, offsetData.total),
+      new OffsetMetaResponse(offsetData.limit, offsetData.offset, offsetData.total),
     );
   }
 }
