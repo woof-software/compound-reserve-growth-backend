@@ -36,7 +36,10 @@ export class LiquidationEventRepositoryService {
   async getOffset(dto: OffsetDto): Promise<OffsetDataDto<LiquidationEvent>> {
     const query = this.liquidationEventRepository.createQueryBuilder('liquidation_event');
 
-    query.orderBy('liquidation_event.date', dto.order).offset(dto.offset ?? 0);
+    query
+      .leftJoinAndSelect('liquidation_event.source', 'source')
+      .orderBy('liquidation_event.date', dto.order)
+      .offset(dto.offset ?? 0);
 
     if (dto.limit) query.limit(dto.limit);
 
