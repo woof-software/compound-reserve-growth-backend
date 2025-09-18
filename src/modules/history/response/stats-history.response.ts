@@ -54,8 +54,9 @@ export class StatsHistoryResponse {
   @ApiProperty({
     type: SpendsStatsResponse,
     description: 'Spends stats for the period',
+    required: false,
   })
-  public spends: SpendsStatsResponse;
+  public spends?: SpendsStatsResponse;
 
   @ApiProperty({
     example: 12,
@@ -65,7 +66,7 @@ export class StatsHistoryResponse {
 
   constructor(statsHistory: StatsHistory) {
     this.incomes = new IncomesStatsResponse(statsHistory.incomes);
-    this.spends = new SpendsStatsResponse(statsHistory.spends);
+    this.spends = statsHistory.spends ? new SpendsStatsResponse(statsHistory.spends) : undefined;
     this.sourceId = statsHistory.sourceId;
   }
 }

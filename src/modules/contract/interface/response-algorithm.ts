@@ -3,7 +3,7 @@ export interface ResponseStatsAlgorithm {
     supply: number;
     borrow: number;
   };
-  spends: {
+  spends?: {
     supplyUsd: number;
     borrowUsd: number;
   };

@@ -28,6 +28,7 @@ export class IncomesRepository {
     return this.incomesRepository.findOne({
       where: { source: { id: sourceId } },
       relations: { source: true },
+      order: { blockNumber: 'DESC' },
     });
   }
 

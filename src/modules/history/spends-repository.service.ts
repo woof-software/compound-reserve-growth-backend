@@ -28,6 +28,7 @@ export class SpendsRepository {
     return this.spendsRepository.findOne({
       where: { source: { id: sourceId } },
       relations: { source: true },
+      order: { blockNumber: 'DESC' },
     });
   }
 

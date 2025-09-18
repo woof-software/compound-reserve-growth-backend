@@ -701,11 +701,16 @@ export class ContractService implements OnModuleInit {
 
       const spends = await this.historyService.findSpendsBySource(source);
       const incomes = await this.historyService.findIncomesBySource(source);
-      const spendBlock = spends?.blockNumber ?? Infinity;
-      const incomeBlock = incomes?.blockNumber ?? Infinity;
 
-      let lastBlock = Math.min(spendBlock, incomeBlock);
-      if (lastBlock === Infinity) {
+      let lastBlock: number | undefined;
+
+      if (incomes?.blockNumber) {
+        lastBlock = incomes.blockNumber;
+      }
+      if (spends?.blockNumber && (!lastBlock || spends.blockNumber < lastBlock)) {
+        lastBlock = spends.blockNumber;
+      }
+      if (!lastBlock) {
         try {
           // Start from the contract creation block if we have no prior events
           const creationBlock = await this.getContractCreationBlock(source.address, source.network);
@@ -810,9 +815,6 @@ export class ContractService implements OnModuleInit {
                   blockTag,
                   blocksPerDay,
                   decimals,
-                  provider,
-                  contractAddress,
-                  priceComp,
                 );
                 break;
               default:
@@ -857,8 +859,8 @@ export class ContractService implements OnModuleInit {
 
           const incomeSupplyQuantity = marketAccounting.incomes.supply * price;
           const incomeBorrowQuantity = marketAccounting.incomes.borrow * price;
-          const spendSupplyQuantity = marketAccounting.spends.supplyUsd;
-          const spendBorrowQuantity = marketAccounting.spends.borrowUsd;
+          const spendSupplyQuantity = marketAccounting.spends?.supplyUsd;
+          const spendBorrowQuantity = marketAccounting.spends?.borrowUsd;
 
           const newIncomes = new Incomes(
             source,
@@ -870,18 +872,25 @@ export class ContractService implements OnModuleInit {
             incomeBorrowQuantity,
             dayDate,
           );
-          const newSpends = new Spends(
-            source,
-            blockTag,
-            marketAccounting.spends.supplyUsd.toString(),
-            marketAccounting.spends.borrowUsd.toString(),
-            price,
-            spendSupplyQuantity,
-            spendBorrowQuantity,
-            dayDate,
-          );
+          // Save spends only if provided by algorithm
+          if (
+            marketAccounting.spends !== undefined &&
+            typeof spendSupplyQuantity === 'number' &&
+            typeof spendBorrowQuantity === 'number'
+          ) {
+            const newSpends = new Spends(
+              source,
+              blockTag,
+              marketAccounting.spends.supplyUsd.toString(),
+              marketAccounting.spends.borrowUsd.toString(),
+              price,
+              spendSupplyQuantity,
+              spendBorrowQuantity,
+              dayDate,
+            );
+            await this.historyService.createSpendsWithSource(newSpends);
+          }
           await this.historyService.createIncomesWithSource(newIncomes);
-          await this.historyService.createSpendsWithSource(newSpends);
 
           lastBlock = blockTag;
           processedCount++;
