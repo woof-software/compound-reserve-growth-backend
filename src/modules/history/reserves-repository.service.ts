@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, Repository } from 'typeorm';
+import { Repository } from 'typeorm';
 import { ethers } from 'ethers';
 
 import { Reserve } from './entities';
@@ -81,24 +81,30 @@ export class ReservesRepository {
   }
 
   async getRevenueReserves(): Promise<Reserve[]> {
-    return this.reservesRepository.find({
-      where: {
-        source: {
-          algorithm: In([Algorithm.COMET, Algorithm.MARKET_V2]),
-        },
-      },
-      relations: { source: { asset: true } },
-      order: { date: 'DESC' },
-    });
+    const algorithmsArrayLiteral = `{${[Algorithm.COMET, Algorithm.MARKET_V2].join(',')}}`;
+
+    return this.reservesRepository
+      .createQueryBuilder('reserves')
+      .leftJoinAndSelect('reserves.source', 'source')
+      .leftJoinAndSelect('source.asset', 'asset')
+      .where('source.algorithm && :algorithms::text[]', { algorithms: algorithmsArrayLiteral })
+      .orderBy('reserves.date', 'DESC')
+      .getMany();
   }
 
   async getPaginatedRevenueReserves(dto: PaginationDto): Promise<PaginatedDataDto<Reserve>> {
+    const algorithmsArrayLiteral = `{${[
+      Algorithm.COMET,
+      Algorithm.MARKET_V2,
+      Algorithm.AERA_COMPOUND_RESERVES,
+    ].join(',')}}`;
+
     const query = this.reservesRepository
       .createQueryBuilder('reserves')
       .leftJoinAndSelect('reserves.source', 'source')
       .leftJoinAndSelect('source.asset', 'asset')
-      .where('source.algorithm IN (:...algorithms)', {
-        algorithms: [Algorithm.COMET, Algorithm.MARKET_V2, Algorithm.AERA_COMPOUND_RESERVES],
+      .where('source.algorithm && :algorithms::text[]', {
+        algorithms: algorithmsArrayLiteral,
       });
 
     query.orderBy('reserves.date', dto.order);
@@ -147,12 +153,18 @@ export class ReservesRepository {
   }
 
   async getOffsetRevenueReserves(dto: OffsetDto): Promise<OffsetDataDto<Reserve>> {
+    const algorithmsArrayLiteral = `{${[
+      Algorithm.COMET,
+      Algorithm.MARKET_V2,
+      Algorithm.AERA_COMPOUND_RESERVES,
+    ].join(',')}}`;
+
     const query = this.reservesRepository
       .createQueryBuilder('reserves')
       .leftJoinAndSelect('reserves.source', 'source')
       .leftJoinAndSelect('source.asset', 'asset')
-      .where('source.algorithm IN (:...algorithms)', {
-        algorithms: [Algorithm.COMET, Algorithm.MARKET_V2, Algorithm.AERA_COMPOUND_RESERVES],
+      .where('source.algorithm && :algorithms::text[]', {
+        algorithms: algorithmsArrayLiteral,
       });
 
     query.orderBy('reserves.date', dto.order).offset(dto.offset ?? 0);

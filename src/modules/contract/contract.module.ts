@@ -7,11 +7,12 @@ import { PriceModule } from 'modules/price/price.module';
 import { RedisModule } from 'modules/redis/redis.module';
 import { MailModule } from 'modules/mail/mail.module';
 
+import { AlgorithmService } from './algorithm.service';
 import { ContractService } from './contract.service';
 
 @Module({
   imports: [NetworkModule, HistoryModule, SourceModule, PriceModule, RedisModule, MailModule],
-  providers: [ContractService],
-  exports: [ContractService],
+  providers: [ContractService, AlgorithmService],
+  exports: [ContractService, AlgorithmService],
 })
 export class ContractModule {}

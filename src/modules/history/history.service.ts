@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 
 import { SourceRepository } from 'modules/source/source.repository';
+import { Source } from 'modules/source/source.entity';
 
 import { ReservesRepository } from './reserves-repository.service';
 import { IncomesRepository } from './incomes-repository.service';
@@ -17,8 +18,8 @@ import { OffsetDataDto } from '@app/common/dto/offset-data.dto';
 export class HistoryService {
   constructor(
     private readonly reservesRepo: ReservesRepository,
-    private readonly IncomesRepo: IncomesRepository,
-    private readonly SpendsRepo: SpendsRepository,
+    private readonly incomesRepo: IncomesRepository,
+    private readonly spendsRepo: SpendsRepository,
     private readonly sourceRepo: SourceRepository,
   ) {}
 
@@ -41,11 +42,11 @@ export class HistoryService {
   }
 
   async createIncomesWithSource(incomes: Incomes): Promise<Incomes> {
-    return this.IncomesRepo.save(incomes);
+    return this.incomesRepo.save(incomes);
   }
 
   async createSpendsWithSource(spends: Spends): Promise<Spends> {
-    return this.SpendsRepo.save(spends);
+    return this.spendsRepo.save(spends);
   }
 
   async findReservesById(id: number): Promise<Reserve> {
@@ -53,11 +54,19 @@ export class HistoryService {
   }
 
   async findIncomesById(id: number): Promise<Incomes> {
-    return this.IncomesRepo.findById(id);
+    return this.incomesRepo.findById(id);
   }
 
   async findSpendsById(id: number): Promise<Spends> {
-    return this.SpendsRepo.findById(id);
+    return this.spendsRepo.findById(id);
+  }
+
+  async findIncomesBySource(source: Source): Promise<Incomes> {
+    return this.incomesRepo.findBySourceId(source.id);
+  }
+
+  async findSpendsBySource(source: Source): Promise<Spends> {
+    return this.spendsRepo.findBySourceId(source.id);
   }
 
   async getTreasuryHistory(): Promise<Reserve[]> {
@@ -107,8 +116,8 @@ export class HistoryService {
   async getOffsetStatsHistory(dto: OffsetDto): Promise<OffsetDataDto<StatsHistory>> {
     // Get all data without offset/limit first to properly merge and calculate total
     const [incomesData, spendsData] = await Promise.all([
-      this.IncomesRepo.getOffsetStats(new OffsetDto(undefined, 0, dto.order)),
-      this.SpendsRepo.getOffsetStats(new OffsetDto(undefined, 0, dto.order)),
+      this.incomesRepo.getOffsetStats(new OffsetDto(undefined, 0, dto.order)),
+      this.spendsRepo.getOffsetStats(new OffsetDto(undefined, 0, dto.order)),
     ]);
 
     // Create a map to group incomes and spends by date and source
@@ -123,12 +132,6 @@ export class HistoryService {
             id: income.id,
             valueSupply: income.valueSupply,
             valueBorrow: income.valueBorrow,
-            date: income.date,
-          },
-          spends: {
-            id: 0,
-            valueSupply: 0,
-            valueBorrow: 0,
             date: income.date,
           },
           sourceId: income.source.id,
@@ -176,7 +179,10 @@ export class HistoryService {
 
     // Convert map to array and sort by date
     const statsHistory = Array.from(statsMap.values()).sort((a, b) => {
-      return new Date(a.incomes.date).getTime() - new Date(b.incomes.date).getTime();
+      // Use incomes date for sorting, fallback to spends date if incomes id is 0
+      const dateA = a.incomes.id === 0 && a.spends ? a.spends.date : a.incomes.date;
+      const dateB = b.incomes.id === 0 && b.spends ? b.spends.date : b.incomes.date;
+      return new Date(dateA).getTime() - new Date(dateB).getTime();
     });
 
     // Apply offset and limit to the merged and sorted data

@@ -1,4 +1,4 @@
-import { Column, CreateDateColumn, Entity, ManyToOne, PrimaryGeneratedColumn } from 'typeorm';
+import { Column, Entity, ManyToOne, PrimaryGeneratedColumn } from 'typeorm';
 
 import { Source } from 'modules/source/source.entity';
 
@@ -28,7 +28,7 @@ export class Spends {
   @Column()
   public date: Date;
 
-  @CreateDateColumn({ type: 'timestamp with time zone' })
+  @Column()
   public createdAt: Date;
 
   @ManyToOne(() => Source, (source) => source.spends)
@@ -52,5 +52,6 @@ export class Spends {
     this.valueSupply = valueSupply;
     this.valueBorrow = valueBorrow;
     this.date = date;
+    this.createdAt = new Date();
   }
 }

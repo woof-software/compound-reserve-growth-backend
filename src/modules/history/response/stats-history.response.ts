@@ -2,38 +2,61 @@ import { ApiProperty } from '@nestjs/swagger';
 
 import { StatsHistory } from 'modules/history/entities';
 
+class IncomesStatsResponse {
+  @ApiProperty({ example: 1, description: 'id - unique identifier for incomes stats' })
+  public id: number;
+
+  @ApiProperty({ example: 100.5, description: 'vs - valueSupply value in USD for supply side' })
+  public vs: number;
+
+  @ApiProperty({ example: 20.25, description: 'vb - valueBorrow value in USD for borrow side' })
+  public vb: number;
+
+  @ApiProperty({ example: 1750809600, description: 'd - date in seconds since epoch for incomes' })
+  public d: number;
+
+  constructor(incomes: any) {
+    this.id = incomes.id;
+    this.vs = incomes.valueSupply;
+    this.vb = incomes.valueBorrow;
+    this.d = new Date(incomes.date).getTime() / 1000;
+  }
+}
+
+class SpendsStatsResponse {
+  @ApiProperty({ example: 2, description: 'id - unique identifier for spends stats' })
+  public id: number;
+
+  @ApiProperty({ example: 50.0, description: 'vs - valueSupply value in USD for supply side' })
+  public vs: number;
+
+  @ApiProperty({ example: 10.0, description: 'vb - valueBorrow value in USD for borrow side' })
+  public vb: number;
+
+  @ApiProperty({ example: 1750809600, description: 'd - date in seconds since epoch for spends' })
+  public d: number;
+
+  constructor(spends: any) {
+    this.id = spends.id;
+    this.vs = spends.valueSupply;
+    this.vb = spends.valueBorrow;
+    this.d = new Date(spends.date).getTime() / 1000;
+  }
+}
+
 export class StatsHistoryResponse {
   @ApiProperty({
-    example: {
-      id: 1,
-      vs: 100.5,
-      vb: 20.25,
-      d: 1750809600,
-    },
+    type: IncomesStatsResponse,
     description: 'Incomes stats for the period',
   })
-  public incomes: {
-    id: number;
-    vs: number;
-    vb: number;
-    d: number; // epoch seconds
-  };
+  public incomes: IncomesStatsResponse;
 
   @ApiProperty({
-    example: {
-      id: 2,
-      vs: 50.0,
-      vb: 10.0,
-      d: 1750809600,
-    },
+    type: SpendsStatsResponse,
     description: 'Spends stats for the period',
+    required: false,
   })
-  public spends: {
-    id: number;
-    vs: number;
-    vb: number;
-    d: number; // epoch seconds
-  };
+  public spends?: SpendsStatsResponse;
 
   @ApiProperty({
     example: 12,
@@ -42,18 +65,8 @@ export class StatsHistoryResponse {
   public sourceId: number;
 
   constructor(statsHistory: StatsHistory) {
-    this.incomes = {
-      id: statsHistory.incomes.id,
-      vs: statsHistory.incomes.valueSupply,
-      vb: statsHistory.incomes.valueBorrow,
-      d: new Date(statsHistory.incomes.date).getTime() / 1000,
-    };
-    this.spends = {
-      id: statsHistory.spends.id,
-      vs: statsHistory.spends.valueSupply,
-      vb: statsHistory.spends.valueBorrow,
-      d: new Date(statsHistory.spends.date).getTime() / 1000,
-    };
+    this.incomes = new IncomesStatsResponse(statsHistory.incomes);
+    this.spends = statsHistory.spends ? new SpendsStatsResponse(statsHistory.spends) : undefined;
     this.sourceId = statsHistory.sourceId;
   }
 }

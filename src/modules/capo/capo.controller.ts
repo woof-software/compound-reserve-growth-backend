@@ -2,20 +2,20 @@ import { Controller, Injectable, Get, HttpCode, HttpStatus, Query } from '@nestj
 import { Throttle } from '@nestjs/throttler';
 import { ApiOkResponse, ApiOperation } from '@nestjs/swagger';
 
-import { CapoService } from './capo.service';
-import { DailyAggregationResponse } from './response/daily.response';
-import { DailyAggregationRequest } from './request/daily.request';
-
-import { PaginationRequest } from 'common/request/pagination.request';
 import { OffsetRequest } from 'modules/history/request/offset.request';
 
+import { PaginationRequest } from 'common/request/pagination.request';
+
+import { DailyAggregationResponse } from './response/daily.response';
+import { DailyAggregationRequest } from './request/daily.request';
+import { CapoService } from './capo.service';
 
 import { ApiPaginatedResponse } from '@app/common/swagger/api-paginated-response.decorator';
 import { ApiOffsetResponse } from '@app/common/swagger/api-offset-response.decorator';
 import { PaginatedDataResponse } from '@app/common/response/paginated-data.response';
 import { PaginationMetaResponse } from '@app/common/response/pagination-meta.response';
 import { OffsetDataResponse } from '@app/common/response/offset-data.response';
-import { OffsetnMetaResponse } from '@app/common/response/offset-meta.response';
+import { OffsetMetaResponse } from '@app/common/response/offset-meta.response';
 
 @Injectable()
 @Controller('capo')
@@ -26,7 +26,7 @@ export class CapoController {
   @ApiOperation({ summary: 'Get daily CAPO aggregations (plain list)' })
   @ApiOkResponse({ type: [DailyAggregationResponse] })
   @HttpCode(HttpStatus.OK)
-  @Get('daily/plain')
+  @Get('daily')
   async getDailyPlain(
     @Query() request: DailyAggregationRequest,
   ): Promise<DailyAggregationResponse[]> {
@@ -37,13 +37,11 @@ export class CapoController {
   @ApiOperation({ summary: 'Get daily CAPO aggregations (paginated)' })
   @ApiPaginatedResponse(DailyAggregationResponse)
   @HttpCode(HttpStatus.OK)
-  @Get('daily')
+  @Get('daily/paginated')
   async getDailyPaginated(
-    @Query() request: PaginationRequest & DailyAggregationRequest,
+    @Query() request: PaginationRequest,
   ): Promise<PaginatedDataResponse<DailyAggregationResponse>> {
-    const paginated = await this.capoService.getPaginatedDailyAggregations(
-      { ...request },
-    );
+    const paginated = await this.capoService.getPaginatedDailyAggregations({ ...request });
     return new PaginatedDataResponse<DailyAggregationResponse>(
       paginated.data,
       new PaginationMetaResponse(paginated.page, paginated.perPage, paginated.total),
@@ -56,14 +54,12 @@ export class CapoController {
   @HttpCode(HttpStatus.OK)
   @Get('daily/offset')
   async getDailyOffset(
-    @Query() request: OffsetRequest & DailyAggregationRequest,
+    @Query() request: OffsetRequest,
   ): Promise<OffsetDataResponse<DailyAggregationResponse>> {
-    const offsetData = await this.capoService.getOffsetDailyAggregations(
-      { ...request },
-    );
+    const offsetData = await this.capoService.getOffsetDailyAggregations({ ...request });
     return new OffsetDataResponse<DailyAggregationResponse>(
       offsetData.data,
-      new OffsetnMetaResponse(offsetData.limit, offsetData.offset, offsetData.total),
+      new OffsetMetaResponse(offsetData.limit, offsetData.offset, offsetData.total),
     );
   }
 }

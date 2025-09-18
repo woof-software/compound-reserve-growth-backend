@@ -2,7 +2,7 @@ import { ApiProperty } from '@nestjs/swagger';
 
 import { Reserve } from 'modules/history/entities';
 
-export class HistoryResponse {
+export class ReserveResponse {
   @ApiProperty({ example: 1 })
   public id: number;
 

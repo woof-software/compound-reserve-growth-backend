@@ -24,13 +24,23 @@ export class SpendsRepository {
     });
   }
 
+  async findBySourceId(sourceId: number): Promise<Spends> {
+    return this.spendsRepository.findOne({
+      where: { source: { id: sourceId } },
+      relations: { source: true },
+      order: { blockNumber: 'DESC' },
+    });
+  }
+
   async getOffsetStats(dto: OffsetDto): Promise<OffsetDataDto<Spends>> {
+    const algorithmsArrayLiteral = `{${[Algorithm.COMET, Algorithm.MARKET_V2].join(',')}}`;
+
     const query = this.spendsRepository
       .createQueryBuilder('spends')
       .leftJoinAndSelect('spends.source', 'source')
       .leftJoinAndSelect('source.asset', 'asset')
-      .where('source.algorithm IN (:...algorithms)', {
-        algorithms: [Algorithm.COMET, Algorithm.MARKET_V2],
+      .where('source.algorithm && :algorithms::text[]', {
+        algorithms: algorithmsArrayLiteral,
       });
 
     query.orderBy('spends.date', dto.order).offset(dto.offset ?? 0);

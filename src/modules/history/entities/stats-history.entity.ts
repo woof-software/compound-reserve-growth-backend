@@ -5,7 +5,7 @@ export interface StatsHistory {
     valueBorrow: number;
     date: Date;
   };
-  spends: {
+  spends?: {
     id: number;
     valueSupply: number;
     valueBorrow: number;

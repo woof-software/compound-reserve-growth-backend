@@ -1,4 +1,13 @@
-import { Entity, Column, PrimaryGeneratedColumn, CreateDateColumn, Index, JoinColumn, ManyToOne } from 'typeorm';
+import {
+  Entity,
+  Column,
+  PrimaryGeneratedColumn,
+  CreateDateColumn,
+  Index,
+  JoinColumn,
+  ManyToOne,
+} from 'typeorm';
+
 import { Source } from 'modules/source/source.entity';
 
 @Entity()
@@ -51,7 +60,7 @@ export class DailyAggregation {
 
   @Column({ nullable: true })
   public sourceId: number | null;
-  
+
   @Column({ nullable: true })
   public assetId: number | null;
 

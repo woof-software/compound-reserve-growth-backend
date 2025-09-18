@@ -1,10 +1,9 @@
-export interface ResponseAlgorithm {
-  reserves: number;
+export interface ResponseStatsAlgorithm {
   incomes: {
     supply: number;
     borrow: number;
   };
-  spends: {
+  spends?: {
     supplyUsd: number;
     borrowUsd: number;
   };

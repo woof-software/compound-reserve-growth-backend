@@ -4,6 +4,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { AssetModule } from 'modules/asset/asset.module';
 import { SourceModule } from 'modules/source/source.module';
 import { ContractModule } from 'modules/contract/contract.module';
+import { RedisModule } from 'modules/redis/redis.module';
 import { LiquidationEventService } from 'modules/history/liquidation-event.service';
 
 import { Reserve, Incomes, Spends, LiquidationEvent } from './entities';
@@ -23,6 +24,7 @@ import { LiquidationEventRepositoryService } from './liquidation-event-repositor
     SourceModule,
     AssetModule,
     forwardRef(() => ContractModule),
+    RedisModule,
   ],
   providers: [
     ReservesRepository,
