@@ -29,6 +29,7 @@ export class LiquidationEventRepositoryService {
     return this.liquidationEventRepository.findOne({
       where: { source: { id: sourceId } },
       relations: { source: true },
+      order: { blockNumber: 'DESC' },
     });
   }
 

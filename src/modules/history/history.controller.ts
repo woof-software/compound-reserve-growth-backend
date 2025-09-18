@@ -13,6 +13,7 @@ import { RevenueHistoryResponse } from './response/revenue-history.response';
 import { RevenueHistoryFullResponse } from './response/revenue-history-full.response';
 import { StatsHistoryResponse } from './response/stats-history.response';
 import { ReserveFullResponse } from './response/reserve-full.response';
+import { LiquidationEventResponse } from './response/liquidation-event.response';
 import { OffsetRequest } from './request/offset.request';
 import { OffsetDto } from './dto/offset.dto';
 
@@ -142,5 +143,32 @@ export class HistoryController {
       }),
       new OffsetMetaResponse(paginatedData.limit, paginatedData.offset, paginatedData.total),
     );
+  }
+
+  @Throttle({ default: { limit: 15, ttl: 1000 } })
+  @ApiOperation({ summary: 'Get liquidation events reduced response' })
+  @ApiOffsetResponse(LiquidationEventResponse)
+  @HttpCode(HttpStatus.OK)
+  @Get('v2/liquidation-events')
+  async getLiquidationEvents(
+    @Query() request: OffsetRequest,
+  ): Promise<OffsetDataResponse<LiquidationEventResponse>> {
+    const key = `history:v2:liquidation-events:${request.limit ?? 'null'}:${request.offset ?? 0}:${request.order ?? 'DESC'}`;
+    const ttl = HOUR_IN_SEC;
+
+    const cached = await this.redisClient.get(key);
+    if (cached) return JSON.parse(cached) as OffsetDataResponse<LiquidationEventResponse>;
+
+    const paginatedData = await this.historyService.getOffsetLiquidationEvents(
+      new OffsetDto(request?.limit, request?.offset, request?.order),
+    );
+    const res = new OffsetDataResponse<LiquidationEventResponse>(
+      paginatedData.data.map((liquidationEvent) => {
+        return new LiquidationEventResponse(liquidationEvent);
+      }),
+      new OffsetMetaResponse(paginatedData.limit, paginatedData.offset, paginatedData.total),
+    );
+    await this.redisClient.set(key, JSON.stringify(res), 'EX', ttl);
+    return res;
   }
 }

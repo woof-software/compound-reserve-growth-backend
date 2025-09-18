@@ -498,6 +498,9 @@ export class ContractService implements OnModuleInit {
         case Algorithm.MARKET_V2_STATS:
           await this.saveStats(source, alg);
           break;
+        case Algorithm.LIQUIDATION_EVENT:
+          await this.saveLiquidationsEvent(source);
+          break;
         default:
           await this.saveReserves(source, alg);
       }
@@ -920,151 +923,240 @@ export class ContractService implements OnModuleInit {
     }
   }
 
-  public async getLiquidationsEvent(source: Source) {
-    const provider = this.providerFactory.get(source.network);
-    const comet = new ethers.Contract(source.address, CometABI, provider);
+  public async saveLiquidationsEvent(source: Source): Promise<void> {
+    const { address: contractAddress, network } = source;
 
-    const latest = await provider.getBlockNumber();
+    this.logger.log(`Starting liquidation events collection for source ${source.id} on ${network}`);
 
-    const lastEvent = await this.liqEventService.findBySource(source);
-    let fromBlock: number;
-    if (lastEvent) {
-      fromBlock = lastEvent.blockNumber + 1;
-    } else {
-      try {
-        // Start from the contract creation block if we have no prior events
-        const creationBlock = await this.getContractCreationBlock(source.address, source.network);
-        // In case source.blockNumber is ahead (e.g., seeded), start from the earliest meaningful point
-        fromBlock = Math.max(creationBlock, 0);
-        this.logger.log(
-          `No previous liquidation events. Starting scan from creation block ${fromBlock} for ${source.address} on ${source.network}`,
-        );
-      } catch (e: any) {
-        // Fallback: if creation block discovery fails, fall back to the source's known blockNumber
-        fromBlock = Math.max(source.blockNumber, 0);
-        this.logger.warn(
-          `Failed to determine creation block for ${source.address} on ${source.network}: ${e?.message}. Fallback to source.blockNumber=${fromBlock}`,
-        );
-      }
-    }
-    if (fromBlock > latest) return;
+    try {
+      const provider = this.providerFactory.get(network);
+      const comet = new ethers.Contract(contractAddress, CometABI, provider);
 
-    const numAssets: bigint = await comet.numAssets();
-    const assetScaleByAddress = new Map<string, bigint>();
-    const priceFeedByAsset = new Map<string, string>();
-    for (let i = 0n; i < numAssets; i++) {
-      const info = await comet.getAssetInfo(i);
-      assetScaleByAddress.set(
-        String(info.asset).toLowerCase(),
-        BigInt(info.scale ?? info.assetScale ?? 1n),
-      );
-      if (info.priceFeed) {
-        priceFeedByAsset.set(
-          String(info.asset).toLowerCase(),
-          String(info.priceFeed).toLowerCase(),
-        );
-      }
-    }
+      const lastEvent = await this.liqEventService.findBySource(source);
+      let lastBlock: number | undefined;
 
-    // Build interface and static topic for AbsorbCollateral
-    const iface = new ethers.Interface(CometABI);
-    const absorbCollateralTopic = ethers.id(
-      'AbsorbCollateral(address,address,address,uint256,uint256)',
-    );
-
-    // Query logs in chunks with adaptive backoff to avoid provider limits
-    let step = 8_000;
-    for (let start = fromBlock; start <= latest; start += step + 1) {
-      let end = Math.min(start + step, latest);
-      let collateralLogs: ethers.Log[] = [];
-
-      // Adaptive retry: shrink range on transient RPC failures
-      let attempt = 0;
-      const minStep = 500;
-      while (attempt < 4) {
+      if (lastEvent) {
+        lastBlock = lastEvent.blockNumber;
+      } else {
         try {
-          collateralLogs = await provider.getLogs({
-            address: (comet.target as string) || source.address,
-            topics: [absorbCollateralTopic],
-            fromBlock: start,
-            toBlock: end,
-          });
-          break;
-        } catch (e: any) {
-          const msg = e?.shortMessage || e?.message || String(e);
-          this.logger.warn(
-            `getLogs failed [${start}-${end}] step=${step} attempt=${attempt + 1}: ${msg}`,
+          // Start from the contract creation block if we have no prior events
+          const creationBlock = await this.getContractCreationBlock(source.address, source.network);
+          lastBlock = Math.max(creationBlock, 0);
+          this.logger.log(
+            `No previous liquidation events. Starting scan from creation block ${lastBlock} for ${source.address} on ${source.network}`,
           );
-          if (
-            e?.code === 'SERVER_ERROR' ||
-            e?.code === 'TIMEOUT' ||
-            e?.code === 'UNSUPPORTED_OPERATION' ||
-            /body is not valid JSON|429|busy|overloaded|rate/i.test(msg)
-          ) {
-            step = Math.max(minStep, Math.floor(step / 2));
-            end = Math.min(start + step, latest);
-            attempt++;
-            await new Promise((r) => setTimeout(r, 150));
-            continue;
-          }
-          throw e;
+        } catch (e: any) {
+          this.logger.warn(
+            `Failed to determine creation block for ${source.address} on ${source.network}: ${e?.message}. Fallback to source.blockNumber=${source.blockNumber}`,
+          );
+          return;
         }
       }
 
-      if (collateralLogs.length === 0) {
-        continue;
+      const startBlockData = await this.getCachedBlock(network, provider, lastBlock);
+      const startTs = startBlockData.timestamp;
+
+      const { firstMidnightUTC, todayMidnightUTC, dailyTs } = calculateTimeRange(startTs);
+
+      // Check if we have any days to process
+      if (firstMidnightUTC > todayMidnightUTC) {
+        this.logger.log(`No historical data needed - source is already up to date`);
+        return;
       }
-      const logs = collateralLogs.sort((a, b) =>
-        a.blockNumber === b.blockNumber ? a.index - b.index : a.blockNumber - b.blockNumber,
+
+      this.logger.log(
+        `Processing ${dailyTs.length} daily timestamps from ${new Date(firstMidnightUTC * 1000).toISOString().slice(0, 10)} to ${new Date(todayMidnightUTC * 1000).toISOString().slice(0, 10)}`,
       );
 
-      // cache decimals per price feed to avoid repetitive RPC calls
-      const decimalsByFeed = new Map<string, number>();
+      // Check if we have a reasonable number of days to process
+      if (dailyTs.length === 0) {
+        this.logger.warn(`No days to process for source ${source.id}`);
+        return;
+      }
 
-      for (const log of logs) {
-        const parsed = iface.parseLog({ topics: log.topics, data: log.data });
-        const block = await provider.getBlock(log.blockNumber);
-        const date = new Date(Number(block.timestamp) * 1000);
+      // Preload asset information once
+      const numAssets: bigint = await comet.numAssets();
+      const assetScaleByAddress = new Map<string, bigint>();
+      const priceFeedByAsset = new Map<string, string>();
+      for (let i = 0n; i < numAssets; i++) {
+        const info = await comet.getAssetInfo(i);
+        assetScaleByAddress.set(
+          String(info.asset).toLowerCase(),
+          BigInt(info.scale ?? info.assetScale ?? 1n),
+        );
+        if (info.priceFeed) {
+          priceFeedByAsset.set(
+            String(info.asset).toLowerCase(),
+            String(info.priceFeed).toLowerCase(),
+          );
+        }
+      }
 
-        if (parsed.name === 'AbsorbCollateral') {
-          const absorber = parsed.args.absorber as string;
-          const asset = (parsed.args.asset as string).toLowerCase();
-          const usdValue = parsed.args.usdValue as bigint;
-          const priceFeedAddress = priceFeedByAsset.get(asset) ?? null;
+      // Build interface and static topic for AbsorbCollateral
+      const iface = new ethers.Interface(CometABI);
+      const absorbCollateralTopic = ethers.id(
+        'AbsorbCollateral(address,address,address,uint256,uint256)',
+      );
 
-          let feedDecimals: number;
-          if (priceFeedAddress) {
-            if (decimalsByFeed.has(priceFeedAddress)) {
-              feedDecimals = decimalsByFeed.get(priceFeedAddress)!;
-            } else {
+      let processedCount = 0;
+      let skippedCount = 0;
+
+      for (const targetTs of dailyTs) {
+        try {
+          const blockTag = await this.findBlockByTimestamp(network, provider, targetTs, lastBlock);
+
+          // Query logs for this specific day
+          const dayStartTs = targetTs;
+          const dayEndTs = targetTs + DAY_IN_SEC;
+
+          const dayStartBlock = await this.findBlockByTimestamp(
+            network,
+            provider,
+            dayStartTs,
+            lastBlock,
+          );
+          const dayEndBlock = await this.findBlockByTimestamp(
+            network,
+            provider,
+            dayEndTs,
+            lastBlock,
+          );
+
+          const collateralLogs: ethers.Log[] = [];
+
+          // Query logs in chunks with adaptive backoff to avoid provider limits
+          let step = Math.min(8_000, dayEndBlock - dayStartBlock);
+          for (let start = dayStartBlock; start <= dayEndBlock; start += step + 1) {
+            let end = Math.min(start + step, dayEndBlock);
+
+            // Adaptive retry: shrink range on transient RPC failures
+            let attempt = 0;
+            const minStep = 500;
+            while (attempt < 4) {
               try {
-                const aggregator = new ethers.Contract(asset, ERC20ABI, provider);
-                const d: number = Number(await aggregator.decimals());
-                if (!Number.isNaN(d) && d > 0 && d <= 36) {
-                  feedDecimals = d;
+                const logs = await provider.getLogs({
+                  address: contractAddress,
+                  topics: [absorbCollateralTopic],
+                  fromBlock: start,
+                  toBlock: end,
+                });
+                collateralLogs.push(...logs);
+                break;
+              } catch (e: any) {
+                const msg = e?.shortMessage || e?.message || String(e);
+                this.logger.warn(
+                  `getLogs failed [${start}-${end}] step=${step} attempt=${attempt + 1}: ${msg}`,
+                );
+                if (
+                  e?.code === 'SERVER_ERROR' ||
+                  e?.code === 'TIMEOUT' ||
+                  e?.code === 'UNSUPPORTED_OPERATION' ||
+                  /body is not valid JSON|429|busy|overloaded|rate/i.test(msg)
+                ) {
+                  step = Math.max(minStep, Math.floor(step / 2));
+                  end = Math.min(start + step, dayEndBlock);
+                  attempt++;
+                  await new Promise((r) => setTimeout(r, 150));
+                  continue;
                 }
-              } catch (_) {
-                feedDecimals = 8;
+                throw e;
               }
-              decimalsByFeed.set(priceFeedAddress, feedDecimals);
             }
           }
 
-          const collateralUsd = Number(ethers.formatUnits(usdValue, feedDecimals));
+          if (collateralLogs.length === 0) {
+            lastBlock = blockTag;
+            continue;
+          }
 
-          const entity = new LiquidationEvent(
-            source,
-            log.blockNumber,
-            log.transactionHash,
-            absorber,
-            asset,
-            priceFeedAddress,
-            collateralUsd,
-            date,
+          const logs = collateralLogs.sort((a, b) =>
+            a.blockNumber === b.blockNumber ? a.index - b.index : a.blockNumber - b.blockNumber,
           );
-          await this.liqEventService.createWithSource(entity);
+
+          // Cache decimals per price feed to avoid repetitive RPC calls
+          const decimalsByFeed = new Map<string, number>();
+
+          for (const log of logs) {
+            const parsed = iface.parseLog({ topics: log.topics, data: log.data });
+            const block = await provider.getBlock(log.blockNumber);
+            const date = new Date(Number(block.timestamp) * 1000);
+
+            if (parsed.name === 'AbsorbCollateral') {
+              const absorber = parsed.args.absorber as string;
+              const asset = (parsed.args.asset as string).toLowerCase();
+              const usdValue = parsed.args.usdValue as bigint;
+              const priceFeedAddress = priceFeedByAsset.get(asset) ?? null;
+
+              let feedDecimals: number;
+              if (priceFeedAddress) {
+                if (decimalsByFeed.has(priceFeedAddress)) {
+                  feedDecimals = decimalsByFeed.get(priceFeedAddress)!;
+                } else {
+                  try {
+                    const aggregator = new ethers.Contract(asset, ERC20ABI, provider);
+                    const d: number = Number(await aggregator.decimals());
+                    if (!Number.isNaN(d) && d > 0 && d <= 36) {
+                      feedDecimals = d;
+                    }
+                  } catch (_) {
+                    feedDecimals = 8;
+                  }
+                  decimalsByFeed.set(priceFeedAddress, feedDecimals);
+                }
+              }
+
+              const collateralUsd = Number(ethers.formatUnits(usdValue, feedDecimals));
+
+              const entity = new LiquidationEvent(
+                source,
+                log.blockNumber,
+                log.transactionHash,
+                absorber,
+                asset,
+                priceFeedAddress,
+                collateralUsd,
+                date,
+              );
+              await this.liqEventService.createWithSource(entity);
+            }
+          }
+
+          lastBlock = blockTag;
+          processedCount++;
+
+          if (processedCount % 50 === 0) {
+            this.logger.log(
+              `Progress: ${processedCount}/${dailyTs.length} days processed (${skippedCount} skipped)`,
+            );
+          }
+        } catch (error) {
+          this.logger.error(`Failed to process timestamp ${targetTs}: ${error.message}`);
+
+          // Fallback
+          if (network === 'arbitrum') {
+            const period = this.getArbitrumConfigForBlock(lastBlock);
+            lastBlock = lastBlock + period.blocksPerDay;
+          } else {
+            const networkConf = this.networkConfig[network];
+            lastBlock = lastBlock + (networkConf?.blocksPerDay || 43200);
+          }
+          skippedCount++;
+          continue;
         }
       }
+
+      // Calculate final statistics
+      const totalAttempted = dailyTs.length;
+      const successRate =
+        totalAttempted > 0 ? Math.round((processedCount / totalAttempted) * 100) : 0;
+
+      this.logger.log(
+        `Completed: ${successRate}% success (${processedCount}/${totalAttempted} processed, ${skippedCount} skipped)`,
+      );
+    } catch (error) {
+      const message = `Error processing liquidation events for source ${source.id} on ${network} for contract ${contractAddress}: ${error.message}`;
+      this.logger.error(message);
+      await this.mailService.notifyGetHistoryError(message);
     }
   }
 }

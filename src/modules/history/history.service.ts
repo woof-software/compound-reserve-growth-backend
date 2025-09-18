@@ -6,8 +6,9 @@ import { Source } from 'modules/source/source.entity';
 import { ReservesRepository } from './reserves-repository.service';
 import { IncomesRepository } from './incomes-repository.service';
 import { SpendsRepository } from './spends-repository.service';
+import { LiquidationEventRepositoryService } from './liquidation-event-repository.service';
 import { CreateHistoryDto } from './dto/create-history.dto';
-import { Reserve, Incomes, Spends, StatsHistory } from './entities';
+import { Reserve, Incomes, Spends, StatsHistory, LiquidationEvent } from './entities';
 import { PaginationDto } from './dto/pagination.dto';
 import { OffsetDto } from './dto/offset.dto';
 
@@ -20,6 +21,7 @@ export class HistoryService {
     private readonly reservesRepo: ReservesRepository,
     private readonly incomesRepo: IncomesRepository,
     private readonly spendsRepo: SpendsRepository,
+    private readonly liqEventRepo: LiquidationEventRepositoryService,
     private readonly sourceRepo: SourceRepository,
   ) {}
 
@@ -200,5 +202,9 @@ export class HistoryService {
       dto.offset ?? 0,
       total,
     );
+  }
+
+  async getOffsetLiquidationEvents(dto: OffsetDto): Promise<OffsetDataDto<LiquidationEvent>> {
+    return this.liqEventRepo.getOffset(dto);
   }
 }

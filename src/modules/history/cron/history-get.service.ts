@@ -3,8 +3,6 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ContractService } from 'modules/contract/contract.service';
 import { SourceService } from 'modules/source/source.service';
 
-import { Algorithm } from '@/common/enum/algorithm.enum';
-
 @Injectable()
 export class GetHistoryService {
   private readonly logger = new Logger(GetHistoryService.name);
@@ -29,25 +27,6 @@ export class GetHistoryService {
       return;
     } catch (error) {
       this.logger.error('An error occurred while getting history data:', error);
-      return;
-    }
-  }
-
-  async getLiquidationsEvent() {
-    this.logger.log('⏰ Starting daily liquidations event sync…');
-    try {
-      this.logger.log('Starting to get liquidations event data...');
-
-      const dbSourcesComet = await this.sourceService.listByAlgorithm(Algorithm.COMET);
-
-      for (const source of dbSourcesComet) {
-        await this.contractService.getLiquidationsEvent(source);
-      }
-
-      this.logger.log('Getting liquidations event data completed.');
-      return;
-    } catch (error) {
-      this.logger.error('An error occurred while getting liquidations event data:', error);
       return;
     }
   }
