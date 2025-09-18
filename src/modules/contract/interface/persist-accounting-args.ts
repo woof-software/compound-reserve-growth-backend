@@ -1,11 +1,11 @@
 import { Source } from 'modules/source/source.entity';
 
-import { ResponseAlgorithm } from './response-algorithm';
+import { ResponseStatsAlgorithm } from './response-algorithm';
 
 export interface PersistAccountingArgs {
   source: Source;
   blockTag: number;
-  marketAccounting: ResponseAlgorithm;
+  marketAccounting: ResponseStatsAlgorithm;
   price: number;
   reserveValue: number;
   incomeSupplyValue: number;

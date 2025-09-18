@@ -15,7 +15,7 @@ export interface DailyProcessArgs {
     symbol: string;
     decimals: number;
   };
-  algorithm: Algorithm | string;
+  algorithm: Algorithm[] | string[];
   contract: Contract;
   assetContract: Contract;
   contractAddress: string;

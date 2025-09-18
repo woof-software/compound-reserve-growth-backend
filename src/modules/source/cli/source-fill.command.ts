@@ -33,7 +33,12 @@ export class SourceFillCommand extends CommandRunner {
       const dbSources = await this.sourceService.listAll();
 
       for (const source of sources) {
-        if (source.algorithm === Algorithm.COMPTROLLER) {
+        const sourceAlgorithms = Array.isArray(source.algorithm)
+          ? source.algorithm
+          : [source.algorithm];
+        const sourceAlgorithmsStr = sourceAlgorithms.map((a) => String(a));
+
+        if (sourceAlgorithms.includes(Algorithm.COMPTROLLER)) {
           const comptrollerMarkets = await this.contractService.getAllComptrollerMarkets(
             source.address,
             source.network,
@@ -43,7 +48,7 @@ export class SourceFillCommand extends CommandRunner {
               (s) =>
                 s.address === marketAddress &&
                 s.network === source.network &&
-                s.algorithm === Algorithm.MARKET_V2,
+                s.algorithm.includes(Algorithm.MARKET_V2),
             );
             if (existingSource) continue;
 
@@ -66,10 +71,13 @@ export class SourceFillCommand extends CommandRunner {
               network: source.network,
             });
 
+            const marketAlgorithms = Array.from(
+              new Set([...sourceAlgorithmsStr, String(Algorithm.MARKET_V2)]),
+            );
             const newMarketSource = new Source(
               marketAddress,
               source.network,
-              Algorithm.MARKET_V2,
+              marketAlgorithms,
               SourceType.MARKET_V2,
               creationBlockNumber,
               marketAsset,
@@ -84,7 +92,8 @@ export class SourceFillCommand extends CommandRunner {
           (s) =>
             s.address === source.address &&
             s.network === source.network &&
-            s.algorithm === source.algorithm &&
+            s.algorithm.length === source.algorithm.length &&
+            sourceAlgorithmsStr.every((a) => s.algorithm.includes(a)) &&
             s.asset.address === source.asset.address,
         );
         if (existingSource) continue;
@@ -151,7 +160,7 @@ export class SourceFillCommand extends CommandRunner {
               const newRewardSource = new Source(
                 marketData.rewardsAddress,
                 marketData.network,
-                Algorithm.REWARDS,
+                [Algorithm.REWARDS],
                 SourceType.REWARDS,
                 creationBlockNumber,
                 compAsset,
@@ -164,7 +173,7 @@ export class SourceFillCommand extends CommandRunner {
             (source) =>
               source.address === marketData.cometAddress &&
               source.network === marketData.network &&
-              source.algorithm === Algorithm.COMET,
+              source.algorithm.includes(Algorithm.COMET),
           );
           if (existingCometSource) continue;
           const creationBlockNumber = await this.contractService.getContractCreationBlock(
@@ -187,7 +196,7 @@ export class SourceFillCommand extends CommandRunner {
           const newMarketSource = new Source(
             marketData.cometAddress,
             marketData.network,
-            Algorithm.COMET,
+            [Algorithm.COMET],
             SourceType.MARKET_V3,
             creationBlockNumber,
             cometAsset,

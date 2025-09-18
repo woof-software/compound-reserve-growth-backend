@@ -23,8 +23,8 @@ export class Source {
   @Column({ nullable: true })
   public type: string;
 
-  @Column()
-  public algorithm: string;
+  @Column('text', { array: true })
+  public algorithm: string[];
 
   @Column()
   public blockNumber: number;
@@ -59,7 +59,7 @@ export class Source {
   constructor(
     address: string,
     network: string,
-    algorithm: string,
+    algorithm: string[],
     type: string,
     blockNumber: number,
     asset: Asset,

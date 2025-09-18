@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 
 import { SourceRepository } from 'modules/source/source.repository';
+import { Source } from 'modules/source/source.entity';
 
 import { ReservesRepository } from './reserves-repository.service';
 import { IncomesRepository } from './incomes-repository.service';
@@ -58,6 +59,14 @@ export class HistoryService {
 
   async findSpendsById(id: number): Promise<Spends> {
     return this.spendsRepo.findById(id);
+  }
+
+  async findIncomesBySource(source: Source): Promise<Incomes> {
+    return this.incomesRepo.findBySourceId(source.id);
+  }
+
+  async findSpendsBySource(source: Source): Promise<Spends> {
+    return this.spendsRepo.findBySourceId(source.id);
   }
 
   async getTreasuryHistory(): Promise<Reserve[]> {

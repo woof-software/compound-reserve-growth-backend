@@ -5,7 +5,7 @@ import { Algorithm } from 'common/enum/algorithm.enum';
 
 export const sources = [
   {
-    algorithm: Algorithm.TIMELOCK,
+    algorithm: [Algorithm.TIMELOCK],
     address: '0x6d903f6003cca6255D85CcA4D3B5E5146dC33925',
     network: 'mainnet',
     type: SourceType.TIMELOCK,
@@ -19,7 +19,7 @@ export const sources = [
     },
   },
   {
-    algorithm: Algorithm.TIMELOCK,
+    algorithm: [Algorithm.TIMELOCK],
     address: '0x6d903f6003cca6255D85CcA4D3B5E5146dC33925',
     network: 'mainnet',
     type: SourceType.TIMELOCK,
@@ -33,7 +33,7 @@ export const sources = [
     },
   },
   {
-    algorithm: Algorithm.TIMELOCK,
+    algorithm: [Algorithm.TIMELOCK],
     address: '0x6d903f6003cca6255D85CcA4D3B5E5146dC33925',
     network: 'mainnet',
     type: SourceType.TIMELOCK,
@@ -47,7 +47,7 @@ export const sources = [
     },
   },
   {
-    algorithm: Algorithm.TIMELOCK,
+    algorithm: [Algorithm.TIMELOCK],
     address: '0x6d903f6003cca6255D85CcA4D3B5E5146dC33925',
     network: 'mainnet',
     type: SourceType.TIMELOCK,
@@ -61,7 +61,7 @@ export const sources = [
     },
   },
   {
-    algorithm: Algorithm.TIMELOCK,
+    algorithm: [Algorithm.TIMELOCK],
     address: '0x6d903f6003cca6255D85CcA4D3B5E5146dC33925',
     network: 'mainnet',
     type: SourceType.TIMELOCK,
@@ -75,7 +75,7 @@ export const sources = [
     },
   },
   {
-    algorithm: Algorithm.TIMELOCK,
+    algorithm: [Algorithm.TIMELOCK],
     address: '0x6d903f6003cca6255D85CcA4D3B5E5146dC33925',
     network: 'mainnet',
     type: SourceType.TIMELOCK,
@@ -89,7 +89,7 @@ export const sources = [
     },
   },
   {
-    algorithm: Algorithm.TIMELOCK,
+    algorithm: [Algorithm.TIMELOCK],
     address: '0x6d903f6003cca6255D85CcA4D3B5E5146dC33925',
     network: 'mainnet',
     type: SourceType.TIMELOCK,
@@ -103,7 +103,7 @@ export const sources = [
     },
   },
   {
-    algorithm: Algorithm.TIMELOCK,
+    algorithm: [Algorithm.TIMELOCK],
     address: '0x6d903f6003cca6255D85CcA4D3B5E5146dC33925',
     network: 'mainnet',
     type: SourceType.TIMELOCK,
@@ -117,7 +117,7 @@ export const sources = [
     },
   },
   {
-    algorithm: Algorithm.TIMELOCK,
+    algorithm: [Algorithm.TIMELOCK],
     address: '0x6d903f6003cca6255D85CcA4D3B5E5146dC33925',
     network: 'mainnet',
     type: SourceType.TIMELOCK,
@@ -131,7 +131,7 @@ export const sources = [
     },
   },
   {
-    algorithm: Algorithm.TIMELOCK,
+    algorithm: [Algorithm.TIMELOCK],
     address: '0x6d903f6003cca6255D85CcA4D3B5E5146dC33925',
     network: 'mainnet',
     type: SourceType.TIMELOCK,
@@ -145,7 +145,7 @@ export const sources = [
     },
   },
   {
-    algorithm: Algorithm.TIMELOCK,
+    algorithm: [Algorithm.TIMELOCK],
     address: '0x6d903f6003cca6255D85CcA4D3B5E5146dC33925',
     network: 'mainnet',
     type: SourceType.TIMELOCK,
@@ -159,7 +159,7 @@ export const sources = [
     },
   },
   {
-    algorithm: Algorithm.AVANTGARDE_TREASURY_GROWTH_PROPOSAL,
+    algorithm: [Algorithm.AVANTGARDE_TREASURY_GROWTH_PROPOSAL],
     address: '0xFDaF45754F372cE8726b10846809878eA53f8c12',
     network: 'mainnet',
     type: SourceType.AVANTGARDE_TREASURY_GROWTH_PROPOSAL,
@@ -173,7 +173,7 @@ export const sources = [
     },
   },
   {
-    algorithm: Algorithm.AVANTGARDE_TREASURY_GROWTH_PROPOSAL,
+    algorithm: [Algorithm.AVANTGARDE_TREASURY_GROWTH_PROPOSAL],
     address: '0x478f2651Be83731328E9532707714CF91cB229a1',
     network: 'mainnet',
     type: SourceType.AVANTGARDE_TREASURY_GROWTH_PROPOSAL,
@@ -187,7 +187,7 @@ export const sources = [
     },
   },
   {
-    algorithm: Algorithm.AERA_COMPOUND_RESERVES,
+    algorithm: [Algorithm.AERA_COMPOUND_RESERVES],
     address: '0x3D6eEf6A92b15361697698695334E98C5db91D6b',
     network: 'mainnet',
     type: SourceType.AERA_COMPOUND_RESERVES,
@@ -208,7 +208,7 @@ export const sources = [
     },
   },
   {
-    algorithm: Algorithm.AERA_COMPOUND_RESERVES,
+    algorithm: [Algorithm.AERA_COMPOUND_RESERVES],
     address: '0x3D6eEf6A92b15361697698695334E98C5db91D6b',
     network: 'mainnet',
     type: SourceType.AERA_COMPOUND_RESERVES,
@@ -229,7 +229,7 @@ export const sources = [
     },
   },
   {
-    algorithm: Algorithm.AERA_COMPOUND_RESERVES,
+    algorithm: [Algorithm.AERA_COMPOUND_RESERVES],
     address: '0x3D6eEf6A92b15361697698695334E98C5db91D6b',
     network: 'mainnet',
     type: SourceType.AERA_COMPOUND_RESERVES,
@@ -243,7 +243,7 @@ export const sources = [
     },
   },
   {
-    algorithm: Algorithm.AERA_COMPOUND_RESERVES,
+    algorithm: [Algorithm.AERA_COMPOUND_RESERVES],
     address: '0x3D6eEf6A92b15361697698695334E98C5db91D6b',
     network: 'mainnet',
     type: SourceType.AERA_COMPOUND_RESERVES,
@@ -257,7 +257,7 @@ export const sources = [
     },
   },
   {
-    algorithm: Algorithm.AERA_COMPOUND_RESERVES,
+    algorithm: [Algorithm.AERA_COMPOUND_RESERVES],
     address: '0x3D6eEf6A92b15361697698695334E98C5db91D6b',
     network: 'mainnet',
     type: SourceType.AERA_COMPOUND_RESERVES,
@@ -271,7 +271,7 @@ export const sources = [
     },
   },
   {
-    algorithm: Algorithm.AERA_VENDORS_VAULT,
+    algorithm: [Algorithm.AERA_VENDORS_VAULT],
     address: '0x8624f61Cc6e5A86790e173712AfDd480fa8b73Ba',
     network: 'mainnet',
     type: SourceType.AERA_VENDORS_VAULT,
@@ -292,7 +292,7 @@ export const sources = [
     },
   },
   {
-    algorithm: Algorithm.COMPTROLLER,
+    algorithm: [Algorithm.COMPTROLLER],
     address: '0x3d9819210A31b4961b30EF54bE2aeD79B9c9Cd3B',
     network: 'mainnet',
     type: SourceType.COMPTROLLER,
@@ -306,7 +306,7 @@ export const sources = [
     },
   },
   {
-    algorithm: Algorithm.COMPOUND_COMMUNITY_MULTISIG,
+    algorithm: [Algorithm.COMPOUND_COMMUNITY_MULTISIG],
     address: '0xbbf3f1421D886E9b2c5D716B5192aC998af2012c',
     network: 'mainnet',
     type: SourceType.COMPOUND_COMMUNITY_MULTISIG,
@@ -320,7 +320,7 @@ export const sources = [
     },
   },
   {
-    algorithm: Algorithm.IMMUNEFI_BUG_BOUNTY_PROGRAM,
+    algorithm: [Algorithm.IMMUNEFI_BUG_BOUNTY_PROGRAM],
     address: '0x429D01a5ff7f7880081f858B50C26452255477f5',
     network: 'mainnet',
     type: SourceType.IMMUNEFI_BUG_BOUNTY_PROGRAM,
@@ -334,7 +334,7 @@ export const sources = [
     },
   },
   {
-    algorithm: Algorithm.WOOF_PAYMENT_STREAM_CONTRACT,
+    algorithm: [Algorithm.WOOF_PAYMENT_STREAM_CONTRACT],
     address: '0xF088339DD8e79819A41aDD5FFB75d9F245AfaAb1',
     network: 'mainnet',
     type: SourceType.WOOF_PAYMENT_STREAM_CONTRACT,
@@ -348,7 +348,7 @@ export const sources = [
     },
   },
   {
-    algorithm: Algorithm.OPENZEPPELIN_PAYMENT_STREAM_CONTRACT,
+    algorithm: [Algorithm.OPENZEPPELIN_PAYMENT_STREAM_CONTRACT],
     address: '0xCC14295eEF16b26171B19a769C8a255b24305533',
     network: 'mainnet',
     type: SourceType.OPENZEPPELIN_PAYMENT_STREAM_CONTRACT,
@@ -362,7 +362,7 @@ export const sources = [
     },
   },
   {
-    algorithm: Algorithm.TIMELOCK,
+    algorithm: [Algorithm.TIMELOCK],
     address: '0xCC3E7c85Bb0EE4f09380e041fee95a0caeDD4a02',
     network: 'polygon',
     type: SourceType.TIMELOCK,
@@ -383,7 +383,7 @@ export const sources = [
     },
   },
   {
-    algorithm: Algorithm.TIMELOCK,
+    algorithm: [Algorithm.TIMELOCK],
     address: '0xCC3E7c85Bb0EE4f09380e041fee95a0caeDD4a02',
     network: 'polygon',
     type: SourceType.TIMELOCK,
@@ -404,7 +404,7 @@ export const sources = [
     },
   },
   {
-    algorithm: Algorithm.TIMELOCK,
+    algorithm: [Algorithm.TIMELOCK],
     address: '0xCC3E7c85Bb0EE4f09380e041fee95a0caeDD4a02',
     network: 'polygon',
     type: SourceType.TIMELOCK,
@@ -425,7 +425,7 @@ export const sources = [
     },
   },
   {
-    algorithm: Algorithm.TIMELOCK,
+    algorithm: [Algorithm.TIMELOCK],
     address: '0xCC3E7c85Bb0EE4f09380e041fee95a0caeDD4a02',
     network: 'polygon',
     type: SourceType.TIMELOCK,
@@ -446,7 +446,7 @@ export const sources = [
     },
   },
   {
-    algorithm: Algorithm.MANTLE,
+    algorithm: [Algorithm.MANTLE],
     address: '0x47b1137df9fF3f9d481da1d8f5f494697e137668',
     network: 'mantle',
     type: SourceType.MANTLE,
@@ -460,7 +460,7 @@ export const sources = [
     },
   },
   {
-    algorithm: Algorithm.DELEGATE_RACE,
+    algorithm: [Algorithm.DELEGATE_RACE],
     address: '0xC623e9bc66cF498ABdC3c7297e9Df95f20C2F0a8',
     network: 'mainnet',
     type: SourceType.DELEGATE_RACE,
@@ -474,7 +474,7 @@ export const sources = [
     },
   },
   {
-    algorithm: Algorithm.DELEGATE_RACE,
+    algorithm: [Algorithm.DELEGATE_RACE],
     address: '0xca038273e110c8e39543E7FAB9279FB42fE32c63',
     network: 'mainnet',
     type: SourceType.DELEGATE_RACE,
@@ -488,7 +488,7 @@ export const sources = [
     },
   },
   {
-    algorithm: Algorithm.DELEGATE_RACE,
+    algorithm: [Algorithm.DELEGATE_RACE],
     address: '0x59dC38b5CEe74ca7189394eddAf5A13611DF0B63',
     network: 'mainnet',
     type: SourceType.DELEGATE_RACE,
@@ -502,7 +502,7 @@ export const sources = [
     },
   },
   {
-    algorithm: Algorithm.DELEGATE_RACE,
+    algorithm: [Algorithm.DELEGATE_RACE],
     address: '0xe8B2B94612240d57D830944a668E4e48eDF9F9D8',
     network: 'mainnet',
     type: SourceType.DELEGATE_RACE,
@@ -516,7 +516,7 @@ export const sources = [
     },
   },
   {
-    algorithm: Algorithm.DELEGATE_RACE,
+    algorithm: [Algorithm.DELEGATE_RACE],
     address: '0xEC8604670F07dB6E40f84147F4297b7f58775350',
     network: 'mainnet',
     type: SourceType.DELEGATE_RACE,
@@ -530,7 +530,7 @@ export const sources = [
     },
   },
   {
-    algorithm: Algorithm.DELEGATE_RACE,
+    algorithm: [Algorithm.DELEGATE_RACE],
     address: '0x603657fDEc47a9dF15A5661cE011E13C0D449982',
     network: 'mainnet',
     type: SourceType.DELEGATE_RACE,
@@ -544,7 +544,7 @@ export const sources = [
     },
   },
   {
-    algorithm: Algorithm.DELEGATE_RACE,
+    algorithm: [Algorithm.DELEGATE_RACE],
     address: '0x1543D57471A5F168cBabb5922246a77013c9d2E4',
     network: 'mainnet',
     type: SourceType.DELEGATE_RACE,
@@ -558,7 +558,7 @@ export const sources = [
     },
   },
   {
-    algorithm: Algorithm.DELEGATE_RACE,
+    algorithm: [Algorithm.DELEGATE_RACE],
     address: '0xBbc353508e782d44fFbD28d2869bd527070b24F2',
     network: 'mainnet',
     type: SourceType.DELEGATE_RACE,

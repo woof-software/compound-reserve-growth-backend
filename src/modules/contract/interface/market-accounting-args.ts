@@ -3,7 +3,7 @@ import { ethers } from 'ethers';
 import { Algorithm } from '@app/common/enum/algorithm.enum';
 
 export interface MarketAccountingArgs {
-  algorithm: Algorithm | string;
+  algorithm: Algorithm[] | string[];
   contract: ethers.Contract;
   blockTag: number;
   decimals: number;

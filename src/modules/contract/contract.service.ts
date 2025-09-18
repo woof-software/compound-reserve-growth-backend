@@ -4,15 +4,16 @@ import { ethers, JsonRpcProvider } from 'ethers';
 import type { Cache } from 'cache-manager';
 import type { Redis } from 'ioredis';
 
+import { Reserve, Spends, Incomes } from 'modules/history/entities';
 import { REDIS_CLIENT } from 'modules/redis/redis.module';
 import { ProviderFactory } from 'modules/network/provider.factory';
 import { HistoryService } from 'modules/history/history.service';
-import { Reserve, Spends, Incomes } from 'modules/history/entities';
 import { Source } from 'modules/source/source.entity';
 import { SourceService } from 'modules/source/source.service';
 import { PriceService } from 'modules/price/price.service';
 import { MailService } from 'modules/mail/mail.service';
 import { STABLECOIN_PRICES } from 'modules/price/constants';
+import { AlgorithmService } from 'modules/contract/algorithm.service';
 
 import CometABI from './abi/CometABI.json';
 import CometExtensionABI from './abi/CometExtensionABI.json';
@@ -23,26 +24,10 @@ import LegacyRewardsABI from './abi/LegacyRewardsABI.json';
 import ERC20ABI from './abi/ERC20ABI.json';
 import Bytes32TokenABI from './abi/Bytes32TokenABI.json';
 import { MarketData, RootJson } from './contract.type';
-import {
-  CachedBlock,
-  ResponseAlgorithm,
-  DailyProcessArgs,
-  DailyProcessOutcome,
-  MarketAccountingArgs,
-  PersistAccountingArgs,
-} from './interface';
+import { CachedBlock, ResponseStatsAlgorithm } from './interface';
 
-import {
-  DAY_IN_SEC,
-  MARKET_DECIMALS,
-  SEC_IN_MS,
-  YEAR_IN_DAYS,
-  YEAR_IN_SECONDS,
-} from '@app/common/constants';
+import { DAY_IN_SEC, SEC_IN_MS } from '@app/common/constants';
 import { Algorithm } from '@app/common/enum/algorithm.enum';
-import { scaleToDecimals } from '@/common/utils/scale-to-decimals';
-import { dayBounds } from '@/common/utils/day-bounds';
-import { buildDailyTimestamps } from '@/common/utils/build-daily-timestamps';
 
 @Injectable()
 export class ContractService implements OnModuleInit {
@@ -93,6 +78,7 @@ export class ContractService implements OnModuleInit {
     private readonly historyService: HistoryService,
     private readonly sourceService: SourceService,
     private readonly priceService: PriceService,
+    private readonly algorithmService: AlgorithmService,
     private readonly mailService: MailService,
   ) {}
 
@@ -492,124 +478,31 @@ export class ContractService implements OnModuleInit {
     return this.arbitrumPeriods[this.arbitrumPeriods.length - 1];
   }
 
-  private async cometAlgorithms(
-    contract: ethers.Contract,
-    blockTag: number,
-    decimals: number,
-    priceComp: number,
-  ): Promise<ResponseAlgorithm> {
-    const reserves: bigint = await contract.getReserves({ blockTag });
-    const totalSupply: bigint = await contract.totalSupply({ blockTag });
-    const totalBorrows: bigint = await contract.totalBorrow({ blockTag });
-    const utilization: bigint = await contract.getUtilization({ blockTag });
-    const supplyRatePerSec: bigint = await contract.getSupplyRate(utilization, { blockTag });
-    const borrowRatePerSec: bigint = await contract.getBorrowRate(utilization, { blockTag });
-    const trackingIndexScale: bigint = await contract.trackingIndexScale({ blockTag });
-    const trackingIndexDecimals = scaleToDecimals(trackingIndexScale);
-    const earnApr = Number(
-      ethers.formatUnits(supplyRatePerSec * BigInt(YEAR_IN_SECONDS) * 100n, MARKET_DECIMALS),
-    );
-    const borrowApr = Number(
-      ethers.formatUnits(borrowRatePerSec * BigInt(YEAR_IN_SECONDS) * 100n, MARKET_DECIMALS),
-    );
-
-    const baseTrackingSupplySpeed: bigint = await contract.baseTrackingSupplySpeed({
-      blockTag,
-    });
-    const baseTrackingBorrowSpeed: bigint = await contract.baseTrackingBorrowSpeed({
-      blockTag,
-    });
-    const annualSupplyRewardCompTokens = Number(
-      ethers.formatUnits(baseTrackingSupplySpeed * BigInt(YEAR_IN_SECONDS), trackingIndexDecimals),
-    );
-    const annualBorrowRewardCompTokens = Number(
-      ethers.formatUnits(baseTrackingBorrowSpeed * BigInt(YEAR_IN_SECONDS), trackingIndexDecimals),
-    );
-    const supplyRewardsUSD = annualSupplyRewardCompTokens * priceComp;
-    const borrowRewardsUSD = annualBorrowRewardCompTokens * priceComp;
-
-    const reservesToken = Number(ethers.formatUnits(reserves, decimals));
-    const totalSupplyTokens = Number(ethers.formatUnits(totalSupply, decimals));
-    const totalBorrowsTokens = Number(ethers.formatUnits(totalBorrows, decimals));
-    const supplyIncome = (totalSupplyTokens * earnApr) / 100;
-    const borrowIncome = (totalBorrowsTokens * borrowApr) / 100;
-
-    return {
-      reserves: reservesToken,
-      incomes: {
-        supply: supplyIncome,
-        borrow: borrowIncome,
-      },
-      spends: { supplyUsd: supplyRewardsUSD, borrowUsd: borrowRewardsUSD },
-    };
-  }
-
-  private async marketV2Algorithms(
-    contract: ethers.Contract,
-    blockTag: number,
-    decimals: number,
-    provider: ethers.JsonRpcProvider,
-    contractAddress: string,
-    network: string,
-    priceComp: number,
-  ): Promise<ResponseAlgorithm> {
-    const reserves = await contract.totalReserves({ blockTag });
-    const totalSupply = await contract.totalSupply({ blockTag });
-    const exchangeRate = await contract.exchangeRateStored({ blockTag });
-    const totalBorrows = await contract.totalBorrows({ blockTag });
-    const supplyRatePerBlock: bigint = await contract.supplyRatePerBlock({ blockTag });
-    const borrowRatePerBlock: bigint = await contract.borrowRatePerBlock({ blockTag });
-    const networkConf = this.networkConfig[network];
-    const blocksPerYear = BigInt(networkConf.blocksPerDay) * BigInt(YEAR_IN_DAYS);
-    const earnApr = Number(
-      ethers.formatUnits(supplyRatePerBlock * blocksPerYear * 100n, MARKET_DECIMALS),
-    );
-    const borrowApr = Number(
-      ethers.formatUnits(borrowRatePerBlock * blocksPerYear * 100n, MARKET_DECIMALS),
-    );
-    const comptrollerAddress = await contract.comptroller({ blockTag });
-    const comptroller = new ethers.Contract(comptrollerAddress, ComptrollerABI, provider);
-    const compAddress = await comptroller.getCompAddress();
-    const compSupplySpeedPerBlock: bigint = await comptroller.compSupplySpeeds(contractAddress, {
-      blockTag,
-    });
-    const compSpeedBorrowPerBlock: bigint = await comptroller.compBorrowSpeeds(contractAddress, {
-      blockTag,
-    });
-    const compTokenContract = new ethers.Contract(compAddress, ERC20ABI, provider);
-    const compDecimals: number = await compTokenContract.decimals();
-    const compSupplyPerYearWei: bigint = compSupplySpeedPerBlock * blocksPerYear;
-    const compBorrowPerYearWei: bigint = compSpeedBorrowPerBlock * blocksPerYear;
-    const compSupplyPerYearCompTokens = Number(
-      ethers.formatUnits(compSupplyPerYearWei, compDecimals),
-    );
-    const compBorrowPerYearCompTokens = Number(
-      ethers.formatUnits(compBorrowPerYearWei, compDecimals),
-    );
-    const totalBorrowsTokens = Number(ethers.formatUnits(totalBorrows, decimals));
-    const totalSupplyCTokens = Number(ethers.formatUnits(totalSupply, decimals));
-    const exchangeRateConvertor = ethers.formatUnits(exchangeRate, MARKET_DECIMALS);
-    const totalSupplyTokens = Number(totalSupplyCTokens) * Number(exchangeRateConvertor);
-    const supplyRewardsUSD = compSupplyPerYearCompTokens * priceComp;
-    const borrowRewardsUSD = compBorrowPerYearCompTokens * priceComp;
-
-    const supplyIncome = (totalSupplyTokens * earnApr) / 100;
-    const borrowIncome = (totalBorrowsTokens * borrowApr) / 100;
-
-    const reservesToken = Number(ethers.formatUnits(reserves, decimals));
-
-    return {
-      reserves: reservesToken,
-      incomes: {
-        supply: supplyIncome,
-        borrow: borrowIncome,
-      },
-      spends: { supplyUsd: supplyRewardsUSD, borrowUsd: borrowRewardsUSD },
-    };
-  }
-
   async getHistory(source: Source) {
-    const { address: contractAddress, network, asset, algorithm } = source;
+    const { algorithm } = source;
+
+    for (const alg of algorithm) {
+      switch (alg) {
+        case Algorithm.COMET:
+          await this.saveReserves(source, alg);
+          break;
+        case Algorithm.MARKET_V2:
+          await this.saveReserves(source, alg);
+          break;
+        case Algorithm.COMET_STATS:
+          await this.saveStats(source, alg);
+          break;
+        case Algorithm.MARKET_V2_STATS:
+          await this.saveStats(source, alg);
+          break;
+        default:
+          await this.saveReserves(source, alg);
+      }
+    }
+  }
+
+  private async saveReserves(source: Source, algorithm: string): Promise<void> {
+    const { address: contractAddress, network, asset } = source;
     const { address: assetAddress } = asset;
 
     this.logger.log(
@@ -623,68 +516,165 @@ export class ContractService implements OnModuleInit {
       const startBlockData = await this.getCachedBlock(network, provider, lastBlock);
       const startTs = startBlockData.timestamp;
 
-      const { firstMidnightUTC, todayMidnightUTC } = dayBounds(startTs);
-      const dailyTs = buildDailyTimestamps(firstMidnightUTC, todayMidnightUTC);
+      const firstMidnightUTC = Math.floor(startTs / DAY_IN_SEC + 1) * DAY_IN_SEC;
+      const now = Math.floor(Date.now() / SEC_IN_MS);
+      const todayMidnightUTC = Math.floor(now / DAY_IN_SEC) * DAY_IN_SEC;
 
-      if (dailyTs.length === 0) {
+      // Check if we have any days to process
+      if (firstMidnightUTC > todayMidnightUTC) {
         this.logger.log(`No historical data needed - source is already up to date`);
+
+        // Update the source with current timestamp
         await this.sourceService.updateWithSource({
           source,
           blockNumber: lastBlock,
           checkedAt: new Date(),
         });
+
         return;
+      }
+
+      const dailyTs: number[] = [];
+      for (let ts = firstMidnightUTC; ts <= todayMidnightUTC; ts += DAY_IN_SEC) {
+        dailyTs.push(ts);
       }
 
       this.logger.log(
         `Processing ${dailyTs.length} daily timestamps from ${new Date(firstMidnightUTC * 1000).toISOString().slice(0, 10)} to ${new Date(todayMidnightUTC * 1000).toISOString().slice(0, 10)}`,
       );
 
-      await this.preloadPrices(asset, firstMidnightUTC);
+      // Check if we have a reasonable number of days to process
+      if (dailyTs.length === 0) {
+        this.logger.warn(`No days to process for source ${source.id}`);
+        return;
+      }
+
+      // Prices preload
+      if (!STABLECOIN_PRICES[asset.symbol]) {
+        try {
+          const firstDate = new Date(firstMidnightUTC * 1000);
+          await this.priceService.getHistoricalPrice(
+            { address: asset.address, symbol: asset.symbol, decimals: asset.decimals },
+            firstDate,
+          );
+          this.logger.log(`Price data preloaded for ${asset.symbol}`);
+        } catch (error) {
+          this.logger.warn(`Failed to preload price data for ${asset.symbol}: ${error.message}`);
+        }
+      } else {
+        this.logger.log(`Skipping preload for stablecoin ${asset.symbol}`);
+      }
 
       let processedCount = 0;
       let skippedCount = 0;
 
-      const abi = algorithm === Algorithm.COMET ? CometABI : MarketV2ABI;
-      const contract = new ethers.Contract(contractAddress, abi, provider) as any;
+      const ABI = algorithm === Algorithm.COMET ? CometABI : MarketV2ABI;
+
+      const contract = new ethers.Contract(contractAddress, ABI, provider) as any;
       const assetContract = new ethers.Contract(assetAddress, ERC20ABI, provider) as any;
 
       for (const targetTs of dailyTs) {
         try {
-          const result = await this.processOneDay({
-            targetTs,
-            lastBlock,
-            source,
-            network,
-            provider,
-            asset,
-            algorithm,
-            contract,
-            assetContract,
-            contractAddress,
-          });
+          const blockTag = await this.findBlockByTimestamp(network, provider, targetTs, lastBlock);
 
-          if (result.stop) {
-            return; // Stop processing to retry on next cron run
+          let reserves: bigint;
+          try {
+            switch (algorithm) {
+              case Algorithm.COMET:
+                reserves = await this.algorithmService.comet(contract, blockTag);
+                break;
+              case Algorithm.MARKET_V2:
+                reserves = await this.algorithmService.marketV2(contract, blockTag);
+                break;
+              default:
+                if (asset.symbol === 'ETH' || asset.symbol === 'MNT') {
+                  reserves = await provider.getBalance(contractAddress, blockTag);
+                } else {
+                  reserves = await assetContract.balanceOf(contractAddress, { blockTag });
+                }
+                break;
+            }
+          } catch (e: any) {
+            if (e.code === 'CALL_EXCEPTION') {
+              const message = `Skip ${new Date(targetTs * SEC_IN_MS).toISOString().slice(0, 10)} block number ${blockTag} — reserves unavailable for contract ${contractAddress} at network ${network}, algorithm ${algorithm}, asset ${asset.symbol}`;
+              this.logger.warn(message);
+              lastBlock = blockTag;
+              skippedCount++;
+              await this.mailService.notifyGetHistoryError(message);
+              continue;
+            } else {
+              throw e;
+            }
           }
 
-          lastBlock = result.lastBlock;
-          processedCount += result.processedDelta;
-          skippedCount += result.skippedDelta;
+          const { symbol, decimals } = asset;
+          const date = new Date(targetTs * 1000);
 
-          if (processedCount > 0 && processedCount % 50 === 0) {
+          // Get price using PriceService
+          let price = 1;
+          try {
+            price = await this.priceService.getHistoricalPrice(
+              { address: asset.address, symbol: asset.symbol, decimals: asset.decimals },
+              date,
+            );
+
+            if (price <= 0) {
+              throw new Error(`Invalid price received: ${price}`);
+            }
+          } catch (priceError) {
+            const message = `Price fetch failed for ${symbol} on ${date.toISOString().slice(0, 10)}: ${priceError.message}. Stopping to retry on next cron run.`;
+            this.logger.error(message);
+            await this.mailService.notifyGetHistoryError(message);
+
+            // Stop processing - will retry from this date on next cron run
+            return;
+          }
+
+          const quantity = ethers.formatUnits(reserves, decimals);
+          const value = Number(quantity) * price;
+
+          if (isNaN(value) || value < 0) {
+            this.logger.warn(`Invalid value: ${value}, skipping`);
+            lastBlock = blockTag;
+            skippedCount++;
+            continue;
+          }
+
+          const newHistory = new Reserve(source, blockTag, reserves.toString(), price, value, date);
+
+          await this.historyService.createReservesWithSource(newHistory);
+
+          await this.sourceService.updateWithSource({
+            source,
+            blockNumber: blockTag,
+            checkedAt: new Date(),
+          });
+
+          lastBlock = blockTag;
+          processedCount++;
+
+          if (processedCount % 50 === 0) {
             this.logger.log(
               `Progress: ${processedCount}/${dailyTs.length} days processed (${skippedCount} skipped)`,
             );
           }
         } catch (error) {
           this.logger.error(`Failed to process timestamp ${targetTs}: ${error.message}`);
-          lastBlock = this.advanceBlockOnError(network, lastBlock);
+
+          // Fallback
+          if (network === 'arbitrum') {
+            const period = this.getArbitrumConfigForBlock(lastBlock);
+            lastBlock = lastBlock + period.blocksPerDay;
+          } else {
+            const networkConf = this.networkConfig[network];
+            lastBlock = lastBlock + (networkConf?.blocksPerDay || 43200);
+          }
           skippedCount++;
           continue;
         }
       }
 
+      // Calculate final statistics
       const totalAttempted = dailyTs.length;
       const successRate =
         totalAttempted > 0 ? Math.round((processedCount / totalAttempted) * 100) : 0;
@@ -699,221 +689,236 @@ export class ContractService implements OnModuleInit {
     }
   }
 
-  private async preloadPrices(
-    asset: { address: string; symbol: string; decimals: number },
-    firstMidnightUTC: number,
-  ): Promise<void> {
-    if (!STABLECOIN_PRICES[asset.symbol]) {
-      try {
-        const firstDate = new Date(firstMidnightUTC * 1000);
-        await this.priceService.getHistoricalPrice(
-          { address: asset.address, symbol: asset.symbol, decimals: asset.decimals },
-          firstDate,
-        );
-        this.logger.log(`Price data preloaded for ${asset.symbol}`);
-      } catch (error: any) {
-        this.logger.warn(`Failed to preload price data for ${asset.symbol}: ${error.message}`);
-      }
-    } else {
-      this.logger.log(`Skipping preload for stablecoin ${asset.symbol}`);
-    }
-  }
+  private async saveStats(source: Source, algorithm: string): Promise<void> {
+    const { address: contractAddress, network, asset } = source;
 
-  private async computeMarketAccounting(params: MarketAccountingArgs): Promise<ResponseAlgorithm> {
-    const {
-      algorithm,
-      contract,
-      blockTag,
-      decimals,
-      provider,
-      contractAddress,
-      network,
-      asset,
-      assetContract,
-      date,
-    } = params;
-    const assetCompToken = { address: null, symbol: 'COMP', decimals: null };
-    let priceComp: number;
+    this.logger.log(
+      `Starting history collection for source ${source.id} on ${network}, algorithm: ${algorithm}`,
+    );
 
-    switch (algorithm) {
-      case Algorithm.COMET:
-        priceComp = await this.fetchPriceOrStop(assetCompToken, date);
-        return this.cometAlgorithms(contract, blockTag, decimals, priceComp);
-      case Algorithm.MARKET_V2:
-        priceComp = await this.fetchPriceOrStop(assetCompToken, date);
-        return this.marketV2Algorithms(
-          contract,
-          blockTag,
-          decimals,
-          provider,
-          contractAddress,
-          network,
-          priceComp,
-        );
-      default: {
-        const reserves: bigint =
-          asset.symbol === 'ETH' || asset.symbol === 'MNT'
-            ? await provider.getBalance(contractAddress, blockTag)
-            : await assetContract.balanceOf(contractAddress, { blockTag });
-        const reservesToken = Number(ethers.formatUnits(reserves, decimals));
-        return {
-          reserves: reservesToken,
-          incomes: { supply: 0, borrow: 0 },
-          spends: { supplyUsd: 0, borrowUsd: 0 },
-        };
-      }
-    }
-  }
-
-  private async fetchPriceOrStop(
-    asset: { address: string; symbol: string; decimals: number },
-    date: Date,
-  ): Promise<number | null> {
     try {
-      const price = await this.priceService.getHistoricalPrice(
-        { address: asset.address, symbol: asset.symbol, decimals: asset.decimals },
-        date,
-      );
-      if (price <= 0) {
-        throw new Error(`Invalid price received: ${price}`);
+      const provider = this.providerFactory.get(network);
+
+      const spends = await this.historyService.findSpendsBySource(source);
+      const incomes = await this.historyService.findIncomesBySource(source);
+      const spendBlock = spends?.blockNumber ?? Infinity;
+      const incomeBlock = incomes?.blockNumber ?? Infinity;
+
+      let lastBlock = Math.min(spendBlock, incomeBlock);
+      if (lastBlock === Infinity) {
+        try {
+          // Start from the contract creation block if we have no prior events
+          const creationBlock = await this.getContractCreationBlock(source.address, source.network);
+          lastBlock = Math.max(creationBlock, 0);
+          this.logger.log(
+            `No previous liquidation events. Starting scan from creation block ${lastBlock} for ${source.address} on ${source.network}`,
+          );
+        } catch (e: any) {
+          this.logger.warn(
+            `Failed to determine creation block for ${source.address} on ${source.network}: ${e?.message}. Fallback to source.blockNumber=${lastBlock}`,
+          );
+          return;
+        }
       }
-      return price;
-    } catch (priceError: any) {
-      const message = `Price fetch failed for ${asset.symbol} on ${date.toISOString().slice(0, 10)}: ${priceError.message}. Stopping to retry on next cron run.`;
+
+      const startBlockData = await this.getCachedBlock(network, provider, lastBlock);
+      const startTs = startBlockData.timestamp;
+
+      const firstMidnightUTC = Math.floor(startTs / DAY_IN_SEC + 1) * DAY_IN_SEC;
+      const now = Math.floor(Date.now() / SEC_IN_MS);
+      const todayMidnightUTC = Math.floor(now / DAY_IN_SEC) * DAY_IN_SEC;
+
+      // Check if we have any days to process
+      if (firstMidnightUTC > todayMidnightUTC) {
+        this.logger.log(`No historical data needed - source is already up to date`);
+        return;
+      }
+
+      const dailyTs: number[] = [];
+      for (let ts = firstMidnightUTC; ts <= todayMidnightUTC; ts += DAY_IN_SEC) {
+        dailyTs.push(ts);
+      }
+
+      this.logger.log(
+        `Processing ${dailyTs.length} daily timestamps from ${new Date(firstMidnightUTC * 1000).toISOString().slice(0, 10)} to ${new Date(todayMidnightUTC * 1000).toISOString().slice(0, 10)}`,
+      );
+
+      // Check if we have a reasonable number of days to process
+      if (dailyTs.length === 0) {
+        this.logger.warn(`No days to process for source ${source.id}`);
+        return;
+      }
+
+      // Prices preload
+      if (!STABLECOIN_PRICES[asset.symbol]) {
+        try {
+          const firstDate = new Date(firstMidnightUTC * 1000);
+          await this.priceService.getHistoricalPrice(
+            { address: asset.address, symbol: asset.symbol, decimals: asset.decimals },
+            firstDate,
+          );
+          this.logger.log(`Price data preloaded for ${asset.symbol}`);
+        } catch (error) {
+          this.logger.warn(`Failed to preload price data for ${asset.symbol}: ${error.message}`);
+        }
+      } else {
+        this.logger.log(`Skipping preload for stablecoin ${asset.symbol}`);
+      }
+
+      let processedCount = 0;
+      let skippedCount = 0;
+
+      const ABI = algorithm === Algorithm.COMET_STATS ? CometABI : MarketV2ABI;
+
+      const contract = new ethers.Contract(contractAddress, ABI, provider) as any;
+      const { symbol, decimals } = asset;
+
+      for (const targetTs of dailyTs) {
+        try {
+          const blockTag = await this.findBlockByTimestamp(network, provider, targetTs, lastBlock);
+          const blocksPerDay = this.networkConfig[network].blocksPerDay;
+
+          const assetCompToken = { address: null, symbol: 'COMP', decimals: null };
+          const compDate = new Date(targetTs * 1000);
+          let priceComp: number;
+          try {
+            priceComp = await this.priceService.getHistoricalPrice(assetCompToken, compDate);
+            if (priceComp <= 0) {
+              throw new Error(`Invalid price received: ${priceComp}`);
+            }
+          } catch (priceError: any) {
+            const message = `Price fetch failed for ${asset.symbol} on ${compDate.toISOString().slice(0, 10)}: ${priceError.message}. Stopping to retry on next cron run.`;
+            this.logger.error(message);
+            await this.mailService.notifyGetHistoryError(message);
+            return;
+          }
+
+          let marketAccounting: ResponseStatsAlgorithm;
+          try {
+            switch (algorithm) {
+              case Algorithm.COMET_STATS:
+                marketAccounting = await this.algorithmService.cometStats(
+                  contract,
+                  blockTag,
+                  decimals,
+                  priceComp,
+                );
+                break;
+              case Algorithm.MARKET_V2_STATS:
+                marketAccounting = await this.algorithmService.marketV2Stats(
+                  contract,
+                  blockTag,
+                  blocksPerDay,
+                  decimals,
+                  provider,
+                  contractAddress,
+                  priceComp,
+                );
+                break;
+              default:
+                throw new Error(
+                  `Unsupported algorithm: ${algorithm} for contract ${contractAddress} at network ${network}, asset ${asset.symbol}`,
+                );
+            }
+          } catch (e: any) {
+            if (e.code === 'CALL_EXCEPTION') {
+              const message = `Skip ${new Date(targetTs * SEC_IN_MS).toISOString().slice(0, 10)} block number ${blockTag} — reserves unavailable for contract ${contractAddress} at network ${network}, algorithm ${algorithm}, asset ${asset.symbol}`;
+              this.logger.warn(message);
+              lastBlock = blockTag;
+              skippedCount++;
+              await this.mailService.notifyGetHistoryError(message);
+              continue;
+            } else {
+              throw e;
+            }
+          }
+
+          const dayDate = new Date(targetTs * 1000);
+
+          // Get price using PriceService
+          let price = 1;
+          try {
+            price = await this.priceService.getHistoricalPrice(
+              { address: asset.address, symbol: asset.symbol, decimals: asset.decimals },
+              dayDate,
+            );
+
+            if (price <= 0) {
+              throw new Error(`Invalid price received: ${price}`);
+            }
+          } catch (priceError) {
+            const message = `Price fetch failed for ${symbol} on ${dayDate.toISOString().slice(0, 10)}: ${priceError.message}. Stopping to retry on next cron run.`;
+            this.logger.error(message);
+            await this.mailService.notifyGetHistoryError(message);
+
+            // Stop processing - will retry from this date on next cron run
+            return;
+          }
+
+          const incomeSupplyQuantity = marketAccounting.incomes.supply * price;
+          const incomeBorrowQuantity = marketAccounting.incomes.borrow * price;
+          const spendSupplyQuantity = marketAccounting.spends.supplyUsd;
+          const spendBorrowQuantity = marketAccounting.spends.borrowUsd;
+
+          const newIncomes = new Incomes(
+            source,
+            blockTag,
+            marketAccounting.incomes.supply.toString(),
+            marketAccounting.incomes.borrow.toString(),
+            price,
+            incomeSupplyQuantity,
+            incomeBorrowQuantity,
+            dayDate,
+          );
+          const newSpends = new Spends(
+            source,
+            blockTag,
+            marketAccounting.spends.supplyUsd.toString(),
+            marketAccounting.spends.borrowUsd.toString(),
+            price,
+            spendSupplyQuantity,
+            spendBorrowQuantity,
+            dayDate,
+          );
+          await this.historyService.createIncomesWithSource(newIncomes);
+          await this.historyService.createSpendsWithSource(newSpends);
+
+          lastBlock = blockTag;
+          processedCount++;
+
+          if (processedCount % 50 === 0) {
+            this.logger.log(
+              `Progress: ${processedCount}/${dailyTs.length} days processed (${skippedCount} skipped)`,
+            );
+          }
+        } catch (error) {
+          this.logger.error(`Failed to process timestamp ${targetTs}: ${error.message}`);
+
+          // Fallback
+          if (network === 'arbitrum') {
+            const period = this.getArbitrumConfigForBlock(lastBlock);
+            lastBlock = lastBlock + period.blocksPerDay;
+          } else {
+            const networkConf = this.networkConfig[network];
+            lastBlock = lastBlock + (networkConf?.blocksPerDay || 43200);
+          }
+          skippedCount++;
+          continue;
+        }
+      }
+
+      // Calculate final statistics
+      const totalAttempted = dailyTs.length;
+      const successRate =
+        totalAttempted > 0 ? Math.round((processedCount / totalAttempted) * 100) : 0;
+
+      this.logger.log(
+        `Completed: ${successRate}% success (${processedCount}/${totalAttempted} processed, ${skippedCount} skipped)`,
+      );
+    } catch (error) {
+      const message = `Error processing source ${source.id} on ${network} for contract ${contractAddress}, algorithm ${algorithm}, asset ${asset.symbol}: ${error.message}`;
       this.logger.error(message);
       await this.mailService.notifyGetHistoryError(message);
-      return null;
     }
-  }
-
-  private advanceBlockOnError(network: string, lastBlock: number): number {
-    if (network === 'arbitrum') {
-      const period = this.getArbitrumConfigForBlock(lastBlock);
-      return lastBlock + period.blocksPerDay;
-    }
-    const networkConf = this.networkConfig[network];
-    return lastBlock + (networkConf?.blocksPerDay || 43200);
-  }
-
-  private async persistCreateAndUpdate(
-    persistAccountingArgs: PersistAccountingArgs,
-  ): Promise<void> {
-    const {
-      source,
-      blockTag,
-      marketAccounting,
-      price,
-      reserveValue,
-      incomeSupplyValue,
-      incomeBorrowValue,
-      spendSupplyValue,
-      spendBorrowValue,
-      date,
-    } = persistAccountingArgs;
-
-    const newReserve = new Reserve(
-      source,
-      blockTag,
-      marketAccounting.reserves.toString(),
-      price,
-      reserveValue,
-      date,
-    );
-    const newIncomes = new Incomes(
-      source,
-      blockTag,
-      marketAccounting.incomes.supply.toString(),
-      marketAccounting.incomes.borrow.toString(),
-      price,
-      incomeSupplyValue,
-      incomeBorrowValue,
-      date,
-    );
-    const newSpends = new Spends(
-      source,
-      blockTag,
-      marketAccounting.spends.supplyUsd.toString(),
-      marketAccounting.spends.borrowUsd.toString(),
-      price,
-      spendSupplyValue,
-      spendBorrowValue,
-      date,
-    );
-
-    await this.historyService.createReservesWithSource(newReserve);
-    await this.historyService.createIncomesWithSource(newIncomes);
-    await this.historyService.createSpendsWithSource(newSpends);
-    await this.sourceService.updateWithSource({
-      source,
-      blockNumber: blockTag,
-      checkedAt: new Date(),
-    });
-  }
-
-  private async processOneDay(params: DailyProcessArgs): Promise<DailyProcessOutcome> {
-    const {
-      targetTs,
-      lastBlock,
-      source,
-      network,
-      provider,
-      asset,
-      algorithm,
-      contract,
-      assetContract,
-      contractAddress,
-    } = params;
-
-    const blockTag = await this.findBlockByTimestamp(network, provider, targetTs, lastBlock);
-    const date = new Date(targetTs * 1000);
-
-    let marketAccounting: ResponseAlgorithm;
-    try {
-      marketAccounting = await this.computeMarketAccounting({
-        algorithm,
-        contract,
-        blockTag,
-        decimals: asset.decimals,
-        provider,
-        contractAddress,
-        network,
-        asset,
-        assetContract,
-        date,
-      });
-    } catch (e: any) {
-      if (e.code === 'CALL_EXCEPTION') {
-        const message = `Skip ${new Date(targetTs * SEC_IN_MS).toISOString().slice(0, 10)} block number ${blockTag} — reserves unavailable for contract ${contractAddress} at network ${network}, algorithm ${algorithm}, asset ${asset.symbol}`;
-        this.logger.warn(message);
-        await this.mailService.notifyGetHistoryError(message);
-        return { lastBlock: blockTag, processedDelta: 0, skippedDelta: 1, stop: false };
-      }
-      throw e;
-    }
-
-    const price = await this.fetchPriceOrStop(asset, date);
-    if (price === null) {
-      return { lastBlock, processedDelta: 0, skippedDelta: 0, stop: true };
-    }
-
-    const reserveQuantity = marketAccounting.reserves * price;
-    const incomeSupplyQuantity = marketAccounting.incomes.supply * price;
-    const incomeBorrowQuantity = marketAccounting.incomes.borrow * price;
-    const spendSupplyQuantity = marketAccounting.spends.supplyUsd;
-    const spendBorrowQuantity = marketAccounting.spends.borrowUsd;
-
-    await this.persistCreateAndUpdate({
-      source,
-      blockTag,
-      marketAccounting,
-      price,
-      reserveValue: reserveQuantity,
-      incomeSupplyValue: incomeSupplyQuantity,
-      incomeBorrowValue: incomeBorrowQuantity,
-      spendSupplyValue: spendSupplyQuantity,
-      spendBorrowValue: spendBorrowQuantity,
-      date,
-    });
-    return { lastBlock: blockTag, processedDelta: 1, skippedDelta: 0, stop: false };
   }
 }

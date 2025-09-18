@@ -2,8 +2,10 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 
-import { Spends } from './entities';
 import { OffsetDto } from 'modules/history/dto/offset.dto';
+
+import { Spends } from './entities';
+
 import { OffsetDataDto } from '@app/common/dto/offset-data.dto';
 import { Algorithm } from '@app/common/enum/algorithm.enum';
 
@@ -22,13 +24,22 @@ export class SpendsRepository {
     });
   }
 
+  async findBySourceId(sourceId: number): Promise<Spends> {
+    return this.spendsRepository.findOne({
+      where: { source: { id: sourceId } },
+      relations: { source: true },
+    });
+  }
+
   async getOffsetStats(dto: OffsetDto): Promise<OffsetDataDto<Spends>> {
+    const algorithmsArrayLiteral = `{${[Algorithm.COMET, Algorithm.MARKET_V2].join(',')}}`;
+
     const query = this.spendsRepository
       .createQueryBuilder('spends')
       .leftJoinAndSelect('spends.source', 'source')
       .leftJoinAndSelect('source.asset', 'asset')
-      .where('source.algorithm IN (:...algorithms)', {
-        algorithms: [Algorithm.COMET, Algorithm.MARKET_V2],
+      .where('source.algorithm && :algorithms::text[]', {
+        algorithms: algorithmsArrayLiteral,
       });
 
     query.orderBy('spends.date', dto.order).offset(dto.offset ?? 0);

@@ -13,4 +13,6 @@ export enum Algorithm {
   REWARDS = 'rewards',
   MANTLE = 'mantle',
   DELEGATE_RACE = 'delegate_race',
+  COMET_STATS = 'comet_stats',
+  MARKET_V2_STATS = 'market_v2_stats',
 }
