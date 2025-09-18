@@ -28,6 +28,7 @@ import { CachedBlock, ResponseStatsAlgorithm } from './interface';
 
 import { DAY_IN_SEC, SEC_IN_MS } from '@app/common/constants';
 import { Algorithm } from '@app/common/enum/algorithm.enum';
+import { calculateTimeRange } from '@/common/utils/calculate-time-range';
 
 @Injectable()
 export class ContractService implements OnModuleInit {
@@ -516,9 +517,7 @@ export class ContractService implements OnModuleInit {
       const startBlockData = await this.getCachedBlock(network, provider, lastBlock);
       const startTs = startBlockData.timestamp;
 
-      const firstMidnightUTC = Math.floor(startTs / DAY_IN_SEC + 1) * DAY_IN_SEC;
-      const now = Math.floor(Date.now() / SEC_IN_MS);
-      const todayMidnightUTC = Math.floor(now / DAY_IN_SEC) * DAY_IN_SEC;
+      const { firstMidnightUTC, todayMidnightUTC, dailyTs } = calculateTimeRange(startTs);
 
       // Check if we have any days to process
       if (firstMidnightUTC > todayMidnightUTC) {
@@ -532,11 +531,6 @@ export class ContractService implements OnModuleInit {
         });
 
         return;
-      }
-
-      const dailyTs: number[] = [];
-      for (let ts = firstMidnightUTC; ts <= todayMidnightUTC; ts += DAY_IN_SEC) {
-        dailyTs.push(ts);
       }
 
       this.logger.log(
@@ -729,19 +723,12 @@ export class ContractService implements OnModuleInit {
       const startBlockData = await this.getCachedBlock(network, provider, lastBlock);
       const startTs = startBlockData.timestamp;
 
-      const firstMidnightUTC = Math.floor(startTs / DAY_IN_SEC + 1) * DAY_IN_SEC;
-      const now = Math.floor(Date.now() / SEC_IN_MS);
-      const todayMidnightUTC = Math.floor(now / DAY_IN_SEC) * DAY_IN_SEC;
+      const { firstMidnightUTC, todayMidnightUTC, dailyTs } = calculateTimeRange(startTs);
 
       // Check if we have any days to process
       if (firstMidnightUTC > todayMidnightUTC) {
         this.logger.log(`No historical data needed - source is already up to date`);
         return;
-      }
-
-      const dailyTs: number[] = [];
-      for (let ts = firstMidnightUTC; ts <= todayMidnightUTC; ts += DAY_IN_SEC) {
-        dailyTs.push(ts);
       }
 
       this.logger.log(
