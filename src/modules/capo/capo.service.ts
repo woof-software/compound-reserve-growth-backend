@@ -492,8 +492,8 @@ export class CapoService {
      * @param date
      * Accepts:
      *  - Date
-     *  - string: everything that can passed to Date.parse(...)
-     *  @returns seconds timestamp
+     *  - string: anything that can be passed to Date.parse(...)
+     * @returns Unix timestamp in seconds
      */
     const normalizeDate = (date: string | Date) => {
       const timestamp = date instanceof Date ? date.getTime() : new Date(date).getTime();
