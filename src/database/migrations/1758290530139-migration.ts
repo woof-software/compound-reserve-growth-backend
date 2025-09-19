@@ -21,12 +21,6 @@ export class Migration1758290530139 implements MigrationInterface {
       `ALTER TABLE "source" ALTER COLUMN "algorithm" TYPE text USING (CASE WHEN "algorithm" IS NULL OR array_length("algorithm", 1) = 0 THEN NULL ELSE "algorithm"[1] END)`,
     );
     await queryRunner.query(`ALTER TABLE "reserves" RENAME TO "history"`);
-    await queryRunner.query(
-      `ALTER TABLE "spends" DROP CONSTRAINT "FK_858bc1de2c14c03be58bd99e740"`,
-    );
-    await queryRunner.query(
-      `ALTER TABLE "incomes" DROP CONSTRAINT "FK_9707a2df523e0e72d0d60c91653"`,
-    );
     await queryRunner.query(`DROP TABLE "spends"`);
     await queryRunner.query(`DROP TABLE "incomes"`);
   }
