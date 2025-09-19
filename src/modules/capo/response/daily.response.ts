@@ -10,8 +10,8 @@ export class DailyAggregationResponse {
   @ApiProperty({ description: 'Chain ID', example: 1 })
   cId: number;
 
-  @ApiProperty({ description: 'Date of aggregation (YYYY-MM-DD)', example: '2024-02-02' })
-  d: string;
+  @ApiProperty({ description: 'Date of aggregation (timestamp, ms)', example: '1758279602196' })
+  d: number;
 
   @ApiProperty({ description: 'Average ratio', example: '1000000000000000000' })
   ar: string;

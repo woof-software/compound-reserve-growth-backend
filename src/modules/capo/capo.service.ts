@@ -425,6 +425,7 @@ export class CapoService {
     return rows.map((r) => this.toResponse(r));
   }
 
+  // ?: remove: not in use
   async getPaginatedDailyAggregations(
     dto: PaginationRequest & { sourceId?: number; assetId?: number },
   ): Promise<PaginatedDataDto<DailyAggregationResponse>> {
@@ -455,6 +456,7 @@ export class CapoService {
     );
   }
 
+  // ?: remove: not in use
   async getOffsetDailyAggregations(
     dto: OffsetRequest & { sourceId?: number; assetId?: number },
   ): Promise<OffsetDataDto<DailyAggregationResponse>> {
@@ -490,7 +492,7 @@ export class CapoService {
       oa: entity.oracleAddress,
       on: entity.oracleName,
       cId: entity.chainId,
-      d: entity.date instanceof Date ? entity.date.toISOString().split('T')[0] : entity.date,
+      d: entity.date instanceof Date ? entity.date.getTime() : new Date(entity.date).getTime(),
       ar: entity.avgRatio,
       mr: entity.minRatio,
       xr: entity.maxRatio,
