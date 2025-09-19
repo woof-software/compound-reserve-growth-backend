@@ -402,20 +402,16 @@ export class CapoService {
   }
 
   async listDailyAggregations(params?: {
-    sourceId?: number | string;
-    assetId?: number | string;
+    sourceId?: number;
+    assetId?: number;
   }): Promise<DailyAggregationResponse[]> {
     const qb = this.aggregationRepository.createQueryBuilder('agg');
 
     if (params?.sourceId !== undefined) {
-      const sourceId =
-        typeof params.sourceId === 'string' ? parseInt(params.sourceId, 10) : params.sourceId;
-      qb.andWhere('agg.sourceId = :sourceId', { sourceId });
+      qb.andWhere('agg.sourceId = :sourceId', { sourceId: params.sourceId });
     }
     if (params?.assetId !== undefined) {
-      const assetId =
-        typeof params.assetId === 'string' ? parseInt(params.assetId, 10) : params.assetId;
-      qb.andWhere('agg.assetId = :assetId', { assetId });
+      qb.andWhere('agg.assetId = :assetId', { assetId: params.assetId });
     }
 
     qb.orderBy('agg.date', 'DESC');
@@ -423,7 +419,7 @@ export class CapoService {
     const rows = await qb.getMany();
 
     if (rows.length === 0) {
-      this.logger.log('No daily aggregations found for the given parameters');
+      this.logger.log('No daily aggregations found for the given parameters'); // ?: remove it and pass 404
       return [];
     }
     return rows.map((r) => this.toResponse(r));

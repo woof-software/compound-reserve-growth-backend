@@ -30,7 +30,7 @@ export class CapoController {
   async getDailyPlain(
     @Query() request: DailyAggregationRequest,
   ): Promise<DailyAggregationResponse[]> {
-    return this.capoService.listDailyAggregations({ ...request });
+    return this.capoService.listDailyAggregations(request);
   }
 
   @Throttle({ default: { limit: 15, ttl: 1000 } })
