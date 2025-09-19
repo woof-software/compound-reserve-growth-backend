@@ -22,8 +22,8 @@ export class LiquidationEvent {
   @Column({ type: 'varchar', nullable: true })
   public priceFeed: string | null; // Price feed contract address
 
-  @Column({ type: 'double precision' })
-  public earnings: number; // USD value from event
+  @Column()
+  public earnings: string; // USD value from event
 
   @Column()
   public date: Date; // Transaction date
@@ -41,7 +41,7 @@ export class LiquidationEvent {
     liquidator: string,
     tokenAddress: string,
     priceFeed: string | null,
-    earnings: number,
+    earnings: string,
     date: Date,
   ) {
     this.source = source;

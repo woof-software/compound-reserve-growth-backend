@@ -21,3 +21,5 @@ export const NULL_ADDRESS = '0x0000000000000000000000000000000000000000';
 export const USD_DECIMALS = 8;
 export const BATCH_SIZE = 2000;
 export const MARKET_DECIMALS = 18;
+export const STEP_LOGS = 8_000;
+export const MIN_STEP_LOGS = 500;

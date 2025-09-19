@@ -7,7 +7,7 @@ import type { Redis } from 'ioredis';
 import { REDIS_CLIENT } from 'modules/redis/redis.module';
 import { ProviderFactory } from 'modules/network/provider.factory';
 import { HistoryService } from 'modules/history/history.service';
-import { Reserve, Spends, Incomes, LiquidationEvent } from 'modules/history/entities';
+import { Incomes, LiquidationEvent, Reserve, Spends } from 'modules/history/entities';
 import { Source } from 'modules/source/source.entity';
 import { SourceService } from 'modules/source/source.service';
 import { PriceService } from 'modules/price/price.service';
@@ -27,9 +27,16 @@ import Bytes32TokenABI from './abi/Bytes32TokenABI.json';
 import { MarketData, RootJson } from './contract.type';
 import { CachedBlock, ResponseStatsAlgorithm } from './interface';
 
-import { DAY_IN_SEC, SEC_IN_MS } from '@app/common/constants';
+import {
+  DAY_IN_SEC,
+  MIN_STEP_LOGS,
+  SEC_IN_MS,
+  STEP_LOGS,
+  USD_DECIMALS,
+} from '@app/common/constants';
 import { Algorithm } from '@app/common/enum/algorithm.enum';
 import { calculateTimeRange } from '@/common/utils/calculate-time-range';
+import { scientificToDecimal } from '@/common/utils/scientific-to-decimal';
 
 @Injectable()
 export class ContractService implements OnModuleInit {
@@ -1025,13 +1032,12 @@ export class ContractService implements OnModuleInit {
           const collateralLogs: ethers.Log[] = [];
 
           // Query logs in chunks with adaptive backoff to avoid provider limits
-          let step = Math.min(8_000, dayEndBlock - dayStartBlock);
+          let step = Math.min(STEP_LOGS, dayEndBlock - dayStartBlock);
           for (let start = dayStartBlock; start <= dayEndBlock; start += step + 1) {
             let end = Math.min(start + step, dayEndBlock);
 
             // Adaptive retry: shrink range on transient RPC failures
             let attempt = 0;
-            const minStep = 500;
             while (attempt < 4) {
               try {
                 const logs = await provider.getLogs({
@@ -1053,7 +1059,7 @@ export class ContractService implements OnModuleInit {
                   e?.code === 'UNSUPPORTED_OPERATION' ||
                   /body is not valid JSON|429|busy|overloaded|rate/i.test(msg)
                 ) {
-                  step = Math.max(minStep, Math.floor(step / 2));
+                  step = Math.max(MIN_STEP_LOGS, Math.floor(step / 2));
                   end = Math.min(start + step, dayEndBlock);
                   attempt++;
                   await new Promise((r) => setTimeout(r, 150));
@@ -1073,9 +1079,6 @@ export class ContractService implements OnModuleInit {
             a.blockNumber === b.blockNumber ? a.index - b.index : a.blockNumber - b.blockNumber,
           );
 
-          // Cache decimals per price feed to avoid repetitive RPC calls
-          const decimalsByFeed = new Map<string, number>();
-
           for (const log of logs) {
             const parsed = iface.parseLog({ topics: log.topics, data: log.data });
             const block = await provider.getBlock(log.blockNumber);
@@ -1087,25 +1090,8 @@ export class ContractService implements OnModuleInit {
               const usdValue = parsed.args.usdValue as bigint;
               const priceFeedAddress = priceFeedByAsset.get(asset) ?? null;
 
-              let feedDecimals: number;
-              if (priceFeedAddress) {
-                if (decimalsByFeed.has(priceFeedAddress)) {
-                  feedDecimals = decimalsByFeed.get(priceFeedAddress)!;
-                } else {
-                  try {
-                    const aggregator = new ethers.Contract(asset, ERC20ABI, provider);
-                    const d: number = Number(await aggregator.decimals());
-                    if (!Number.isNaN(d) && d > 0 && d <= 36) {
-                      feedDecimals = d;
-                    }
-                  } catch (_) {
-                    feedDecimals = 8;
-                  }
-                  decimalsByFeed.set(priceFeedAddress, feedDecimals);
-                }
-              }
-
-              const collateralUsd = Number(ethers.formatUnits(usdValue, feedDecimals));
+              const collateralScientificUsd = Number(ethers.formatUnits(usdValue, USD_DECIMALS));
+              const collateralUsd = scientificToDecimal(collateralScientificUsd);
 
               const entity = new LiquidationEvent(
                 source,

@@ -6,8 +6,8 @@ export class LiquidationEventResponse {
   @ApiProperty({ example: 1 })
   public id: number;
 
-  @ApiProperty({ example: 105.525, description: 'earnings - earnings in USD' })
-  public earnings: number;
+  @ApiProperty({ example: '0xdef0...', description: 'txHash - transaction hash' })
+  public txHash: string;
 
   @ApiProperty({ example: '0x1234...', description: 'liquidator - address of the liquidator' })
   public liquidator: string;
@@ -22,11 +22,11 @@ export class LiquidationEventResponse {
   })
   public priceFeed: string | null;
 
+  @ApiProperty({ example: '105.525', description: 'earnings - earnings in USD' })
+  public earnings: string;
+
   @ApiProperty({ example: 12345678, description: 'blockNumber - block number of the transaction' })
   public blockNumber: number;
-
-  @ApiProperty({ example: '0xdef0...', description: 'txHash - transaction hash' })
-  public txHash: string;
 
   @ApiProperty({ example: 1750809600, description: 'date - date in seconds since epoch' })
   public d: number;
@@ -39,12 +39,12 @@ export class LiquidationEventResponse {
 
   constructor(liquidationEvent: LiquidationEvent) {
     this.id = liquidationEvent.id;
-    this.earnings = liquidationEvent.earnings;
+    this.txHash = liquidationEvent.txHash;
     this.liquidator = liquidationEvent.liquidator;
     this.tokenAddress = liquidationEvent.tokenAddress;
     this.priceFeed = liquidationEvent.priceFeed;
+    this.earnings = liquidationEvent.earnings;
     this.blockNumber = liquidationEvent.blockNumber;
-    this.txHash = liquidationEvent.txHash;
     this.d = new Date(liquidationEvent.date).getTime() / 1000;
     this.sId = liquidationEvent.source.id;
   }
