@@ -2,8 +2,8 @@ import { Column, Entity, ManyToOne, PrimaryGeneratedColumn } from 'typeorm';
 
 import { Source } from 'modules/source/source.entity';
 
-@Entity({ name: 'history' })
-export class History {
+@Entity({ name: 'spends' })
+export class Spends {
   @PrimaryGeneratedColumn()
   public id: number;
 
@@ -11,13 +11,19 @@ export class History {
   public blockNumber: number;
 
   @Column({ type: 'numeric' })
-  public quantity: string;
+  public quantitySupply: string;
+
+  @Column({ type: 'numeric' })
+  public quantityBorrow: string;
 
   @Column({ type: 'double precision' })
   public price: number; // USD
 
   @Column({ type: 'double precision' })
-  public value: number; // USD
+  public valueSupply: number; // USD
+
+  @Column({ type: 'double precision' })
+  public valueBorrow: number; // USD
 
   @Column()
   public date: Date;
@@ -25,22 +31,26 @@ export class History {
   @Column()
   public createdAt: Date;
 
-  @ManyToOne(() => Source, (source) => source.histories)
+  @ManyToOne(() => Source, (source) => source.spends)
   public source: Source;
 
   constructor(
     source: Source,
     blockNumber: number,
-    quantity: string,
+    quantitySupply: string,
+    quantityBorrow: string,
     price: number,
-    value: number,
+    valueSupply: number,
+    valueBorrow: number,
     date: Date,
   ) {
     this.source = source;
     this.blockNumber = blockNumber;
-    this.quantity = quantity;
+    this.quantitySupply = quantitySupply;
+    this.quantityBorrow = quantityBorrow;
     this.price = price;
-    this.value = value;
+    this.valueSupply = valueSupply;
+    this.valueBorrow = valueBorrow;
     this.date = date;
     this.createdAt = new Date();
   }

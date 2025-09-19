@@ -2,8 +2,8 @@ import { Column, Entity, ManyToOne, PrimaryGeneratedColumn } from 'typeorm';
 
 import { Source } from 'modules/source/source.entity';
 
-@Entity({ name: 'revenue' })
-export class Revenue {
+@Entity({ name: 'reserves' })
+export class Reserve {
   @PrimaryGeneratedColumn()
   public id: number;
 

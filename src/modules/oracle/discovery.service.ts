@@ -127,7 +127,7 @@ export class DiscoveryService implements OnModuleInit {
   }
   async syncFromSources(): Promise<CapoOracleInfo[]> {
     const sources = await this.sourceRepository.list();
-    const comets = sources.filter((s) => s.algorithm === Algorithm.COMET);
+    const comets = sources.filter((s) => s.algorithm.includes(Algorithm.COMET));
 
     this.logger.log(`Found ${comets.length} COMET sources for discovery`);
 

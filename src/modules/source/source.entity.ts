@@ -1,6 +1,6 @@
 import { Column, Entity, ManyToOne, OneToMany, PrimaryGeneratedColumn } from 'typeorm';
 
-import { History } from 'modules/history/history.entity';
+import { Reserve, Incomes, Spends } from 'modules/history/entities';
 import { Revenue } from 'modules/revenue/revenue.entity';
 import { Treasury } from 'modules/treasury/treasury.entity';
 import { Asset } from 'modules/asset/asset.entity';
@@ -23,8 +23,8 @@ export class Source {
   @Column({ nullable: true })
   public type: string;
 
-  @Column()
-  public algorithm: string;
+  @Column('text', { array: true })
+  public algorithm: string[];
 
   @Column()
   public blockNumber: number;
@@ -38,8 +38,8 @@ export class Source {
   @ManyToOne(() => Asset, (asset) => asset.sources)
   public asset: Asset;
 
-  @OneToMany(() => History, (histories) => histories.source)
-  public histories: History[];
+  @OneToMany(() => Reserve, (reserves) => reserves.source)
+  public reserves: Reserve[];
 
   @OneToMany(() => Treasury, (treasuries) => treasuries.source)
   public treasuries: Treasury[];
@@ -50,10 +50,16 @@ export class Source {
   @OneToMany(() => DailyAggregation, (dailyAggregations) => dailyAggregations.source)
   public dailyAggregations: DailyAggregation[];
 
+  @OneToMany(() => Incomes, (incomes) => incomes.source)
+  public incomes: Incomes[];
+
+  @OneToMany(() => Spends, (spends) => spends.source)
+  public spends: Spends[];
+
   constructor(
     address: string,
     network: string,
-    algorithm: string,
+    algorithm: string[],
     type: string,
     blockNumber: number,
     asset: Asset,

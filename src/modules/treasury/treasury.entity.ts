@@ -25,7 +25,7 @@ export class Treasury {
   @Column()
   public createdAt: Date;
 
-  @ManyToOne(() => Source, (source) => source.histories)
+  @ManyToOne(() => Source, (source) => source.reserves)
   public source: Source;
 
   constructor(
