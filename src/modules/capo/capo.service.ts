@@ -488,11 +488,23 @@ export class CapoService {
   }
 
   private toResponse(entity: DailyAggregation): DailyAggregationResponse {
+    /**
+     * @param date
+     * Accepts:
+     *  - Date
+     *  - string: everything that can passed to Date.parse(...)
+     *  @returns seconds timestamp
+     */
+    const normalizeDate = (date: string | Date) => {
+      const timestamp = date instanceof Date ? date.getTime() : new Date(date).getTime();
+      return Math.floor(timestamp / 1000);
+    };
+
     return {
       oa: entity.oracleAddress,
       on: entity.oracleName,
       cId: entity.chainId,
-      d: entity.date instanceof Date ? entity.date.getTime() : new Date(entity.date).getTime(),
+      d: normalizeDate(entity.date),
       ar: entity.avgRatio,
       mr: entity.minRatio,
       xr: entity.maxRatio,
