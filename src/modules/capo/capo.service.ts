@@ -402,20 +402,16 @@ export class CapoService {
   }
 
   async listDailyAggregations(params?: {
-    sourceId?: number | string;
-    assetId?: number | string;
+    sourceId?: number;
+    assetId?: number;
   }): Promise<DailyAggregationResponse[]> {
     const qb = this.aggregationRepository.createQueryBuilder('agg');
 
     if (params?.sourceId !== undefined) {
-      const sourceId =
-        typeof params.sourceId === 'string' ? parseInt(params.sourceId, 10) : params.sourceId;
-      qb.andWhere('agg.sourceId = :sourceId', { sourceId });
+      qb.andWhere('agg.sourceId = :sourceId', { sourceId: params.sourceId });
     }
     if (params?.assetId !== undefined) {
-      const assetId =
-        typeof params.assetId === 'string' ? parseInt(params.assetId, 10) : params.assetId;
-      qb.andWhere('agg.assetId = :assetId', { assetId });
+      qb.andWhere('agg.assetId = :assetId', { assetId: params.assetId });
     }
 
     qb.orderBy('agg.date', 'DESC');
@@ -423,12 +419,13 @@ export class CapoService {
     const rows = await qb.getMany();
 
     if (rows.length === 0) {
-      this.logger.log('No daily aggregations found for the given parameters');
+      this.logger.log('No daily aggregations found for the given parameters'); // ?: remove it and pass 404
       return [];
     }
     return rows.map((r) => this.toResponse(r));
   }
 
+  // ?: remove: not in use
   async getPaginatedDailyAggregations(
     dto: PaginationRequest & { sourceId?: number; assetId?: number },
   ): Promise<PaginatedDataDto<DailyAggregationResponse>> {
@@ -459,6 +456,7 @@ export class CapoService {
     );
   }
 
+  // ?: remove: not in use
   async getOffsetDailyAggregations(
     dto: OffsetRequest & { sourceId?: number; assetId?: number },
   ): Promise<OffsetDataDto<DailyAggregationResponse>> {
@@ -494,7 +492,7 @@ export class CapoService {
       oa: entity.oracleAddress,
       on: entity.oracleName,
       cId: entity.chainId,
-      d: entity.date instanceof Date ? entity.date.toISOString().split('T')[0] : entity.date,
+      d: entity.date instanceof Date ? entity.date.getTime() : new Date(entity.date).getTime(),
       ar: entity.avgRatio,
       mr: entity.minRatio,
       xr: entity.maxRatio,
