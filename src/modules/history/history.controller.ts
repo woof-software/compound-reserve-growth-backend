@@ -133,14 +133,22 @@ export class HistoryController {
   async getStatsHistory(
     @Query() request: OffsetRequest,
   ): Promise<OffsetDataResponse<StatsHistoryResponse>> {
+    const key = `history:v2:stats:${request.limit ?? 'null'}:${request.offset ?? 0}:${request.order ?? 'DESC'}`;
+    const ttl = HOUR_IN_SEC;
+
+    const cached = await this.redisClient.get(key);
+    if (cached) return JSON.parse(cached) as OffsetDataResponse<StatsHistoryResponse>;
+
     const paginatedData = await this.historyService.getOffsetStatsHistory(
       new OffsetDto(request?.limit, request?.offset, request?.order),
     );
-    return new OffsetDataResponse<StatsHistoryResponse>(
+    const res = new OffsetDataResponse<StatsHistoryResponse>(
       paginatedData.data.map((data) => {
         return new StatsHistoryResponse(data);
       }),
       new OffsetMetaResponse(paginatedData.limit, paginatedData.offset, paginatedData.total),
     );
+    await this.redisClient.set(key, JSON.stringify(res), 'EX', ttl);
+    return res;
   }
 }
