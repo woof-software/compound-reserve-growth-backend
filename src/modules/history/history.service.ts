@@ -184,7 +184,9 @@ export class HistoryService {
       // Use incomes date for sorting, fallback to spends date if incomes id is 0
       const dateA = a.incomes.id === 0 && a.spends ? a.spends.date : a.incomes.date;
       const dateB = b.incomes.id === 0 && b.spends ? b.spends.date : b.incomes.date;
-      return new Date(dateA).getTime() - new Date(dateB).getTime();
+      return dto.order === 'ASC' 
+        ? new Date(dateA).getTime() - new Date(dateB).getTime()
+        : new Date(dateB).getTime() - new Date(dateA).getTime();
     });
 
     // Apply offset and limit to the merged and sorted data

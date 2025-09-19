@@ -62,7 +62,7 @@ module.exports = {
             position: 'after',
           },
           {
-            pattern: 'entities/**',
+            pattern: 'entity/**',
             group: 'external',
             position: 'after',
           },
