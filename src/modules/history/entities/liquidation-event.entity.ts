@@ -46,10 +46,10 @@ export class LiquidationEvent {
   ) {
     this.source = source;
     this.blockNumber = blockNumber;
-    this.txHash = txHash;
-    this.liquidator = liquidator;
-    this.tokenAddress = tokenAddress;
-    this.priceFeed = priceFeed;
+    this.txHash = txHash.toLowerCase();
+    this.liquidator = liquidator.toLowerCase();
+    this.tokenAddress = tokenAddress.toLowerCase();
+    this.priceFeed = priceFeed.toLowerCase();
     this.earnings = earnings;
     this.date = date;
   }
