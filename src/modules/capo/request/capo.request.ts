@@ -2,7 +2,9 @@ import { ApiProperty } from '@nestjs/swagger';
 import { IsInt, IsOptional } from 'class-validator';
 import { Type } from 'class-transformer';
 
-export class DailyAggregationRequest {
+import { OffsetRequest } from 'modules/history/request/offset.request';
+
+export class CapoRequest extends OffsetRequest {
   @IsInt()
   @IsOptional()
   @Type(() => Number)

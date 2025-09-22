@@ -3,8 +3,10 @@ import { Throttle } from '@nestjs/throttler';
 import { ApiOkResponse, ApiOperation } from '@nestjs/swagger';
 
 import { DailyAggregationResponse } from './response/daily.response';
-import { DailyAggregationRequest } from './request/daily.request';
+import { CapoRequest } from './request/capo.request';
 import { CapoService } from './capo.service';
+
+import { OffsetDataDto } from '@/common/dto/offset-data.dto';
 
 @Injectable()
 @Controller('capo')
@@ -16,7 +18,7 @@ export class CapoController {
   @ApiOkResponse({ type: [DailyAggregationResponse] })
   @HttpCode(HttpStatus.OK)
   @Get()
-  async list(@Query() request: DailyAggregationRequest): Promise<DailyAggregationResponse[]> {
-    return this.capoService.listDailyAggregations(request);
+  async list(@Query() request: CapoRequest): Promise<OffsetDataDto<DailyAggregationResponse>> {
+    return this.capoService.getOffsetDailyAggregations(request);
   }
 }
