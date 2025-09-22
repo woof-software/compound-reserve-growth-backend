@@ -401,6 +401,7 @@ export class CapoService {
     this.logger.log(`Daily aggregation complete. Processed ${results.length} oracles.`);
   }
 
+  // ?: remove: not in use
   async listDailyAggregations(params?: {
     sourceId?: number;
     assetId?: number;
@@ -456,7 +457,6 @@ export class CapoService {
     );
   }
 
-  // ?: remove: not in use
   async getOffsetDailyAggregations(
     dto: OffsetRequest & { sourceId?: number; assetId?: number },
   ): Promise<OffsetDataDto<DailyAggregationResponse>> {
