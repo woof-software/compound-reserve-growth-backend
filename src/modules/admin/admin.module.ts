@@ -1,12 +1,12 @@
 import { Module } from '@nestjs/common';
 
-import { ContractModule } from 'modules/contract/contract.module';
+import { HistoryModule } from 'modules/history/history.module';
 
 import { AdminController } from './admin.controller';
 import { AdminService } from './admin.service';
 
 @Module({
-  imports: [ContractModule],
+  imports: [HistoryModule],
   providers: [AdminService],
   exports: [AdminService],
   controllers: [AdminController],

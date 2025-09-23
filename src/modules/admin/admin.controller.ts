@@ -20,4 +20,28 @@ export class AdminController {
   testAccess(): string {
     return 'OK';
   }
+
+  @Get('/start-reserves')
+  @AdminEndpoint()
+  @ApiOperation({
+    summary: 'Start reserves processing',
+    description: 'Returns the process status response.',
+  })
+  @ApiResponse({ status: 200, type: String })
+  @SerializeOptions({ type: String })
+  async startReserves(): Promise<string> {
+    return this.admin.startReserves();
+  }
+
+  @Get('/start-stats')
+  @AdminEndpoint()
+  @ApiOperation({
+    summary: 'Start stats processing',
+    description: 'Returns the process status response.',
+  })
+  @ApiResponse({ status: 200, type: String })
+  @SerializeOptions({ type: String })
+  async startStats(): Promise<string> {
+    return this.admin.startStats();
+  }
 }

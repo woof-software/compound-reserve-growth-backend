@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 
 import { AssetService } from 'modules/asset/asset.service';
 import { AssetResponse } from 'modules/asset/response/asset.response';
+import { Algorithm } from 'common/enum/algorithm.enum';
 
 import { SourceRepository } from './source.repository';
 import { CreateSourceDto } from './dto/create-source.dto';
@@ -83,5 +84,9 @@ export class SourceService {
       sources: sources.map((source) => new SourceResponse(source)),
       assets: assets.map((asset) => new AssetResponse(asset)),
     };
+  }
+
+  async listByAlgorithms(algorithms: Algorithm[]): Promise<Source[]> {
+    return this.sourceRepository.listByAlgorithms(algorithms);
   }
 }

@@ -4,6 +4,7 @@ import { Repository } from 'typeorm';
 
 import { Source } from './source.entity';
 import { FindSourceDto } from './dto/find-source.dto';
+import { Algorithm } from 'common/enum/algorithm.enum';
 
 @Injectable()
 export class SourceRepository {
@@ -39,5 +40,18 @@ export class SourceRepository {
   async update(source: Source): Promise<Source> {
     source.checkedAt = new Date();
     return this.sourceRepository.save(source);
+  }
+
+  async listByAlgorithms(algorithms: Algorithm[]): Promise<Source[]> {
+    const algorithmsArrayLiteral = `{${algorithms.join(',')}}`;
+
+    return this.sourceRepository
+      .createQueryBuilder('source')
+      .leftJoinAndSelect('source.asset', 'asset')
+      .where('source.algorithm && :algorithms::text[]', {
+        algorithms: algorithmsArrayLiteral,
+      })
+      .orderBy('source.id', 'ASC')
+      .getMany();
   }
 }
