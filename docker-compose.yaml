@@ -1,15 +1,24 @@
 services:
+
   db:
     image: postgres:17
-    shm_size: 4g
+    container_name: postgres
+    restart: always
+    volumes:
+      - ./postgres_data:/var/lib/postgresql/data
     ports:
-      - "${DB_PORT}:5432"
+      - 5432:5432
     environment:
       POSTGRES_DB: ${DB_NAME}
       POSTGRES_USER: ${DB_USER}
       POSTGRES_PASSWORD: ${DB_PASSWORD}
-    volumes:
-      - "./pg-db:/var/lib/postgres"
+    healthcheck:
+      test: ["CMD-SHELL", "sh -c 'pg_isready -U postgres -d postgres'"]
+      interval: 5s
+      timeout: 5s
+      retries: 3
+    networks:
+      - backend
 
   pgadmin:
     image: dpage/pgadmin4:latest
@@ -22,56 +31,56 @@ services:
       PGADMIN_DEFAULT_PASSWORD: supersecret
     depends_on:
       - db
+    networks:
+      - backend
 
   redis:
+    image: redis:alpine
     container_name: redis
-    image: 'redis:6.2.6-alpine'
     restart: always
-    volumes:
-      - redis_data:/data
     ports:
-      - '${REDIS_PORT}:6379'
-    environment:
-      - REDIS_PASSWORD=${REDIS_PASSWORD}
-    command: sh -c 'exec redis-server --requirepass "$$REDIS_PASSWORD"'
+      - 6379:6379
     healthcheck:
-      test: [ 'CMD', 'redis-cli', '--raw', 'incr', 'ping' ]
-      interval: 1s
-      timeout: 3s
-      retries: 10
+      test: ["CMD", "redis-cli", "ping"]
+      retries: 3
+      timeout: 5s
+    networks:
+      - backend
 
-#  migrate:
-#    build:
-#      dockerfile: ".docker/Dockerfile"
-#      context: .
-#      target: build
-#    command: ["npm", "run", "mikro-orm", "migration:up"]
-#    volumes:
-#      - ./migrations:/code/migrations:delegated
-#    depends_on:
-#      - db
-#    env_file:
-#      - ".env"
+  migrations:
+    image: compound-reserve-growth-backend-dev:latest
+    build:
+      context: .
+    container_name: migrations
+    command: ["yarn", "run", "migration:run"]
+    env_file:
+      - .env
+    networks:
+      - backend
+    depends_on:
+      - db
 
-#  app:
-#    build:
-#      dockerfile: ".docker/Dockerfile"
-#      context: .
-#      target: develop
-#    env_file:
-#      - ".env"
-#    volumes:
-#      - ./src:/code/src:delegated
-#      - ./migrations:/code/migrations:delegated
-#      - ./package.json:/code/package.json:delegated
-#      - ./package-lock.json:/code/package-lock.json:delegated
-#    ports:
-#      - "3000:3000"
-#    depends_on:
-#      - db
+  backend:
+    image: compound-reserve-growth-backend-dev:latest
+    build:
+      context: .
+    container_name: backend
+    ports:
+      - 3000:3000
+    env_file:
+      - .env
+    networks:
+      - backend
+    depends_on:
+      migrations:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://127.0.0.1:3000/api/health || exit 1"]
+      interval: 1m
+      timeout: 10s
+      retries: 3
+      start_period: 10s
 
-volumes:
-  pg-db:
-  redis_data:
-    name: redis_data
-    driver: local
+networks:
+  backend:
+    name: backend
