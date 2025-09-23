@@ -1,4 +1,4 @@
-import { Controller, Get, SerializeOptions } from '@nestjs/common';
+import { Controller, Get, Post, SerializeOptions } from '@nestjs/common';
 import { ApiOperation, ApiResponse } from '@nestjs/swagger';
 
 import { AdminService } from 'modules/admin/admin.service';
@@ -21,7 +21,7 @@ export class AdminController {
     return 'OK';
   }
 
-  @Get('/start-reserves')
+  @Post('/reserves/collect')
   @AdminEndpoint()
   @ApiOperation({
     summary: 'Start reserves processing',
@@ -33,7 +33,7 @@ export class AdminController {
     return this.admin.startReserves();
   }
 
-  @Get('/start-stats')
+  @Post('/stats/collect')
   @AdminEndpoint()
   @ApiOperation({
     summary: 'Start stats processing',
