@@ -23,6 +23,7 @@ import { MailModule } from 'modules/mail/mail.module';
 import { EventModule } from 'modules/event/event.module';
 import { CoinGeckoModule } from 'modules/price/providers/coingecko/coingecko.module';
 import { CapoModule } from 'modules/capo/capo.module';
+import { AdminModule } from 'modules/admin';
 
 import { AppController } from './app.controller';
 
@@ -31,6 +32,7 @@ import databaseConfig from 'config/database';
 import networksConfig from 'config/networks.config';
 import redis from 'config/redis';
 import google from 'config/google';
+import admin from 'config/admin';
 import { DatabaseModule } from 'database/database.module';
 import { Logger } from 'infrastructure/logger';
 import { ExceptionInterceptor } from 'infrastructure/http/interceptors/exception.interceptor';
@@ -39,7 +41,7 @@ import { ExceptionInterceptor } from 'infrastructure/http/interceptors/exception
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      load: [appConfig, databaseConfig, networksConfig, redis, google],
+      load: [appConfig, databaseConfig, networksConfig, redis, google, admin],
     }),
     ScheduleModule.forRoot(),
     ThrottlerModule.forRoot({
@@ -70,6 +72,7 @@ import { ExceptionInterceptor } from 'infrastructure/http/interceptors/exception
         },
       },
     }),
+    AdminModule,
     DatabaseModule,
     GithubModule,
     NetworkModule,
