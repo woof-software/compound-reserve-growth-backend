@@ -1,14 +1,4 @@
-import {
-  Entity,
-  Column,
-  PrimaryGeneratedColumn,
-  CreateDateColumn,
-  Index,
-  JoinColumn,
-  ManyToOne,
-} from 'typeorm';
-
-import { Source } from 'modules/source/source.entity';
+import { Entity, Column, PrimaryGeneratedColumn, CreateDateColumn, Index } from 'typeorm';
 
 @Entity()
 @Index(['oracleAddress', 'date'])
@@ -59,12 +49,5 @@ export class DailyAggregation {
   public createdAt: Date;
 
   @Column({ nullable: true })
-  public sourceId: number | null;
-
-  @Column({ nullable: true })
   public assetId: number | null;
-
-  @ManyToOne(() => Source, (source) => source.dailyAggregations, { eager: false, nullable: true })
-  @JoinColumn({ name: 'sourceId' })
-  public source?: Source | null;
 }

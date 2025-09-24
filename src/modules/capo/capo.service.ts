@@ -286,19 +286,8 @@ export class CapoService {
       try {
         const oracle = await this.oracleRepository.findOne({
           where: { address: row.oracleAddress },
+          relations: ['asset'],
         });
-
-        let source;
-        let sourceId;
-        let assetId;
-        if (oracle) {
-          source = await this.sourceRepository.findOne({
-            where: { network: oracle.network },
-            relations: ['asset'],
-          });
-          sourceId = source?.id || null;
-          assetId = source?.asset.id || null;
-        }
 
         const latestOracleSnapshot = await this.snapshotRepository
           .createQueryBuilder('snapshot')
@@ -363,8 +352,7 @@ export class CapoService {
             cap: maxCapPrice,
             cappedCount: Number(row.cappedCount ?? 0),
             totalCount: Number(row.totalCount ?? 0),
-            sourceId: sourceId,
-            assetId: assetId,
+            assetId: oracle.asset.id,
           });
           aggregation = existingAggregation;
           this.logger.log(`Updating existing aggregation for oracle ${row.oracleAddress}`);
@@ -383,8 +371,7 @@ export class CapoService {
             cap: maxCapPrice,
             cappedCount: Number(row.cappedCount ?? 0),
             totalCount: Number(row.totalCount ?? 0),
-            sourceId: sourceId,
-            assetId: assetId,
+            assetId: oracle.asset.id,
           });
           this.logger.log(`Creating new aggregation for oracle ${row.oracleAddress}`);
         }
@@ -458,13 +445,12 @@ export class CapoService {
   }
 
   async getOffsetDailyAggregations(
-    dto: OffsetRequest & { sourceId?: number; assetId?: number },
+    dto: OffsetRequest & { assetId?: number },
   ): Promise<OffsetDataDto<DailyAggregationResponse>> {
-    const { offset = 0, limit = null, order = Order.DESC, sourceId, assetId } = dto;
+    const { offset = 0, limit = null, order = Order.DESC, assetId } = dto;
 
     const qb = this.aggregationRepository.createQueryBuilder('agg');
 
-    if (sourceId !== undefined) qb.andWhere('agg.sourceId = :sourceId', { sourceId });
     if (assetId !== undefined) qb.andWhere('agg.assetId = :assetId', { assetId });
 
     const total = await qb.getCount();
@@ -514,7 +500,6 @@ export class CapoService {
       cp: entity.cap,
       cc: entity.cappedCount,
       tc: entity.totalCount,
-      sId: entity.sourceId,
       aId: entity.assetId,
     };
   }
