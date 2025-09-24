@@ -6,7 +6,9 @@ import {
   UpdateDateColumn,
   Unique,
   Index,
+  ManyToOne,
 } from 'typeorm';
+import { Asset } from 'modules/asset/asset.entity';
 
 @Entity('oracles')
 @Unique(['address'])
@@ -59,4 +61,10 @@ export class Oracle {
 
   @UpdateDateColumn()
   updatedAt: Date;
+
+  @Column({ nullable: true })
+  assetId: number;
+
+  @ManyToOne(() => Asset, (asset) => asset.oracles)
+  public asset: Asset;
 }

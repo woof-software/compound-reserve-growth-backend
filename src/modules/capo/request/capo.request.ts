@@ -8,12 +8,6 @@ export class CapoRequest extends OffsetRequest {
   @IsInt()
   @IsOptional()
   @Type(() => Number)
-  @ApiProperty({ description: 'Source ID', example: 1, required: false })
-  sourceId?: number;
-
-  @IsInt()
-  @IsOptional()
-  @Type(() => Number)
   @ApiProperty({ description: 'Asset ID', example: 1, required: false })
   assetId?: number;
 }
