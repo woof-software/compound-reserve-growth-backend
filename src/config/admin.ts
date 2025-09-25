@@ -1,9 +1,8 @@
 export type AdminConfig = {
-  token: string;
+  token: string | undefined;
 };
 
 const adminToken = process.env.ADMIN_TOKEN;
-if (!adminToken) throw new Error(`Missing env: ADMIN_TOKEN`);
 
 export default (): { admin: AdminConfig } => ({
   admin: {
