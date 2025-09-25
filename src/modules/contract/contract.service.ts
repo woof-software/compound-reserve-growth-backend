@@ -502,7 +502,7 @@ export class ContractService implements OnModuleInit {
     }
   }
 
-  private async saveReserves(source: Source, algorithm: string): Promise<void> {
+  public async saveReserves(source: Source, algorithm: string): Promise<void> {
     const { address: contractAddress, network, asset } = source;
     const { address: assetAddress } = asset;
 
@@ -683,7 +683,7 @@ export class ContractService implements OnModuleInit {
     }
   }
 
-  private async saveStats(source: Source, algorithm: string): Promise<void> {
+  public async saveStats(source: Source, algorithm: string): Promise<void> {
     const { address: contractAddress, network, asset } = source;
 
     this.logger.log(

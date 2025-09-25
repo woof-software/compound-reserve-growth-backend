@@ -33,7 +33,13 @@ import { SpendsRepository } from './spends-repository.service';
     HistoryGetCron,
     GetHistoryService,
   ],
-  exports: [HistoryService, ReservesRepository, IncomesRepository, SpendsRepository],
+  exports: [
+    HistoryService,
+    ReservesRepository,
+    IncomesRepository,
+    SpendsRepository,
+    GetHistoryService,
+  ],
   controllers: [HistoryController],
 })
 export class HistoryModule {}
