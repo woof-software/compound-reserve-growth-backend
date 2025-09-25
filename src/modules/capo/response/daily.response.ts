@@ -39,8 +39,6 @@ export class DailyAggregationResponse {
 
   @ApiProperty({ description: 'Total count of entries', example: 100 })
   tc: number;
-  @ApiProperty({ description: 'Source ID', example: 1, nullable: true })
-  sId: number | null;
 
   @ApiProperty({ description: 'Asset ID', example: 1, nullable: true })
   aId: number | null;

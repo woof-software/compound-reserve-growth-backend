@@ -47,9 +47,6 @@ export class Source {
   @OneToMany(() => Revenue, (revenues) => revenues.source)
   public revenues: Revenue[];
 
-  @OneToMany(() => DailyAggregation, (dailyAggregations) => dailyAggregations.source)
-  public dailyAggregations: DailyAggregation[];
-
   @OneToMany(() => Incomes, (incomes) => incomes.source)
   public incomes: Incomes[];
 
