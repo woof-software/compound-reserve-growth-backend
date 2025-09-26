@@ -2,7 +2,7 @@ import { Controller, Injectable, Get, HttpCode, HttpStatus, Query } from '@nestj
 import { Throttle } from '@nestjs/throttler';
 import { ApiOkResponse, ApiOperation } from '@nestjs/swagger';
 
-import { DailyAggregationResponse } from './response/daily.response';
+import { CapoResponse } from './response/capo.response';
 import { CapoRequest } from './request/capo.request';
 import { CapoService } from './capo.service';
 
@@ -15,10 +15,10 @@ export class CapoController {
 
   @Throttle({ default: { limit: 15, ttl: 1000 } })
   @ApiOperation({ summary: 'Get CAPO aggregations (plain list)' })
-  @ApiOkResponse({ type: [DailyAggregationResponse] })
+  @ApiOkResponse({ type: [CapoResponse] })
   @HttpCode(HttpStatus.OK)
   @Get()
-  async list(@Query() request: CapoRequest): Promise<OffsetDataDto<DailyAggregationResponse>> {
-    return this.capoService.getOffsetDailyAggregations(request);
+  async list(@Query() request: CapoRequest): Promise<OffsetDataDto<CapoResponse>> {
+    return this.capoService.getAggregations(request);
   }
 }

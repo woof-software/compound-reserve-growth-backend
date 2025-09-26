@@ -1,4 +1,4 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiPropertyOptional } from '@nestjs/swagger';
 import { IsInt, IsOptional } from 'class-validator';
 import { Type } from 'class-transformer';
 
@@ -8,6 +8,6 @@ export class CapoRequest extends OffsetRequest {
   @IsInt()
   @IsOptional()
   @Type(() => Number)
-  @ApiProperty({ description: 'Asset ID', example: 1, required: false })
+  @ApiPropertyOptional({ description: 'Asset ID', example: 1 })
   assetId?: number;
 }
