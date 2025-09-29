@@ -399,9 +399,9 @@ export class CapoService {
           .where('s.oracleAddress = agg.oracleAddress')
           .andWhere('s.chainId = agg.chainId')
           // Last snapshot for the day
-          .andWhere(`s."timestamp" >= (agg.date::timestamp)`)
-          .andWhere(`s."timestamp" <  (agg.date::timestamp + interval '1 day')`)
-          .orderBy('s."timestamp"', 'DESC')
+          .andWhere('s.timestamp >= (agg.date::timestamp)')
+          .andWhere(`s.timestamp <  (agg.date::timestamp + interval '1 day')`)
+          .orderBy('s.timestamp', 'DESC')
           .limit(1),
       'lastPrice',
     );
