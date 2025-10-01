@@ -28,12 +28,6 @@ export class Spends {
   @Column({ type: 'double precision' })
   public valueBorrow: number; // USD
 
-  @Column({ type: 'double precision' })
-  public supplyComp: number; // Comp
-
-  @Column({ type: 'double precision' })
-  public borrowComp: number; // Comp
-
   @Column()
   public date: Date;
 
@@ -52,8 +46,6 @@ export class Spends {
     priceComp: number,
     valueSupply: number,
     valueBorrow: number,
-    supplyComp: number,
-    borrowComp: number,
     date: Date,
   ) {
     this.source = source;
@@ -63,9 +55,7 @@ export class Spends {
     this.price = price;
     this.priceComp = priceComp;
     this.valueSupply = valueSupply;
-    this.valueBorrow = valueBorrow;
-    this.supplyComp = supplyComp;
-    this.borrowComp = borrowComp;
+    this.valueBorrow = valueBorrow;;
     this.date = date;
     this.createdAt = new Date();
   }

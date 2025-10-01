@@ -20,6 +20,9 @@ export class Incomes {
   public price: number; // USD
 
   @Column({ type: 'double precision' })
+  public priceComp: number; // USD Comp
+
+  @Column({ type: 'double precision' })
   public valueSupply: number; // USD
 
   @Column({ type: 'double precision' })
@@ -40,6 +43,7 @@ export class Incomes {
     quantitySupply: string,
     quantityBorrow: string,
     price: number,
+    priceComp: number,
     valueSupply: number,
     valueBorrow: number,
     date: Date,
@@ -49,6 +53,7 @@ export class Incomes {
     this.quantitySupply = quantitySupply;
     this.quantityBorrow = quantityBorrow;
     this.price = price;
+    this.priceComp = priceComp;
     this.valueSupply = valueSupply;
     this.valueBorrow = valueBorrow;
     this.date = date;

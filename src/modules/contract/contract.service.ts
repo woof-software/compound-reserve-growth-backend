@@ -855,6 +855,7 @@ export class ContractService implements OnModuleInit {
             marketAccounting.incomes.supply.toString(),
             marketAccounting.incomes.borrow.toString(),
             price,
+            priceComp,
             incomeSupplyQuantity,
             incomeBorrowQuantity,
             dayDate,
@@ -874,8 +875,6 @@ export class ContractService implements OnModuleInit {
               priceComp,
               spendSupplyQuantity,
               spendBorrowQuantity,
-              marketAccounting.spends.supplyComp,
-              marketAccounting.spends.borrowComp,
               dayDate,
             );
             await this.historyService.createSpendsWithSource(newSpends);
