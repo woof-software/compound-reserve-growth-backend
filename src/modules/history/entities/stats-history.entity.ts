@@ -3,13 +3,15 @@ export interface StatsHistory {
     id: number;
     valueSupply: number;
     valueBorrow: number;
-    date: Date;
   };
   spends?: {
     id: number;
     valueSupply: number;
     valueBorrow: number;
-    date: Date;
+    supplyComp: number;
+    borrowComp: number;
+    priceComp: number;
   };
   sourceId: number;
+  date: Date;
 }
