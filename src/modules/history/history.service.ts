@@ -134,6 +134,7 @@ export class HistoryService {
             valueBorrow: income.valueBorrow,
           },
           sourceId: income.source.id,
+          priceComp: income.priceComp,
           date: income.date,
         });
       } else {
@@ -160,11 +161,9 @@ export class HistoryService {
             id: spend.id,
             valueSupply: spend.valueSupply,
             valueBorrow: spend.valueBorrow,
-            supplyComp: spend.supplyComp,
-            borrowComp: spend.borrowComp,
-            priceComp: spend.priceComp,
           },
           sourceId: spend.source.id,
+          priceComp: spend.priceComp,
           date: spend.date,
         });
       } else {
@@ -173,9 +172,6 @@ export class HistoryService {
           id: spend.id,
           valueSupply: spend.valueSupply,
           valueBorrow: spend.valueBorrow,
-          supplyComp: spend.supplyComp,
-          borrowComp: spend.borrowComp,
-          priceComp: spend.priceComp,
         };
       }
     });

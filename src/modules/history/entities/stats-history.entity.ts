@@ -8,10 +8,8 @@ export interface StatsHistory {
     id: number;
     valueSupply: number;
     valueBorrow: number;
-    supplyComp: number;
-    borrowComp: number;
-    priceComp: number;
   };
   sourceId: number;
+  priceComp: number;
   date: Date;
 }
