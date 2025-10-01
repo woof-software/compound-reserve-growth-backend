@@ -208,4 +208,8 @@ export class ReservesRepository {
 
     return new OffsetDataDto<Reserve>(reserves, dto.limit ?? null, dto.offset ?? 0, total);
   }
+
+  async deleteAll(): Promise<void> {
+    await this.reservesRepository.clear();
+  }
 }

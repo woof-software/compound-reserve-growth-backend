@@ -51,4 +51,8 @@ export class IncomesRepository {
 
     return new OffsetDataDto<Incomes>(incomes, dto.limit ?? null, dto.offset ?? 0, total);
   }
+
+  async deleteAll(): Promise<void> {
+    await this.incomesRepository.clear();
+  }
 }
