@@ -132,9 +132,9 @@ export class HistoryService {
             id: income.id,
             valueSupply: income.valueSupply,
             valueBorrow: income.valueBorrow,
-            date: income.date,
           },
           sourceId: income.source.id,
+          date: income.date,
         });
       } else {
         const existing = statsMap.get(key)!;
@@ -142,7 +142,6 @@ export class HistoryService {
           id: income.id,
           valueSupply: income.valueSupply,
           valueBorrow: income.valueBorrow,
-          date: income.date,
         };
       }
     });
@@ -156,15 +155,17 @@ export class HistoryService {
             id: 0,
             valueSupply: 0,
             valueBorrow: 0,
-            date: spend.date,
           },
           spends: {
             id: spend.id,
             valueSupply: spend.valueSupply,
             valueBorrow: spend.valueBorrow,
-            date: spend.date,
+            supplyComp: spend.supplyComp,
+            borrowComp: spend.borrowComp,
+            priceComp: spend.priceComp,
           },
           sourceId: spend.source.id,
+          date: spend.date,
         });
       } else {
         const existing = statsMap.get(key)!;
@@ -172,19 +173,18 @@ export class HistoryService {
           id: spend.id,
           valueSupply: spend.valueSupply,
           valueBorrow: spend.valueBorrow,
-          date: spend.date,
+          supplyComp: spend.supplyComp,
+          borrowComp: spend.borrowComp,
+          priceComp: spend.priceComp,
         };
       }
     });
 
     // Convert map to array and sort by date
     const statsHistory = Array.from(statsMap.values()).sort((a, b) => {
-      // Use incomes date for sorting, fallback to spends date if incomes id is 0
-      const dateA = a.incomes.id === 0 && a.spends ? a.spends.date : a.incomes.date;
-      const dateB = b.incomes.id === 0 && b.spends ? b.spends.date : b.incomes.date;
       return dto.order === 'ASC'
-        ? new Date(dateA).getTime() - new Date(dateB).getTime()
-        : new Date(dateB).getTime() - new Date(dateA).getTime();
+        ? new Date(a.date).getTime() - new Date(b.date).getTime()
+        : new Date(b.date).getTime() - new Date(a.date).getTime();
     });
 
     // Apply offset and limit to the merged and sorted data

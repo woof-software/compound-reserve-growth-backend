@@ -63,7 +63,12 @@ export class AlgorithmService {
         supply: supplyIncome,
         borrow: borrowIncome,
       },
-      spends: { supplyUsd: supplyRewardsUSD, borrowUsd: borrowRewardsUSD },
+      spends: {
+        supplyComp: annualSupplyRewardCompTokens,
+        supplyUsd: supplyRewardsUSD,
+        borrowComp: annualBorrowRewardCompTokens,
+        borrowUsd: borrowRewardsUSD,
+      },
     };
   }
 

@@ -12,14 +12,10 @@ class IncomesStatsResponse {
   @ApiProperty({ example: 20.25, description: 'vb - valueBorrow value in USD for borrow side' })
   public vb: number;
 
-  @ApiProperty({ example: 1750809600, description: 'd - date in seconds since epoch for incomes' })
-  public d: number;
-
   constructor(incomes: any) {
     this.id = incomes.id;
     this.vs = incomes.valueSupply;
     this.vb = incomes.valueBorrow;
-    this.d = new Date(incomes.date).getTime() / 1000;
   }
 }
 
@@ -33,14 +29,22 @@ class SpendsStatsResponse {
   @ApiProperty({ example: 10.0, description: 'vb - valueBorrow value in USD for borrow side' })
   public vb: number;
 
-  @ApiProperty({ example: 1750809600, description: 'd - date in seconds since epoch for spends' })
-  public d: number;
+  @ApiProperty({ example: 2.4, description: 'vsComp - valueSupply value in Comp for supply side' })
+  public vsComp: number;
+
+  @ApiProperty({ example: 1.4, description: 'vbComp - valueBorrow value in Comp for borrow side' })
+  public vbComp: number;
+
+  @ApiProperty({ example: 44.6, description: 'pc - price Comp token' })
+  public pc: number;
 
   constructor(spends: any) {
     this.id = spends.id;
     this.vs = spends.valueSupply;
     this.vb = spends.valueBorrow;
-    this.d = new Date(spends.date).getTime() / 1000;
+    this.vsComp = spends.supplyComp;
+    this.vbComp = spends.borrowComp;
+    this.pc = spends.priceComp;
   }
 }
 
@@ -64,9 +68,16 @@ export class StatsHistoryResponse {
   })
   public sourceId: number;
 
+  @ApiProperty({
+    example: 1750809600,
+    description: 'Date in seconds since epoch for the stats period',
+  })
+  public d: number;
+
   constructor(statsHistory: StatsHistory) {
     this.incomes = new IncomesStatsResponse(statsHistory.incomes);
     this.spends = statsHistory.spends ? new SpendsStatsResponse(statsHistory.spends) : undefined;
     this.sourceId = statsHistory.sourceId;
+    this.d = new Date(statsHistory.date).getTime() / 1000;
   }
 }

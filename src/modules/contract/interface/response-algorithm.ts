@@ -4,7 +4,9 @@ export interface ResponseStatsAlgorithm {
     borrow: number;
   };
   spends?: {
+    supplyComp: number;
     supplyUsd: number;
+    borrowComp: number;
     borrowUsd: number;
   };
 }
