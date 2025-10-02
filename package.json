@@ -21,7 +21,7 @@
     "migration:show": "yarn run typeorm -- migration:show -d ./src/database/typeorm.config.ts",
     "cli:source-fill": "nest build && node dist/src/cli.js source:fill",
     "cli:history-get": "nest build && node dist/src/cli.js history:get",
-    "cli:stats:get": "nest build && node dist/src/cli.js stats:get",
+    "cli:stats-get": "nest build && node dist/src/cli.js stats:get",
     "cli:event-fill": "nest build && node dist/src/cli.js event:fill",
     "cli:price-preload": "nest build && node dist/src/cli.js price:preload",
     "docker:up": "docker-compose up -d",
