@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 
 import { ContractService } from 'modules/contract/contract.service';
 import { SourceService } from 'modules/source/source.service';
+import { PriceService } from 'modules/price/price.service';
 import { StartCollectionResponse } from 'modules/admin/response';
 import { IncomesRepository } from 'modules/history/incomes-repository.service';
 import { SpendsRepository } from 'modules/history/spends-repository.service';
@@ -18,6 +19,7 @@ export class GetHistoryService {
   constructor(
     private readonly sourceService: SourceService,
     private readonly contractService: ContractService,
+    private readonly priceService: PriceService,
     private readonly incomesRepository: IncomesRepository,
     private readonly spendsRepository: SpendsRepository,
     private readonly reservesRepository: ReservesRepository,
@@ -98,20 +100,35 @@ export class GetHistoryService {
     });
   }
 
-  async startReservesProcessing(dto?: StartCollectionResponse) {
+  async startReservesProcessing(collectionSwitch?: StartCollectionResponse) {
     return this.executeWithLock('Reserves Processing', async () => {
       this.logger.log('Starting to process reserves...');
 
-      const reservesAlgorithms = [Algorithm.COMET, Algorithm.MARKET_V2];
+      const reservesAlgorithms = [
+        Algorithm.COMET,
+        Algorithm.MARKET_V2,
+        Algorithm.AERA_COMPOUND_RESERVES,
+        Algorithm.AERA_VENDORS_VAULT,
+        Algorithm.AVANTGARDE_TREASURY_GROWTH_PROPOSAL,
+        Algorithm.COMPOUND_COMMUNITY_MULTISIG,
+        Algorithm.COMPTROLLER,
+        Algorithm.DELEGATE_RACE,
+        Algorithm.IMMUNEFI_BUG_BOUNTY_PROGRAM,
+        Algorithm.MANTLE,
+        Algorithm.OPENZEPPELIN_PAYMENT_STREAM_CONTRACT,
+        Algorithm.REWARDS,
+        Algorithm.TIMELOCK,
+        Algorithm.WOOF_PAYMENT_STREAM_CONTRACT,
+      ];
       const dbSources = await this.sourceService.listByAlgorithms(reservesAlgorithms);
 
       this.logger.log(`Found ${dbSources.length} sources for reserves processing`);
 
-      if (dto?.enableFlag) {
+      if (collectionSwitch?.clearData) {
         this.logger.log('Clearing reserves table...');
         await this.reservesRepository.deleteAll();
         this.logger.log('Reserves table cleared successfully.');
-        await this.updateSourcesBlockNumber(dbSources, dto.data);
+        await this.updateSourcesBlockNumber(dbSources, collectionSwitch.data);
       }
 
       for (const source of dbSources) {
@@ -128,15 +145,15 @@ export class GetHistoryService {
     });
   }
 
-  async startStatsProcessing(dto?: StartCollectionResponse) {
+  async startStatsProcessing(collectionSwitch?: StartCollectionResponse) {
     return this.executeWithLock('Stats Processing', async () => {
       this.logger.log('Starting to process stats...');
       let data: Date;
-      if (dto?.enableFlag) {
+      if (collectionSwitch?.clearData) {
         this.logger.log('Clearing spends and incomes tables...');
         await Promise.all([this.spendsRepository.deleteAll(), this.incomesRepository.deleteAll()]);
         this.logger.log('Spends and incomes tables cleared successfully.');
-        data = dto.data;
+        data = collectionSwitch.data;
       }
 
       const statsAlgorithms = [Algorithm.COMET_STATS, Algorithm.MARKET_V2_STATS];
@@ -155,6 +172,79 @@ export class GetHistoryService {
       }
 
       this.logger.log('Stats processing completed.');
+    });
+  }
+
+  async updatePriceCompForIncentives() {
+    return this.executeWithLock('Price Comp Update', async () => {
+      this.logger.log('Starting to update priceComp for incentives...');
+
+      // Get all incomes and spends records with missing priceComp (priceComp = 0)
+      const [incomesRecords, spendsRecords] = await Promise.all([
+        this.incomesRepository.findAllWithMissingPriceComp(),
+        this.spendsRepository.findAllWithMissingPriceComp(),
+      ]);
+
+      this.logger.log(
+        `Found ${incomesRecords.length} incomes and ${spendsRecords.length} spends records to update`,
+      );
+
+      const assetCompToken = { address: null, symbol: 'COMP', decimals: null };
+
+      // Update incomes records
+      let updatedIncomes = 0;
+      let failedIncomes = 0;
+
+      for (const income of incomesRecords) {
+        try {
+          const priceComp = await this.priceService.getHistoricalPrice(assetCompToken, income.date);
+          if (priceComp > 0) {
+            await this.incomesRepository.updatePriceComp(income.id, priceComp);
+            updatedIncomes++;
+            this.logger.debug(`Updated priceComp for income ID ${income.id}: ${priceComp} USD`);
+          } else {
+            this.logger.warn(
+              `Invalid COMP price (${priceComp}) for income ID ${income.id} on ${income.date.toISOString().slice(0, 10)}`,
+            );
+            failedIncomes++;
+          }
+        } catch (error) {
+          this.logger.error(
+            `Failed to update priceComp for income ID ${income.id}: ${error.message}`,
+          );
+          failedIncomes++;
+        }
+      }
+
+      // Update spends records
+      let updatedSpends = 0;
+      let failedSpends = 0;
+
+      for (const spend of spendsRecords) {
+        try {
+          const priceComp = await this.priceService.getHistoricalPrice(assetCompToken, spend.date);
+          if (priceComp > 0) {
+            await this.spendsRepository.updatePriceComp(spend.id, priceComp);
+            updatedSpends++;
+            this.logger.debug(`Updated priceComp for spend ID ${spend.id}: ${priceComp} USD`);
+          } else {
+            this.logger.warn(
+              `Invalid COMP price (${priceComp}) for spend ID ${spend.id} on ${spend.date.toISOString().slice(0, 10)}`,
+            );
+            failedSpends++;
+          }
+        } catch (error) {
+          this.logger.error(
+            `Failed to update priceComp for spend ID ${spend.id}: ${error.message}`,
+          );
+          failedSpends++;
+        }
+      }
+
+      this.logger.log(
+        `Price Comp update completed: ${updatedIncomes} incomes and ${updatedSpends} spends updated successfully`,
+      );
+      this.logger.log(`Failed updates: ${failedIncomes} incomes and ${failedSpends} spends`);
     });
   }
 }

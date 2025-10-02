@@ -26,7 +26,11 @@ export class AdminController {
   @AdminEndpoint()
   @ApiOperation({
     summary: 'Start reserves processing',
-    description: 'Returns the process status response.',
+    description:
+      'Returns the process status response.\n' +
+      '  - If the `clearData` field is set to true in the request, existing data in the database will be cleared before the new collection starts.\n' +
+      '  - The `data` field specifies the time (in ISO format) at which data collection should start.\n' +
+      '  - When `clearData` is enabled and `data` is not specified, the start of the report is considered to be the create of the contract',
   })
   @ApiResponse({ status: 200, type: String })
   @SerializeOptions({ type: String })
@@ -38,7 +42,11 @@ export class AdminController {
   @AdminEndpoint()
   @ApiOperation({
     summary: 'Start stats processing',
-    description: 'Returns the process status response.',
+    description:
+      'Returns the process status response.\n' +
+      '  - If the `clearData` field is set to true in the request, existing data in the database will be cleared before the new collection starts.\n' +
+      '  - The `data` field specifies the time (in ISO format) at which data collection should start.\n' +
+      '  - When `clearData` is enabled and `data` is not specified, the start of the report is considered to be the create of the contract',
   })
   @ApiResponse({ status: 200, type: String })
   @SerializeOptions({ type: String })

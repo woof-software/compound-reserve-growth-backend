@@ -8,14 +8,14 @@ export class AdminService {
   private readonly logger = new Logger(AdminService.name);
   constructor(private readonly getHistoryService: GetHistoryService) {}
 
-  async startReserves(dto: StartCollectionResponse) {
+  async startReserves(collectionSwitch: StartCollectionResponse) {
     if (this.getHistoryService.isProcessRunning()) {
       this.logger.warn('Reserves processing was blocked - another process is running');
       return 'Blocked: Another process is already running';
     }
 
     // Start the process asynchronously without waiting
-    this.getHistoryService.startReservesProcessing(dto).catch((error) => {
+    this.getHistoryService.startReservesProcessing(collectionSwitch).catch((error) => {
       this.logger.error('Error in reserves processing:', error);
     });
 
@@ -23,14 +23,14 @@ export class AdminService {
     return 'Started successfully';
   }
 
-  async startStats(dto: StartCollectionResponse) {
+  async startStats(collectionSwitch: StartCollectionResponse) {
     if (this.getHistoryService.isProcessRunning()) {
       this.logger.warn('Stats processing was blocked - another process is running');
       return 'Blocked: Another process is already running';
     }
 
     // Start the process asynchronously without waiting
-    this.getHistoryService.startStatsProcessing(dto).catch((error) => {
+    this.getHistoryService.startStatsProcessing(collectionSwitch).catch((error) => {
       this.logger.error('Error in stats processing:', error);
     });
 

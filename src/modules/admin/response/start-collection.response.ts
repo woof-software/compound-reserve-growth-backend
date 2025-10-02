@@ -4,7 +4,7 @@ import { Transform, Type } from 'class-transformer';
 
 export class StartCollectionResponse {
   @ApiProperty({
-    description: 'flag',
+    description: 'flag for clearing data from databases ',
     example: false,
     type: 'boolean',
     required: false,
@@ -12,11 +12,11 @@ export class StartCollectionResponse {
   @Type(() => Boolean)
   @IsOptional()
   @IsBoolean()
-  enableFlag?: boolean = false;
+  clearData?: boolean = false;
 
   @ApiProperty({
-    description: 'data',
-    example: '2025-07-28 12:55:20',
+    description: 'collection start date',
+    example: '2025-05-01',
     type: 'string',
     format: 'date-time',
     required: false,

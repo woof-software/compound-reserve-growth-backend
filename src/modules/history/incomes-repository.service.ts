@@ -55,4 +55,17 @@ export class IncomesRepository {
   async deleteAll(): Promise<void> {
     await this.incomesRepository.clear();
   }
+
+  async findAllWithMissingPriceComp(): Promise<Incomes[]> {
+    return this.incomesRepository
+      .createQueryBuilder('incomes')
+      .leftJoinAndSelect('incomes.source', 'source')
+      .where('incomes.priceComp IS NULL OR incomes.priceComp = 0')
+      .orderBy('incomes.date', 'ASC')
+      .getMany();
+  }
+
+  async updatePriceComp(id: number, priceComp: number): Promise<void> {
+    await this.incomesRepository.update(id, { priceComp });
+  }
 }
