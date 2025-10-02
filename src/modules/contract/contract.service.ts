@@ -4,7 +4,7 @@ import { ethers, JsonRpcProvider } from 'ethers';
 import type { Cache } from 'cache-manager';
 import type { Redis } from 'ioredis';
 
-import { Reserve, Spends, Incomes } from 'modules/history/entities';
+import { Incomes, Reserve, Spends } from 'modules/history/entities';
 import { REDIS_CLIENT } from 'modules/redis/redis.module';
 import { ProviderFactory } from 'modules/network/provider.factory';
 import { HistoryService } from 'modules/history/history.service';
@@ -171,8 +171,20 @@ export class ContractService implements OnModuleInit {
   async getSourceBlockNumber(source: Source, startDate?: Date): Promise<number> {
     if (startDate) {
       const provider = this.providerFactory.get(source.network);
-      const targetTimestamp = Math.floor(startDate.getTime() / 1000);
-      return this.findBlockByTimestamp(source.network, provider, targetTimestamp);
+
+      // Get contract creation block to compare with provided date
+      const creationBlock = await this.getContractCreationBlock(source.address, source.network);
+      const creationBlockData = await this.getCachedBlock(source.network, provider, creationBlock);
+      const creationTimestamp = creationBlockData.timestamp;
+      const providedTimestamp = Math.floor(startDate.getTime() / 1000);
+
+      const targetTimestamp = Math.max(creationTimestamp, providedTimestamp);
+
+      if (providedTimestamp < creationTimestamp) {
+        return creationBlock;
+      } else {
+        return this.findBlockByTimestamp(source.network, provider, targetTimestamp);
+      }
     } else {
       return this.getContractCreationBlock(source.address, source.network);
     }
@@ -713,12 +725,26 @@ export class ContractService implements OnModuleInit {
 
       if (data) {
         try {
-          const targetTimestamp = Math.floor(data.getTime() / 1000);
-          lastBlock = await this.findBlockByTimestamp(network, provider, targetTimestamp);
+          // Get contract creation block to compare with provided date
+          const creationBlock = await this.getContractCreationBlock(source.address, source.network);
+          const creationBlockData = await this.getCachedBlock(network, provider, creationBlock);
+          const creationTimestamp = creationBlockData.timestamp;
+          const providedTimestamp = Math.floor(data.getTime() / 1000);
 
-          this.logger.log(
-            `Using provided date ${data.toISOString()} to start from block ${lastBlock} for ${source.address} on ${source.network}`,
-          );
+          // Use the later of creation block or provided date
+          const targetTimestamp = Math.max(creationTimestamp, providedTimestamp);
+
+          if (providedTimestamp < creationTimestamp) {
+            this.logger.log(
+              `Provided date ${data.toISOString()} is older than contract creation. Using creation block ${creationBlock} instead for ${source.address} on ${source.network}`,
+            );
+            lastBlock = creationBlock;
+          } else {
+            lastBlock = await this.findBlockByTimestamp(network, provider, targetTimestamp);
+            this.logger.log(
+              `Using provided date ${data.toISOString()} to start from block ${lastBlock} for ${source.address} on ${source.network}`,
+            );
+          }
         } catch (e: any) {
           this.logger.error(
             `Failed to find block for date ${data.toISOString()} for ${source.address} on ${source.network}: ${e?.message}`,
