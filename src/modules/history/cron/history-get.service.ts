@@ -175,19 +175,15 @@ export class GetHistoryService {
     });
   }
 
-  async updatePriceCompForIncentives() {
+  async updatePriceCompForStats() {
     return this.executeWithLock('Price Comp Update', async () => {
-      this.logger.log('Starting to update priceComp for incentives...');
+      this.logger.log('Starting to update priceComp for stats...');
 
       // Get all incomes and spends records with missing priceComp (priceComp = 0)
       const [incomesRecords, spendsRecords] = await Promise.all([
         this.incomesRepository.findAllWithMissingPriceComp(),
         this.spendsRepository.findAllWithMissingPriceComp(),
       ]);
-
-      this.logger.log(
-        `Found ${incomesRecords.length} incomes and ${spendsRecords.length} spends records to update`,
-      );
 
       const assetCompToken = { address: null, symbol: 'COMP', decimals: null };
 

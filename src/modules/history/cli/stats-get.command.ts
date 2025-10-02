@@ -14,7 +14,7 @@ export class StatsGetCommand extends CommandRunner {
   async run() {
     try {
       this.logger.log('Starting stats priceComp update process...');
-      return await this.getHistoryService.updatePriceCompForIncentives();
+      return await this.getHistoryService.updatePriceCompForStats();
     } catch (error) {
       this.logger.error('An error occurred while running stats:get command:', error);
       return;
