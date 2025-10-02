@@ -1,7 +1,8 @@
-import { Controller, Get, Post, SerializeOptions } from '@nestjs/common';
+import { Controller, Get, Post, Query, SerializeOptions } from '@nestjs/common';
 import { ApiOperation, ApiResponse } from '@nestjs/swagger';
 
 import { AdminService } from 'modules/admin/admin.service';
+import { StartCollectionResponse } from 'modules/admin/response';
 
 import { AdminEndpoint } from '@/common/decorators';
 
@@ -25,23 +26,31 @@ export class AdminController {
   @AdminEndpoint()
   @ApiOperation({
     summary: 'Start reserves processing',
-    description: 'Returns the process status response.',
+    description:
+      'Returns the process status response.\n' +
+      '  - If the `clearData` field is set to true in the request, existing data in the database will be cleared before the new collection starts.\n' +
+      '  - The `data` field specifies the time (in ISO format) at which data collection should start.\n' +
+      '  - When `clearData` is enabled and `data` is not specified, the start of the report is considered to be the create of the contract',
   })
   @ApiResponse({ status: 200, type: String })
   @SerializeOptions({ type: String })
-  async startReserves(): Promise<string> {
-    return this.admin.startReserves();
+  async startReserves(@Query() request: StartCollectionResponse): Promise<string> {
+    return this.admin.startReserves(request);
   }
 
   @Post('/stats/collect')
   @AdminEndpoint()
   @ApiOperation({
     summary: 'Start stats processing',
-    description: 'Returns the process status response.',
+    description:
+      'Returns the process status response.\n' +
+      '  - If the `clearData` field is set to true in the request, existing data in the database will be cleared before the new collection starts.\n' +
+      '  - The `data` field specifies the time (in ISO format) at which data collection should start.\n' +
+      '  - When `clearData` is enabled and `data` is not specified, the start of the report is considered to be the create of the contract',
   })
   @ApiResponse({ status: 200, type: String })
   @SerializeOptions({ type: String })
-  async startStats(): Promise<string> {
-    return this.admin.startStats();
+  async startStats(@Query() request: StartCollectionResponse): Promise<string> {
+    return this.admin.startStats(request);
   }
 }

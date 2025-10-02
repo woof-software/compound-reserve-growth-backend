@@ -4,7 +4,7 @@ import { ethers, JsonRpcProvider } from 'ethers';
 import type { Cache } from 'cache-manager';
 import type { Redis } from 'ioredis';
 
-import { Reserve, Spends, Incomes } from 'modules/history/entities';
+import { Incomes, Reserve, Spends } from 'modules/history/entities';
 import { REDIS_CLIENT } from 'modules/redis/redis.module';
 import { ProviderFactory } from 'modules/network/provider.factory';
 import { HistoryService } from 'modules/history/history.service';
@@ -159,6 +159,41 @@ export class ContractService implements OnModuleInit {
     } catch (error) {
       this.logger.error(`Error finding creation block for ${contractAddress}:`, error);
       throw error;
+    }
+  }
+
+  /**
+   * Gets the appropriate block number for a source based on date or creation block
+   * @param source - Source entity
+   * @param startDate - Optional date to start from
+   * @returns Block number to start from
+   */
+  async getSourceBlockNumber(source: Source, startDate?: Date): Promise<number> {
+    try {
+      if (startDate) {
+        const provider = this.providerFactory.get(source.network);
+
+        // Get contract creation block to compare with provided date
+        const creationBlock = await this.getContractCreationBlock(source.address, source.network);
+        const creationBlockData = await this.getCachedBlock(source.network, provider, creationBlock);
+        const creationTimestamp = creationBlockData.timestamp;
+        const providedTimestamp = Math.floor(startDate.getTime() / 1000);
+
+        const targetTimestamp = Math.max(creationTimestamp, providedTimestamp);
+
+        if (providedTimestamp < creationTimestamp) {
+          return creationBlock;
+        } else {
+          return this.findBlockByTimestamp(source.network, provider, targetTimestamp);
+        }
+      } else {
+        return this.getContractCreationBlock(source.address, source.network);
+      }
+    } catch (error) {
+      this.logger.warn(
+        `Failed to get block number for source ${source.id} (${source.address}): ${error.message}. Using current block number ${source.blockNumber} as fallback.`,
+      );
+      return source.blockNumber;
     }
   }
 
@@ -683,7 +718,7 @@ export class ContractService implements OnModuleInit {
     }
   }
 
-  public async saveStats(source: Source, algorithm: string): Promise<void> {
+  public async saveStats(source: Source, algorithm: string, data?: Date): Promise<void> {
     const { address: contractAddress, network, asset } = source;
 
     this.logger.log(
@@ -693,30 +728,63 @@ export class ContractService implements OnModuleInit {
     try {
       const provider = this.providerFactory.get(network);
 
-      const spends = await this.historyService.findSpendsBySource(source);
-      const incomes = await this.historyService.findIncomesBySource(source);
-
       let lastBlock: number | undefined;
 
-      if (incomes?.blockNumber) {
-        lastBlock = incomes.blockNumber;
-      }
-      if (spends?.blockNumber && (!lastBlock || spends.blockNumber < lastBlock)) {
-        lastBlock = spends.blockNumber;
-      }
-      if (!lastBlock) {
+      if (data) {
         try {
-          // Start from the contract creation block if we have no prior events
+          // Get contract creation block to compare with provided date
           const creationBlock = await this.getContractCreationBlock(source.address, source.network);
-          lastBlock = Math.max(creationBlock, 0);
-          this.logger.log(
-            `No previous liquidation events. Starting scan from creation block ${lastBlock} for ${source.address} on ${source.network}`,
-          );
+          const creationBlockData = await this.getCachedBlock(network, provider, creationBlock);
+          const creationTimestamp = creationBlockData.timestamp;
+          const providedTimestamp = Math.floor(data.getTime() / 1000);
+
+          // Use the later of creation block or provided date
+          const targetTimestamp = Math.max(creationTimestamp, providedTimestamp);
+
+          if (providedTimestamp < creationTimestamp) {
+            this.logger.log(
+              `Provided date ${data.toISOString()} is older than contract creation. Using creation block ${creationBlock} instead for ${source.address} on ${source.network}`,
+            );
+            lastBlock = creationBlock;
+          } else {
+            lastBlock = await this.findBlockByTimestamp(network, provider, targetTimestamp);
+            this.logger.log(
+              `Using provided date ${data.toISOString()} to start from block ${lastBlock} for ${source.address} on ${source.network}`,
+            );
+          }
         } catch (e: any) {
-          this.logger.warn(
-            `Failed to determine creation block for ${source.address} on ${source.network}: ${e?.message}. Fallback to source.blockNumber=${lastBlock}`,
+          this.logger.error(
+            `Failed to find block for date ${data.toISOString()} for ${source.address} on ${source.network}: ${e?.message}`,
           );
           return;
+        }
+      } else {
+        const spends = await this.historyService.findSpendsBySource(source);
+        const incomes = await this.historyService.findIncomesBySource(source);
+
+        if (incomes?.blockNumber) {
+          lastBlock = incomes.blockNumber;
+        }
+        if (spends?.blockNumber && (!lastBlock || spends.blockNumber < lastBlock)) {
+          lastBlock = spends.blockNumber;
+        }
+        if (!lastBlock) {
+          try {
+            // Start from the contract creation block if we have no prior events
+            const creationBlock = await this.getContractCreationBlock(
+              source.address,
+              source.network,
+            );
+            lastBlock = Math.max(creationBlock, 0);
+            this.logger.log(
+              `No previous liquidation events. Starting scan from creation block ${lastBlock} for ${source.address} on ${source.network}`,
+            );
+          } catch (e: any) {
+            this.logger.warn(
+              `Failed to determine creation block for ${source.address} on ${source.network}: ${e?.message}. Fallback to source.blockNumber=${lastBlock}`,
+            );
+            return;
+          }
         }
       }
 

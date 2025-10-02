@@ -4,12 +4,14 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { AssetModule } from 'modules/asset/asset.module';
 import { SourceModule } from 'modules/source/source.module';
 import { ContractModule } from 'modules/contract/contract.module';
+import { PriceModule } from 'modules/price/price.module';
 import { RedisModule } from 'modules/redis/redis.module';
 
 import { Reserve, Incomes, Spends } from './entities';
 import { ReservesRepository } from './reserves-repository.service';
 import { HistoryService } from './history.service';
 import { HistoryGetCommand } from './cli/history-get.command';
+import { StatsGetCommand } from './cli/stats-get.command';
 import { HistoryController } from './history.controller';
 import { HistoryGetCron } from './cron/history-get.cron';
 import { GetHistoryService } from './cron/history-get.service';
@@ -22,6 +24,7 @@ import { SpendsRepository } from './spends-repository.service';
     SourceModule,
     AssetModule,
     forwardRef(() => ContractModule),
+    PriceModule,
     RedisModule,
   ],
   providers: [
@@ -30,6 +33,7 @@ import { SpendsRepository } from './spends-repository.service';
     SpendsRepository,
     HistoryService,
     HistoryGetCommand,
+    StatsGetCommand,
     HistoryGetCron,
     GetHistoryService,
   ],

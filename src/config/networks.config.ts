@@ -32,7 +32,7 @@ export default registerAs('networks', (): NetworkConfig[] => [
   {
     network: 'mantle',
     chainId: 5000,
-    url: `https://rpc.ankr.com/mantle/${process.env.ANKR_KEY}`,
+    url: `https://1rpc.io/mantle`,
   },
   {
     network: 'unichain',

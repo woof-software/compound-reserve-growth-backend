@@ -51,4 +51,21 @@ export class SpendsRepository {
 
     return new OffsetDataDto<Spends>(spends, dto.limit ?? null, dto.offset ?? 0, total);
   }
+
+  async deleteAll(): Promise<void> {
+    await this.spendsRepository.clear();
+  }
+
+  async findAllWithMissingPriceComp(): Promise<Spends[]> {
+    return this.spendsRepository
+      .createQueryBuilder('spends')
+      .leftJoinAndSelect('spends.source', 'source')
+      .where('spends.priceComp IS NULL OR spends.priceComp = 0')
+      .orderBy('spends.date', 'ASC')
+      .getMany();
+  }
+
+  async updatePriceComp(id: number, priceComp: number): Promise<void> {
+    await this.spendsRepository.update(id, { priceComp });
+  }
 }
