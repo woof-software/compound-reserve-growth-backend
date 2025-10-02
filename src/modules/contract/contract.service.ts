@@ -169,24 +169,31 @@ export class ContractService implements OnModuleInit {
    * @returns Block number to start from
    */
   async getSourceBlockNumber(source: Source, startDate?: Date): Promise<number> {
-    if (startDate) {
-      const provider = this.providerFactory.get(source.network);
+    try {
+      if (startDate) {
+        const provider = this.providerFactory.get(source.network);
 
-      // Get contract creation block to compare with provided date
-      const creationBlock = await this.getContractCreationBlock(source.address, source.network);
-      const creationBlockData = await this.getCachedBlock(source.network, provider, creationBlock);
-      const creationTimestamp = creationBlockData.timestamp;
-      const providedTimestamp = Math.floor(startDate.getTime() / 1000);
+        // Get contract creation block to compare with provided date
+        const creationBlock = await this.getContractCreationBlock(source.address, source.network);
+        const creationBlockData = await this.getCachedBlock(source.network, provider, creationBlock);
+        const creationTimestamp = creationBlockData.timestamp;
+        const providedTimestamp = Math.floor(startDate.getTime() / 1000);
 
-      const targetTimestamp = Math.max(creationTimestamp, providedTimestamp);
+        const targetTimestamp = Math.max(creationTimestamp, providedTimestamp);
 
-      if (providedTimestamp < creationTimestamp) {
-        return creationBlock;
+        if (providedTimestamp < creationTimestamp) {
+          return creationBlock;
+        } else {
+          return this.findBlockByTimestamp(source.network, provider, targetTimestamp);
+        }
       } else {
-        return this.findBlockByTimestamp(source.network, provider, targetTimestamp);
+        return this.getContractCreationBlock(source.address, source.network);
       }
-    } else {
-      return this.getContractCreationBlock(source.address, source.network);
+    } catch (error) {
+      this.logger.warn(
+        `Failed to get block number for source ${source.id} (${source.address}): ${error.message}. Using current block number ${source.blockNumber} as fallback.`,
+      );
+      return source.blockNumber;
     }
   }
 

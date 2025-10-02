@@ -61,29 +61,55 @@ export class GetHistoryService {
    * Updates blockNumber for sources with reserves algorithms
    * @param sources - Array of sources to update
    * @param startDate - Optional date to start from. If not provided, uses contract creation block
+   * @returns Array of sources that were successfully updated (excluding those that failed or had no changes)
    */
-  private async updateSourcesBlockNumber(sources: Source[], startDate: Date): Promise<void> {
+  private async updateSourcesBlockNumber(sources: Source[], startDate: Date): Promise<Source[]> {
     this.logger.log(`Updating blockNumber for ${sources.length} sources...`);
 
-    const updatePromises = sources.map(async (source) => {
+    let successCount = 0;
+    let failureCount = 0;
+    const successfullyUpdatedSources: Source[] = [];
+
+    // Process sources sequentially to avoid RPC batch limit errors
+    for (const source of sources) {
       try {
+        this.logger.log(`Processing source ${source.id} (${source.address})...`);
         const newBlockNumber = await this.contractService.getSourceBlockNumber(source, startDate);
+
+        if (newBlockNumber === source.blockNumber) {
+          this.logger.log(
+            `Source ${source.id} already has correct block number ${newBlockNumber}, skipping update`,
+          );
+          successCount++;
+          continue;
+        }
 
         await this.sourceService.updateWithSource({
           source,
           blockNumber: newBlockNumber,
           checkedAt: new Date(),
         });
+
+        successfullyUpdatedSources.push(source);
+        successCount++;
+        this.logger.log(`Successfully updated source ${source.id} to block ${newBlockNumber}`);
       } catch (error) {
+        failureCount++;
         this.logger.error(
           `Failed to update blockNumber for source ${source.id} (${source.address}): ${error.message}`,
         );
-        throw error; // Re-throw to stop the entire process if any source fails
+        // Continue processing other sources instead of stopping the entire process
       }
-    });
+    }
 
-    await Promise.all(updatePromises);
-    this.logger.log(`Successfully updated blockNumber for ${sources.length} sources`);
+    this.logger.log(
+      `BlockNumber update completed: ${successCount} successful, ${failureCount} failed out of ${sources.length} sources`,
+    );
+    this.logger.log(
+      `Successfully updated ${successfullyUpdatedSources.length} sources that will have their reserves cleared`,
+    );
+
+    return successfullyUpdatedSources;
   }
 
   async getHistory() {
@@ -125,10 +151,23 @@ export class GetHistoryService {
       this.logger.log(`Found ${dbSources.length} sources for reserves processing`);
 
       if (collectionSwitch?.clearData) {
-        this.logger.log('Clearing reserves table...');
-        await this.reservesRepository.deleteAll();
-        this.logger.log('Reserves table cleared successfully.');
-        await this.updateSourcesBlockNumber(dbSources, collectionSwitch.data);
+        const successfullyUpdatedSources = await this.updateSourcesBlockNumber(
+          dbSources,
+          collectionSwitch.data,
+        );
+
+        if (successfullyUpdatedSources.length > 0) {
+          this.logger.log(
+            `Clearing reserves for ${successfullyUpdatedSources.length} successfully updated sources...`,
+          );
+          const sourceIds = successfullyUpdatedSources.map((source) => source.id);
+          await this.reservesRepository.deleteBySourceIds(sourceIds);
+          this.logger.log(
+            `Reserves cleared successfully for ${successfullyUpdatedSources.length} sources.`,
+          );
+        } else {
+          this.logger.log('No sources were successfully updated, skipping reserves cleanup.');
+        }
       }
 
       for (const source of dbSources) {

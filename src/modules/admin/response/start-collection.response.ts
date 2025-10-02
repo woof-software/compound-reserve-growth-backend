@@ -9,7 +9,7 @@ export class StartCollectionResponse {
     type: 'boolean',
     required: false,
   })
-  @Type(() => Boolean)
+  @Transform(({ value }) => value === 'true')
   @IsOptional()
   @IsBoolean()
   clearData?: boolean = false;

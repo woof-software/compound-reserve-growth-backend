@@ -212,4 +212,15 @@ export class ReservesRepository {
   async deleteAll(): Promise<void> {
     await this.reservesRepository.clear();
   }
+
+  async deleteBySourceIds(sourceIds: number[]): Promise<void> {
+    if (sourceIds.length === 0) {
+      return;
+    }
+    await this.reservesRepository
+      .createQueryBuilder()
+      .delete()
+      .where('sourceId IN (:...sourceIds)', { sourceIds })
+      .execute();
+  }
 }
