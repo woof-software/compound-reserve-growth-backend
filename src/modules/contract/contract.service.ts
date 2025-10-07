@@ -175,7 +175,11 @@ export class ContractService implements OnModuleInit {
 
         // Get contract creation block to compare with provided date
         const creationBlock = await this.getContractCreationBlock(source.address, source.network);
-        const creationBlockData = await this.getCachedBlock(source.network, provider, creationBlock);
+        const creationBlockData = await this.getCachedBlock(
+          source.network,
+          provider,
+          creationBlock,
+        );
         const creationTimestamp = creationBlockData.timestamp;
         const providedTimestamp = Math.floor(startDate.getTime() / 1000);
 

@@ -55,7 +55,7 @@ export class Spends {
     this.price = price;
     this.priceComp = priceComp;
     this.valueSupply = valueSupply;
-    this.valueBorrow = valueBorrow;;
+    this.valueBorrow = valueBorrow;
     this.date = date;
     this.createdAt = new Date();
   }

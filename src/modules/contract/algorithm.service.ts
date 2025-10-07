@@ -3,6 +3,8 @@ import { ethers } from 'ethers';
 
 import { ResponseStatsAlgorithm } from 'modules/contract/interface';
 
+import { dailyIncomeTokens, dailySpendUsd } from './math';
+
 import { MARKET_DECIMALS, YEAR_IN_DAYS, YEAR_IN_SECONDS } from '@/common/constants';
 import { scaleToDecimals } from '@/common/utils/scale-to-decimals';
 
@@ -25,13 +27,13 @@ export class AlgorithmService {
     priceComp: number,
   ): Promise<ResponseStatsAlgorithm> {
     const totalSupply: bigint = await contract.totalSupply({ blockTag });
-    const totalBorrows: bigint = await contract.totalBorrow({ blockTag });
+    const totalBorrow: bigint = await contract.totalBorrow({ blockTag });
     const utilization: bigint = await contract.getUtilization({ blockTag });
     const supplyRatePerSec: bigint = await contract.getSupplyRate(utilization, { blockTag });
     const borrowRatePerSec: bigint = await contract.getBorrowRate(utilization, { blockTag });
     const trackingIndexScale: bigint = await contract.trackingIndexScale({ blockTag });
     const trackingIndexDecimals = scaleToDecimals(trackingIndexScale);
-    const earnApr = Number(
+    const supplyApr = Number(
       ethers.formatUnits(supplyRatePerSec * BigInt(YEAR_IN_SECONDS) * 100n, MARKET_DECIMALS),
     );
     const borrowApr = Number(
@@ -44,28 +46,18 @@ export class AlgorithmService {
     const baseTrackingBorrowSpeed: bigint = await contract.baseTrackingBorrowSpeed({
       blockTag,
     });
-    const annualSupplyRewardCompTokens = Number(
-      ethers.formatUnits(baseTrackingSupplySpeed * BigInt(YEAR_IN_SECONDS), trackingIndexDecimals),
-    );
-    const annualBorrowRewardCompTokens = Number(
-      ethers.formatUnits(baseTrackingBorrowSpeed * BigInt(YEAR_IN_SECONDS), trackingIndexDecimals),
-    );
-    const supplyRewardsUSD = annualSupplyRewardCompTokens * priceComp;
-    const borrowRewardsUSD = annualBorrowRewardCompTokens * priceComp;
 
     const totalSupplyTokens = Number(ethers.formatUnits(totalSupply, decimals));
-    const totalBorrowsTokens = Number(ethers.formatUnits(totalBorrows, decimals));
-    const supplyIncome = (totalSupplyTokens * earnApr) / 100;
-    const borrowIncome = (totalBorrowsTokens * borrowApr) / 100;
+    const totalBorrowTokens = Number(ethers.formatUnits(totalBorrow, decimals));
 
     return {
       incomes: {
-        supply: supplyIncome,
-        borrow: borrowIncome,
+        supply: dailyIncomeTokens(totalSupplyTokens, supplyApr),
+        borrow: dailyIncomeTokens(totalBorrowTokens, borrowApr),
       },
       spends: {
-        supplyUsd: supplyRewardsUSD,
-        borrowUsd: borrowRewardsUSD,
+        supplyUsd: dailySpendUsd(baseTrackingSupplySpeed, trackingIndexDecimals, priceComp),
+        borrowUsd: dailySpendUsd(baseTrackingBorrowSpeed, trackingIndexDecimals, priceComp),
       },
     };
   }
@@ -76,30 +68,27 @@ export class AlgorithmService {
     blocksPerDay: number,
     decimals: number,
   ): Promise<ResponseStatsAlgorithm> {
-    const totalSupply = await contract.totalSupply({ blockTag });
-    const exchangeRate = await contract.exchangeRateStored({ blockTag });
-    const totalBorrows = await contract.totalBorrows({ blockTag });
+    const totalSupply: bigint = await contract.totalSupply({ blockTag });
+    const exchangeRate: bigint = await contract.exchangeRateStored({ blockTag });
+    const totalBorrow: bigint = await contract.totalBorrows({ blockTag });
     const supplyRatePerBlock: bigint = await contract.supplyRatePerBlock({ blockTag });
     const borrowRatePerBlock: bigint = await contract.borrowRatePerBlock({ blockTag });
     const blocksPerYear = BigInt(blocksPerDay) * BigInt(YEAR_IN_DAYS);
-    const earnApr = Number(
+    const supplyApr = Number(
       ethers.formatUnits(supplyRatePerBlock * blocksPerYear * 100n, MARKET_DECIMALS),
     );
     const borrowApr = Number(
       ethers.formatUnits(borrowRatePerBlock * blocksPerYear * 100n, MARKET_DECIMALS),
     );
-    const totalBorrowsTokens = Number(ethers.formatUnits(totalBorrows, decimals));
+    const totalBorrowsTokens = Number(ethers.formatUnits(totalBorrow, decimals));
     const totalSupplyCTokens = Number(ethers.formatUnits(totalSupply, decimals));
     const exchangeRateConvertor = ethers.formatUnits(exchangeRate, MARKET_DECIMALS);
     const totalSupplyTokens = Number(totalSupplyCTokens) * Number(exchangeRateConvertor);
 
-    const supplyIncome = (totalSupplyTokens * earnApr) / 100;
-    const borrowIncome = (totalBorrowsTokens * borrowApr) / 100;
-
     return {
       incomes: {
-        supply: supplyIncome,
-        borrow: borrowIncome,
+        supply: dailyIncomeTokens(totalSupplyTokens, supplyApr),
+        borrow: dailyIncomeTokens(totalBorrowsTokens, borrowApr),
       },
     };
   }
