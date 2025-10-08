@@ -1,6 +1,6 @@
 import { ethers } from 'ethers';
 
-import { YEAR_IN_SECONDS } from '@/common/constants';
+import { DAY_IN_SEC } from '@/common/constants';
 
 /**
  * @param baseTrackingSpeed baseTrackingSupplySpeed or baseTrackingBorrowSpeed
@@ -12,9 +12,9 @@ export const dailySpendUsd = (
   trackingIndexDecimals: number,
   compPriceUsd: number,
 ): number => {
-  const annualReward = ethers.formatUnits(
-    baseTrackingSpeed * BigInt(YEAR_IN_SECONDS),
+  const dailyReward = ethers.formatUnits(
+    baseTrackingSpeed * BigInt(DAY_IN_SEC),
     trackingIndexDecimals,
   );
-  return (Number(annualReward) / 365) * compPriceUsd;
+  return Number(dailyReward) * compPriceUsd;
 };
