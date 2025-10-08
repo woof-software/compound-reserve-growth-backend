@@ -199,4 +199,28 @@ export class HistoryService {
       total,
     );
   }
+
+  async getIncentiveHistory(dto: OffsetDto): Promise<OffsetDataDto<StatsHistory>> {
+    // FIXME
+    const [revenue, stats]: [OffsetDataDto<Reserve>, OffsetDataDto<StatsHistory>] =
+      await Promise.all([this.getOffsetRevenueHistory(dto), this.getOffsetStatsHistory(dto)]);
+
+    const data = stats.data.map((d, i) => {
+      const r = revenue.data[i];
+      const incomes = {
+        ...d.incomes,
+        valueSupply: r?.value ?? 0,
+        valueBorrow: 0,
+      };
+      return {
+        ...d,
+        incomes,
+      };
+    });
+
+    return {
+      ...stats,
+      data,
+    };
+  }
 }
