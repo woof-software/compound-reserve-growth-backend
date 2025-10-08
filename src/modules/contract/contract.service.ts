@@ -527,13 +527,15 @@ export class ContractService implements OnModuleInit {
           await this.saveReserves(source, alg);
           break;
         case Algorithm.MARKET_V2:
-          await this.saveReserves(source, alg);
+          // !: disabled
+          // await this.saveReserves(source, alg);
           break;
         case Algorithm.COMET_STATS:
           await this.saveStats(source, alg);
           break;
         case Algorithm.MARKET_V2_STATS:
-          await this.saveStats(source, alg);
+          // !: disabled
+          // await this.saveStats(source, alg);
           break;
         default:
           await this.saveReserves(source, alg);
