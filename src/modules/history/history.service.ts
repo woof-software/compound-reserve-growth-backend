@@ -172,8 +172,16 @@ export class HistoryService {
     const [revenue, stats]: [OffsetDataDto<Reserve>, OffsetDataDto<StatsHistory>] =
       await Promise.all([this.getOffsetRevenueHistory(dto), this.getOffsetStatsHistory(dto)]);
 
-    const data = stats.data.map((d, i) => {
-      const r = revenue.data[i];
+    const revenueBySourceId = revenue.data.reduce(
+      (acc, item) => {
+        acc[item.source.id] = item;
+        return acc;
+      },
+      {} as Record<number, Reserve>,
+    );
+
+    const data = stats.data.map((d) => {
+      const r = revenueBySourceId[d.sourceId];
       const incomes = {
         ...d.incomes,
         valueSupply: r?.value ?? 0,
