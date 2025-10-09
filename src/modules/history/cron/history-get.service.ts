@@ -195,7 +195,7 @@ export class GetHistoryService {
         data = collectionSwitch.data;
       }
 
-      const statsAlgorithms = [Algorithm.COMET_STATS, Algorithm.MARKET_V2_STATS];
+      const statsAlgorithms = [Algorithm.COMET_STATS];
       const dbSources = await this.sourceService.listByAlgorithms(statsAlgorithms);
 
       this.logger.log(`Found ${dbSources.length} sources for stats processing`);

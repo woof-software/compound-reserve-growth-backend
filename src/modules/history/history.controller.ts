@@ -4,6 +4,7 @@ import { Throttle } from '@nestjs/throttler';
 import Redis from 'ioredis';
 
 import { REDIS_CLIENT } from 'modules/redis/redis.module';
+import { IncentiveHistoryDto } from 'modules/history/response/incentives-history.response';
 
 import { HistoryService } from './history.service';
 import { ReserveResponse } from './response/reserve.response';
@@ -153,25 +154,24 @@ export class HistoryController {
   }
 
   @Throttle({ default: { limit: 15, ttl: 1000 } })
-  @ApiOffsetResponse(StatsHistoryResponse)
+  @ApiOperation({ summary: 'Get incentives (incomes + spends) data' })
+  @ApiOffsetResponse(IncentiveHistoryDto)
   @HttpCode(HttpStatus.OK)
   @Get('v2/incentives')
   async getIncentivesHistory(
     @Query() request: OffsetRequest,
-  ): Promise<OffsetDataResponse<StatsHistoryResponse>> {
+  ): Promise<OffsetDataResponse<IncentiveHistoryDto>> {
     const key = `history:v2:incentives:${request.limit ?? 'null'}:${request.offset ?? 0}:${request.order ?? 'DESC'}`;
     const ttl = HOUR_IN_SEC;
 
     const cached = await this.redisClient.get(key);
-    if (cached) return JSON.parse(cached) as OffsetDataResponse<StatsHistoryResponse>;
+    if (cached) return JSON.parse(cached) as OffsetDataResponse<IncentiveHistoryDto>;
 
     const paginatedData = await this.historyService.getIncentiveHistory(
       new OffsetDto(request?.limit, request?.offset, request?.order),
     );
-    const res = new OffsetDataResponse<StatsHistoryResponse>(
-      paginatedData.data.map((data) => {
-        return new StatsHistoryResponse(data);
-      }),
+    const res = new OffsetDataResponse<IncentiveHistoryDto>(
+      paginatedData.data.map((d) => new IncentiveHistoryDto(d)),
       new OffsetMetaResponse(paginatedData.limit, paginatedData.offset, paginatedData.total),
     );
     await this.redisClient.set(key, JSON.stringify(res), 'EX', ttl);

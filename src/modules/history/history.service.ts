@@ -7,7 +7,7 @@ import { ReservesRepository } from './reserves-repository.service';
 import { IncomesRepository } from './incomes-repository.service';
 import { SpendsRepository } from './spends-repository.service';
 import { CreateHistoryDto } from './dto/create-history.dto';
-import { Reserve, Incomes, Spends, StatsHistory } from './entities';
+import { Reserve, Incomes, Spends, StatsHistory, IncentivesHistory } from './entities';
 import { PaginationDto } from './dto/pagination.dto';
 import { OffsetDto } from './dto/offset.dto';
 
@@ -167,7 +167,7 @@ export class HistoryService {
     );
   }
 
-  async getIncentiveHistory(dto: OffsetDto): Promise<OffsetDataDto<StatsHistory>> {
+  async getIncentiveHistory(dto: OffsetDto): Promise<OffsetDataDto<IncentivesHistory>> {
     // FIXME
     const [revenue, stats]: [OffsetDataDto<Reserve>, OffsetDataDto<StatsHistory>] =
       await Promise.all([this.getOffsetRevenueHistory(dto), this.getOffsetStatsHistory(dto)]);
@@ -186,16 +186,15 @@ export class HistoryService {
       {} as Record<number, Record<number, Reserve>>,
     );
 
-    const data = stats.data.map((d) => {
+    const data: IncentivesHistory[] = stats.data.map((d) => {
       const r = revenueBySourceIdAndDay[d.sourceId]?.[dayId(d.date)];
-      const incomes = {
-        ...d.incomes,
-        valueSupply: r?.value ?? 0,
-        valueBorrow: 0,
-      };
       return {
-        ...d,
-        incomes,
+        incomes: r?.value ?? 0,
+        rewardsSupply: d.spends.valueSupply,
+        rewardsBorrow: d.spends.valueBorrow,
+        sourceId: d.sourceId,
+        priceComp: d.priceComp,
+        date: d.date,
       };
     });
 

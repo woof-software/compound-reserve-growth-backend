@@ -527,15 +527,10 @@ export class ContractService implements OnModuleInit {
           await this.saveReserves(source, alg);
           break;
         case Algorithm.MARKET_V2:
-          // !: disabled
-          // await this.saveReserves(source, alg);
+          await this.saveReserves(source, alg);
           break;
         case Algorithm.COMET_STATS:
           await this.saveStats(source, alg);
-          break;
-        case Algorithm.MARKET_V2_STATS:
-          // !: disabled
-          // await this.saveStats(source, alg);
           break;
         default:
           await this.saveReserves(source, alg);
@@ -842,7 +837,6 @@ export class ContractService implements OnModuleInit {
       for (const targetTs of dailyTs) {
         try {
           const blockTag = await this.findBlockByTimestamp(network, provider, targetTs, lastBlock);
-          const blocksPerDay = this.networkConfig[network].blocksPerDay;
 
           const assetCompToken = { address: null, symbol: 'COMP', decimals: null };
           const compDate = new Date(targetTs * 1000);
@@ -868,14 +862,6 @@ export class ContractService implements OnModuleInit {
                   blockTag,
                   decimals,
                   priceComp,
-                );
-                break;
-              case Algorithm.MARKET_V2_STATS:
-                marketAccounting = await this.algorithmService.marketV2Stats(
-                  contract,
-                  blockTag,
-                  blocksPerDay,
-                  decimals,
                 );
                 break;
               default:
