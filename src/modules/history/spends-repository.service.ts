@@ -33,7 +33,7 @@ export class SpendsRepository {
   }
 
   async getOffsetStats(dto: OffsetDto): Promise<OffsetDataDto<Spends>> {
-    const algorithmsArrayLiteral = `{${[Algorithm.COMET].join(',')}}`;
+    const algorithmsArrayLiteral = `{${[Algorithm.COMET_STATS].join(',')}}`;
 
     const query = this.spendsRepository
       .createQueryBuilder('spends')

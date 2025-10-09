@@ -93,9 +93,11 @@ export class ReservesRepository {
   }
 
   async getPaginatedRevenueReserves(dto: PaginationDto): Promise<PaginatedDataDto<Reserve>> {
-    const algorithmsArrayLiteral = `{${[Algorithm.COMET, Algorithm.AERA_COMPOUND_RESERVES].join(
-      ',',
-    )}}`;
+    const algorithmsArrayLiteral = `{${[
+      Algorithm.COMET,
+      Algorithm.MARKET_V2,
+      Algorithm.AERA_COMPOUND_RESERVES,
+    ].join(',')}}`;
 
     const query = this.reservesRepository
       .createQueryBuilder('reserves')
@@ -151,9 +153,11 @@ export class ReservesRepository {
   }
 
   async getOffsetRevenueReserves(dto: OffsetDto): Promise<OffsetDataDto<Reserve>> {
-    const algorithmsArrayLiteral = `{${[Algorithm.COMET, Algorithm.AERA_COMPOUND_RESERVES].join(
-      ',',
-    )}}`;
+    const algorithmsArrayLiteral = `{${[
+      Algorithm.COMET,
+      Algorithm.MARKET_V2,
+      Algorithm.AERA_COMPOUND_RESERVES,
+    ].join(',')}}`;
 
     const query = this.reservesRepository
       .createQueryBuilder('reserves')
