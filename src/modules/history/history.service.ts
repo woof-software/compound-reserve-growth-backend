@@ -144,11 +144,7 @@ export class HistoryService {
         date: incData.date,
       };
     });
-
-    // !: remove empty rewards
-    const filteredStats = rawStats.filter((s) => s.spends?.valueSupply && s.spends?.valueBorrow);
-
-    const statsHistory = filteredStats.sort((a, b) => {
+    const statsHistory = rawStats.sort((a, b) => {
       return dto.order === 'ASC'
         ? new Date(a.date).getTime() - new Date(b.date).getTime()
         : new Date(b.date).getTime() - new Date(a.date).getTime();
