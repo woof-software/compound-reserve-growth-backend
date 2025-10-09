@@ -172,16 +172,22 @@ export class HistoryService {
     const [revenue, stats]: [OffsetDataDto<Reserve>, OffsetDataDto<StatsHistory>] =
       await Promise.all([this.getOffsetRevenueHistory(dto), this.getOffsetStatsHistory(dto)]);
 
-    const revenueBySourceId = revenue.data.reduce(
+    const msInDay = 86400000;
+    const dayId = (date: Date): number => Math.floor(date.getTime() / msInDay);
+
+    const revenueBySourceIdAndDay = revenue.data.reduce(
       (acc, item) => {
-        acc[item.source.id] = item;
+        acc[item.source.id] = {
+          ...acc[item.source.id],
+          [dayId(item.date)]: item,
+        };
         return acc;
       },
-      {} as Record<number, Reserve>,
+      {} as Record<number, Record<number, Reserve>>,
     );
 
     const data = stats.data.map((d) => {
-      const r = revenueBySourceId[d.sourceId];
+      const r = revenueBySourceIdAndDay[d.sourceId]?.[dayId(d.date)];
       const incomes = {
         ...d.incomes,
         valueSupply: r?.value ?? 0,
