@@ -33,7 +33,8 @@ export class SpendsRepository {
   }
 
   async getOffsetStats(dto: OffsetDto): Promise<OffsetDataDto<Spends>> {
-    const algorithmsArrayLiteral = `{${[Algorithm.COMET, Algorithm.MARKET_V2].join(',')}}`;
+    // !: removed MARKET_V2
+    const algorithmsArrayLiteral = `{${[Algorithm.COMET].join(',')}}`;
 
     const query = this.spendsRepository
       .createQueryBuilder('spends')

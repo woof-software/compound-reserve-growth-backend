@@ -120,64 +120,35 @@ export class HistoryService {
       this.spendsRepo.getOffsetStats(new OffsetDto(undefined, 0, dto.order)),
     ]);
 
-    // Create a map to group incomes and spends by date and source
-    const statsMap = new Map<string, StatsHistory>();
-
     // Process incomes data
-    incomesData.data.forEach((income) => {
-      const key = `${income.date.getTime()}-${income.source.id}`;
-      if (!statsMap.has(key)) {
-        statsMap.set(key, {
-          incomes: {
-            id: income.id,
-            valueSupply: income.valueSupply,
-            valueBorrow: income.valueBorrow,
-          },
-          sourceId: income.source.id,
-          priceComp: income.priceComp,
-          date: income.date,
-        });
-      } else {
-        const existing = statsMap.get(key)!;
-        existing.incomes = {
-          id: income.id,
-          valueSupply: income.valueSupply,
-          valueBorrow: income.valueBorrow,
+    const rawStats: StatsHistory[] = incomesData.data.map((incData, index) => {
+      const spData = spendsData.data[index];
+      let spends = undefined;
+      if (spData) {
+        spends = {
+          id: spData.id,
+          valueSupply: spData.valueSupply,
+          valueBorrow: spData.valueBorrow,
         };
       }
+
+      return {
+        incomes: {
+          id: incData.id,
+          valueSupply: incData.valueSupply,
+          valueBorrow: incData.valueBorrow,
+        },
+        spends,
+        sourceId: incData.source.id,
+        priceComp: incData.priceComp,
+        date: incData.date,
+      };
     });
 
-    // Process spends data
-    spendsData.data.forEach((spend) => {
-      const key = `${spend.date.getTime()}-${spend.source.id}`;
-      if (!statsMap.has(key)) {
-        statsMap.set(key, {
-          incomes: {
-            id: 0,
-            valueSupply: 0,
-            valueBorrow: 0,
-          },
-          spends: {
-            id: spend.id,
-            valueSupply: spend.valueSupply,
-            valueBorrow: spend.valueBorrow,
-          },
-          sourceId: spend.source.id,
-          priceComp: spend.priceComp,
-          date: spend.date,
-        });
-      } else {
-        const existing = statsMap.get(key)!;
-        existing.spends = {
-          id: spend.id,
-          valueSupply: spend.valueSupply,
-          valueBorrow: spend.valueBorrow,
-        };
-      }
-    });
+    // !: remove empty rewards
+    const filteredStats = rawStats.filter((s) => s.spends?.valueSupply && s.spends?.valueBorrow);
 
-    // Convert map to array and sort by date
-    const statsHistory = Array.from(statsMap.values()).sort((a, b) => {
+    const statsHistory = filteredStats.sort((a, b) => {
       return dto.order === 'ASC'
         ? new Date(a.date).getTime() - new Date(b.date).getTime()
         : new Date(b.date).getTime() - new Date(a.date).getTime();
