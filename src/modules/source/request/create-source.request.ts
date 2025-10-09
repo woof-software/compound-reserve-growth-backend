@@ -21,7 +21,7 @@ export class CreateSourceRequest {
   @IsString()
   public network: string;
 
-  @ApiProperty({ example: Algorithm.MARKET_V2, description: 'Algorithm used for reading' })
+  @ApiProperty({ example: Algorithm.COMET, description: 'Algorithm used for reading' })
   @IsNotEmpty()
   @IsEnum(Algorithm)
   public algorithm: Algorithm;
