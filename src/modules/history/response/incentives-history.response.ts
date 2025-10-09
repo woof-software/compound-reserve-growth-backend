@@ -5,7 +5,7 @@ import { IsInt, IsPositive } from 'class-validator';
 import { type IncentivesHistory } from 'modules/history/entities';
 
 @Exclude()
-export class IncentiveHistoryDto {
+export class IncentiveHistoryResponse {
   @Expose({ name: 'i' })
   @ApiProperty({ example: 140.5, description: 'i - incomes value in USD' })
   i: number;
