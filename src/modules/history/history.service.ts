@@ -14,6 +14,10 @@ import { OffsetDto } from './dto/offset.dto';
 import { PaginatedDataDto } from '@app/common/dto/paginated-data.dto';
 import { OffsetDataDto } from '@app/common/dto/offset-data.dto';
 
+const msInDay = 86400000;
+const dayId = (date: Date): number => Math.floor(date.getTime() / msInDay);
+const generateKey = (sourceId: number, date: Date): string => `${sourceId}_${dayId(date)}`;
+
 @Injectable()
 export class HistoryService {
   constructor(
@@ -123,13 +127,13 @@ export class HistoryService {
     // Create a Map for quick lookup of spends by sourceId and date
     const spendsMap = new Map<string, Spends>();
     spendsData.data.forEach((spData) => {
-      const key = `${spData.source.id}_${new Date(spData.date).toISOString()}`;
+      const key = generateKey(spData.source.id, spData.date);
       spendsMap.set(key, spData);
     });
 
     // Process incomes data
     const rawStats: StatsHistory[] = incomesData.data.map((incData) => {
-      const key = `${incData.source.id}_${new Date(incData.date).toISOString()}`;
+      const key = generateKey(incData.source.id, incData.date);
       const spData = spendsMap.get(key);
       let spends = undefined;
       if (spData) {
@@ -179,9 +183,6 @@ export class HistoryService {
     // FIXME
     const [revenue, stats]: [OffsetDataDto<Reserve>, OffsetDataDto<StatsHistory>] =
       await Promise.all([this.getOffsetRevenueHistory(dto), this.getOffsetStatsHistory(dto)]);
-
-    const msInDay = 86400000;
-    const dayId = (date: Date): number => Math.floor(date.getTime() / msInDay);
 
     const revenueBySourceIdAndDay = revenue.data.reduce(
       (acc, item) => {
