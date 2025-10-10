@@ -120,9 +120,17 @@ export class HistoryService {
       this.spendsRepo.getOffsetStats(new OffsetDto(undefined, 0, dto.order)),
     ]);
 
+    // Create a Map for quick lookup of spends by sourceId and date
+    const spendsMap = new Map<string, Spends>();
+    spendsData.data.forEach((spData) => {
+      const key = `${spData.source.id}_${new Date(spData.date).toISOString()}`;
+      spendsMap.set(key, spData);
+    });
+
     // Process incomes data
-    const rawStats: StatsHistory[] = incomesData.data.map((incData, index) => {
-      const spData = spendsData.data[index];
+    const rawStats: StatsHistory[] = incomesData.data.map((incData) => {
+      const key = `${incData.source.id}_${new Date(incData.date).toISOString()}`;
+      const spData = spendsMap.get(key);
       let spends = undefined;
       if (spData) {
         spends = {
