@@ -32,7 +32,7 @@ export default registerAs('networks', (): NetworkConfig[] => [
   {
     network: 'mantle',
     chainId: 5000,
-    url: `https://1rpc.io/mantle`,
+    url: `https://yolo-side-wildflower.mantle-mainnet.quiknode.pro/${process.env.MANTLE_QUICKNODE_KEY}/`,
   },
   {
     network: 'unichain',
