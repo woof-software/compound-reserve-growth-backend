@@ -180,9 +180,10 @@ export class HistoryService {
   }
 
   async getIncentiveHistory(dto: OffsetDto): Promise<OffsetDataDto<IncentivesHistory>> {
-    // FIXME
-    const [revenue, stats]: [OffsetDataDto<Reserve>, OffsetDataDto<StatsHistory>] =
-      await Promise.all([this.getOffsetRevenueHistory(dto), this.getOffsetStatsHistory(dto)]);
+    const [revenue, spends] = await Promise.all([
+      this.getOffsetRevenueHistory(dto),
+      this.spendsRepo.getOffsetStats(dto),
+    ]);
 
     // Create a Map for quick lookup of revenue by sourceId and date
     const revenueMap = new Map<string, Reserve>();
@@ -191,21 +192,18 @@ export class HistoryService {
       revenueMap.set(key, item);
     });
 
-    const data: IncentivesHistory[] = stats.data.map((d) => {
-      const r = revenueMap.get(generateDailyKey(d.sourceId, d.date));
+    const data: IncentivesHistory[] = spends.data.map((spend) => {
+      const revenueRecord = revenueMap.get(generateDailyKey(spend.source.id, spend.date));
       return {
-        incomes: r?.value ?? 0,
-        rewardsSupply: d.spends.valueSupply,
-        rewardsBorrow: d.spends.valueBorrow,
-        sourceId: d.sourceId,
-        priceComp: d.priceComp,
-        date: d.date,
+        incomes: revenueRecord?.value ?? 0,
+        rewardsSupply: spend.valueSupply,
+        rewardsBorrow: spend.valueBorrow,
+        sourceId: spend.source.id,
+        priceComp: spend.priceComp,
+        date: spend.date,
       };
     });
 
-    return {
-      ...stats,
-      data,
-    };
+    return new OffsetDataDto<IncentivesHistory>(data, spends.limit, spends.offset, spends.total);
   }
 }
