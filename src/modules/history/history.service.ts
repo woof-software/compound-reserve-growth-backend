@@ -184,7 +184,7 @@ export class HistoryService {
     const [revenue, stats]: [OffsetDataDto<Reserve>, OffsetDataDto<StatsHistory>] =
       await Promise.all([this.getOffsetRevenueHistory(dto), this.getOffsetStatsHistory(dto)]);
 
-    const revenueBySourceIdAndDay = revenue.data.reduce(
+    const revenueMap = revenue.data.reduce(
       (acc, item) => {
         acc[item.source.id] = {
           ...acc[item.source.id],
@@ -196,7 +196,7 @@ export class HistoryService {
     );
 
     const data: IncentivesHistory[] = stats.data.map((d) => {
-      const r = revenueBySourceIdAndDay[d.sourceId]?.[dayId(d.date)];
+      const r = revenueMap[d.sourceId]?.[dayId(d.date)];
       return {
         incomes: r?.value ?? 0,
         rewardsSupply: d.spends.valueSupply,
