@@ -14,6 +14,10 @@ import { OffsetDto } from './dto/offset.dto';
 import { PaginatedDataDto } from '@app/common/dto/paginated-data.dto';
 import { OffsetDataDto } from '@app/common/dto/offset-data.dto';
 
+const msInDay = 86400000;
+const dayId = (date: Date): number => Math.floor(date.getTime() / msInDay);
+const generateDailyKey = (sourceId: number, date: Date): string => `${sourceId}_${dayId(date)}`;
+
 @Injectable()
 export class HistoryService {
   constructor(
@@ -120,9 +124,17 @@ export class HistoryService {
       this.spendsRepo.getOffsetStats(new OffsetDto(undefined, 0, dto.order)),
     ]);
 
+    // Create a Map for quick lookup of spends by sourceId and date
+    const spendsMap = new Map<string, Spends>();
+    spendsData.data.forEach((spData) => {
+      const key = generateDailyKey(spData.source.id, spData.date);
+      spendsMap.set(key, spData);
+    });
+
     // Process incomes data
-    const rawStats: StatsHistory[] = incomesData.data.map((incData, index) => {
-      const spData = spendsData.data[index];
+    const rawStats: StatsHistory[] = incomesData.data.map((incData) => {
+      const key = generateDailyKey(incData.source.id, incData.date);
+      const spData = spendsMap.get(key);
       let spends = undefined;
       if (spData) {
         spends = {
@@ -172,22 +184,15 @@ export class HistoryService {
     const [revenue, stats]: [OffsetDataDto<Reserve>, OffsetDataDto<StatsHistory>] =
       await Promise.all([this.getOffsetRevenueHistory(dto), this.getOffsetStatsHistory(dto)]);
 
-    const msInDay = 86400000;
-    const dayId = (date: Date): number => Math.floor(date.getTime() / msInDay);
-
-    const revenueBySourceIdAndDay = revenue.data.reduce(
-      (acc, item) => {
-        acc[item.source.id] = {
-          ...acc[item.source.id],
-          [dayId(item.date)]: item,
-        };
-        return acc;
-      },
-      {} as Record<number, Record<number, Reserve>>,
-    );
+    // Create a Map for quick lookup of revenue by sourceId and date
+    const revenueMap = new Map<string, Reserve>();
+    revenue.data.forEach((item) => {
+      const key = generateDailyKey(item.source.id, item.date);
+      revenueMap.set(key, item);
+    });
 
     const data: IncentivesHistory[] = stats.data.map((d) => {
-      const r = revenueBySourceIdAndDay[d.sourceId]?.[dayId(d.date)];
+      const r = revenueMap.get(generateDailyKey(d.sourceId, d.date));
       return {
         incomes: r?.value ?? 0,
         rewardsSupply: d.spends.valueSupply,
