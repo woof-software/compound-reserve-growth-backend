@@ -16,7 +16,7 @@ import { OffsetDataDto } from '@app/common/dto/offset-data.dto';
 
 const msInDay = 86400000;
 const dayId = (date: Date): number => Math.floor(date.getTime() / msInDay);
-const generateKey = (sourceId: number, date: Date): string => `${sourceId}_${dayId(date)}`;
+const generateDailyKey = (sourceId: number, date: Date): string => `${sourceId}_${dayId(date)}`;
 
 @Injectable()
 export class HistoryService {
@@ -127,13 +127,13 @@ export class HistoryService {
     // Create a Map for quick lookup of spends by sourceId and date
     const spendsMap = new Map<string, Spends>();
     spendsData.data.forEach((spData) => {
-      const key = generateKey(spData.source.id, spData.date);
+      const key = generateDailyKey(spData.source.id, spData.date);
       spendsMap.set(key, spData);
     });
 
     // Process incomes data
     const rawStats: StatsHistory[] = incomesData.data.map((incData) => {
-      const key = generateKey(incData.source.id, incData.date);
+      const key = generateDailyKey(incData.source.id, incData.date);
       const spData = spendsMap.get(key);
       let spends = undefined;
       if (spData) {
