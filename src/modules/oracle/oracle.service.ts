@@ -6,16 +6,8 @@ import CapoABI from 'modules/capo/abi/ERC4626CorrelatedAssetsPriceOracle.json';
 
 import { Oracle } from './oracle.entity';
 
-interface OracleData {
-  ratio: string;
-  price: string;
-  snapshotRatio: string;
-  snapshotTimestamp: number;
-  maxYearlyGrowthPercent: number;
-  isCapped: boolean;
-  blockNumber: number;
-  timestamp: number;
-}
+import { OracleData } from '@/common/types/oracle-data';
+import { CapoValues } from '@/common/types/capo-values';
 
 @Injectable()
 export class OracleService {
@@ -55,7 +47,7 @@ export class OracleService {
     }
   }
 
-  calculateCapoValues(oracleData: OracleData) {
+  calculateCapoValues(oracleData: OracleData): CapoValues {
     const currentTime = oracleData.timestamp;
     const timeDiff = Math.max(0, currentTime - oracleData.snapshotTimestamp);
 

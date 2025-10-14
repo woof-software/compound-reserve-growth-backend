@@ -16,6 +16,10 @@ import { CapoResponse } from './response/capo.response';
 
 import { OffsetDataDto } from '@app/common/dto/offset-data.dto';
 import { Order } from '@app/common/enum/order.enum';
+import { OracleData } from '@/common/types/oracle-data';
+import { CapoValues } from '@/common/types/capo-values';
+
+const PRICE_ABOVE_CAP_PCT = 10; // alert if price exceeds CAP by >= 10%
 
 @Injectable()
 export class CapoService {
@@ -103,7 +107,11 @@ export class CapoService {
     }
   }
 
-  private async checkAlerts(oracle: Oracle, data: any, capoValues: any) {
+  private async checkAlerts(
+    oracle: Oracle,
+    data: OracleData,
+    capoValues: CapoValues,
+  ): Promise<void> {
     if (data.isCapped) {
       await this.alertService.createAlert(
         oracle.address,
@@ -146,6 +154,50 @@ export class CapoService {
           maxGrowthRate: capoValues.maxGrowthRate,
         },
       );
+    }
+
+    {
+      // One-sided check: alert only if price is above CAP by >= threshold
+      //    CAP price is implied by current ratio vs time-adjusted maxRatio:
+      //    capPrice ≈ (maxRatio / ratio) * currentPrice
+      const ratio = Number(data.ratio);
+      const maxRatio = Number(capoValues.maxRatio);
+      const currentPrice = Number(data.price);
+
+      // Guard invalid inputs to avoid NaN alerts
+      if (
+        Number.isFinite(ratio) &&
+        Number.isFinite(maxRatio) &&
+        Number.isFinite(currentPrice) &&
+        ratio > 0 &&
+        maxRatio > 0 &&
+        currentPrice > 0
+      ) {
+        const capPrice = (maxRatio / ratio) * currentPrice;
+
+        // Signed over-cap percentage (positive means current price is above CAP)
+        const overCapPct = ((currentPrice - capPrice) / capPrice) * 100;
+
+        // One-sided trigger: only when price is above CAP by >= threshold
+        if (overCapPct >= PRICE_ABOVE_CAP_PCT) {
+          await this.alertService.createAlert(
+            oracle.address,
+            oracle.chainId,
+            'PRICE_ABOVE_CAP',
+            'warning',
+            `Price exceeds CAP by ${overCapPct.toFixed(2)}% for ${oracle.description}`,
+            {
+              currentPrice,
+              capPrice,
+              overCapPct, // keep the signed value; positive by construction here
+              thresholdPct: PRICE_ABOVE_CAP_PCT,
+              ratio,
+              maxRatio,
+              snapshotTimestamp: data?.snapshotTimestamp,
+            },
+          );
+        }
+      }
     }
   }
 
