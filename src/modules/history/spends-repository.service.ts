@@ -32,8 +32,11 @@ export class SpendsRepository {
     });
   }
 
-  async getOffsetStats(dto: OffsetDto): Promise<OffsetDataDto<Spends>> {
-    const algorithmsArrayLiteral = `{${[Algorithm.COMET_STATS].join(',')}}`;
+  async getOffsetStats(
+    dto: OffsetDto,
+    algorithms = [Algorithm.COMET_STATS],
+  ): Promise<OffsetDataDto<Spends>> {
+    const algorithmsArrayLiteral = `{${algorithms.join(',')}}`;
 
     const query = this.spendsRepository
       .createQueryBuilder('spends')

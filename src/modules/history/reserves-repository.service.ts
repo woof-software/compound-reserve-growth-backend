@@ -152,19 +152,16 @@ export class ReservesRepository {
     return new PaginatedDataDto<Reserve>(reserves, dto.page ?? 1, dto.perPage ?? total, total);
   }
 
-  async getOffsetRevenueReserves(dto: OffsetDto): Promise<OffsetDataDto<Reserve>> {
-    const algorithmsArrayLiteral = `{${[
-      Algorithm.COMET,
-      Algorithm.MARKET_V2,
-      Algorithm.AERA_COMPOUND_RESERVES,
-    ].join(',')}}`;
-
+  async getOffsetRevenueReserves(
+    dto: OffsetDto,
+    algorithms = [Algorithm.COMET, Algorithm.MARKET_V2, Algorithm.AERA_COMPOUND_RESERVES],
+  ): Promise<OffsetDataDto<Reserve>> {
     const query = this.reservesRepository
       .createQueryBuilder('reserves')
       .leftJoinAndSelect('reserves.source', 'source')
       .leftJoinAndSelect('source.asset', 'asset')
       .where('source.algorithm && :algorithms::text[]', {
-        algorithms: algorithmsArrayLiteral,
+        algorithms: `{${algorithms.join(',')}}`,
       });
 
     query.orderBy('reserves.date', dto.order).offset(dto.offset ?? 0);
