@@ -13,6 +13,7 @@ import { OffsetDto } from './dto/offset.dto';
 
 import { PaginatedDataDto } from '@app/common/dto/paginated-data.dto';
 import { OffsetDataDto } from '@app/common/dto/offset-data.dto';
+import { Algorithm } from '@/common/enum/algorithm.enum';
 
 const msInDay = 86400000;
 const dayId = (date: Date): number => Math.floor(date.getTime() / msInDay);
@@ -180,9 +181,11 @@ export class HistoryService {
   }
 
   async getIncentiveHistory(dto: OffsetDto): Promise<OffsetDataDto<IncentivesHistory>> {
+    const allAlgorithms = Object.values(Algorithm) as Algorithm[];
+
     const [revenue, spends] = await Promise.all([
-      this.getOffsetRevenueHistory(dto),
-      this.spendsRepo.getOffsetStats(dto),
+      this.reservesRepo.getOffsetRevenueReserves(dto, allAlgorithms),
+      this.spendsRepo.getOffsetStats(dto, allAlgorithms),
     ]);
 
     // Create a Map for quick lookup of revenue by sourceId and date
