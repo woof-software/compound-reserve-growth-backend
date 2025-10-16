@@ -14,15 +14,19 @@
     "start:prod": "node dist/src/main",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
     "typeorm": "ts-node -r tsconfig-paths/register ./node_modules/typeorm/cli.js",
-    "migration:run": "npm run typeorm migration:run -- -d ./src/database/typeorm.config.ts",
-    "migration:generate": "npm run typeorm -- -d ./src/database/typeorm.config.ts migration:generate ./src/database/migrations/migration",
-    "migration:create": "npm run typeorm -- migration:create ./src/database/migrations/migration",
-    "migration:revert": "npm run typeorm -- -d ./src/database/typeorm.config.ts migration:revert",
-    "migration:show": "npm run typeorm -- migration:show -d ./src/database/typeorm.config.ts",
+    "migration:run": "yarn run typeorm migration:run -- -d ./src/database/typeorm.config.ts",
+    "migration:generate": "yarn run typeorm -- -d ./src/database/typeorm.config.ts migration:generate ./src/database/migrations/migration",
+    "migration:create": "yarn run typeorm -- migration:create ./src/database/migrations/migration",
+    "migration:revert": "yarn run typeorm -- -d ./src/database/typeorm.config.ts migration:revert",
+    "migration:show": "yarn run typeorm -- migration:show -d ./src/database/typeorm.config.ts",
     "cli:source-fill": "nest build && node dist/src/cli.js source:fill",
     "cli:history-get": "nest build && node dist/src/cli.js history:get",
+    "cli:stats:get": "nest build && node dist/src/cli.js stats:get",
     "cli:event-fill": "nest build && node dist/src/cli.js event:fill",
-    "cli:price-preload": "nest build && node dist/src/cli.js price:preload"
+    "cli:price-preload": "nest build && node dist/src/cli.js price:preload",
+    "docker:up": "docker-compose up -d",
+    "docker:down": "docker-compose down",
+    "docker:clean": "docker volume prune -f && docker system prune -f"
   },
   "dependencies": {
     "@nestjs-modules/mailer": "^2.0.2",
@@ -50,6 +54,7 @@
     "reflect-metadata": "^0.1.13",
     "rxjs": "^7.8.1",
     "typeorm": "^0.3.21",
+    "tsconfig-paths": "^4.2.0",
     "uuid": "^10.0.0"
   },
   "devDependencies": {
@@ -79,7 +84,6 @@
     "ts-jest": "^29.1.0",
     "ts-loader": "^9.4.3",
     "ts-node": "^10.9.1",
-    "tsconfig-paths": "^4.2.0",
     "typescript": "^5.1.3"
   },
   "jest": {

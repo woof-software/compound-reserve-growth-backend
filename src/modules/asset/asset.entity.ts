@@ -1,6 +1,7 @@
 import { Column, Entity, OneToMany, PrimaryGeneratedColumn } from 'typeorm';
 
 import { Source } from 'modules/source/source.entity';
+import { Oracle } from 'modules/oracle/oracle.entity';
 
 @Entity({ name: 'asset' })
 export class Asset {
@@ -27,6 +28,9 @@ export class Asset {
 
   @OneToMany(() => Source, (sources) => sources.asset)
   public sources: Source[];
+
+  @OneToMany(() => Oracle, (oracles) => oracles.asset)
+  public oracles: Oracle[];
 
   constructor(address: string, decimals: number, symbol: string, network: string, type?: string) {
     this.address = address;

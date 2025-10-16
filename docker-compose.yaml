@@ -1,0 +1,86 @@
+services:
+
+  db:
+    image: postgres:17
+    container_name: postgres
+    restart: always
+    volumes:
+      - ./postgres_data:/var/lib/postgresql/data
+    ports:
+      - 5432:5432
+    environment:
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    healthcheck:
+      test: ["CMD-SHELL", "sh -c 'pg_isready -U postgres -d postgres'"]
+      interval: 5s
+      timeout: 5s
+      retries: 3
+    networks:
+      - backend
+
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: pgadmin
+    restart: unless-stopped
+    ports:
+      - "5050:80"
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@example.com
+      PGADMIN_DEFAULT_PASSWORD: supersecret
+    depends_on:
+      - db
+    networks:
+      - backend
+
+  redis:
+    image: redis:alpine
+    container_name: redis
+    restart: always
+    ports:
+      - 6379:6379
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      retries: 3
+      timeout: 5s
+    networks:
+      - backend
+
+  migrations:
+    image: compound-reserve-growth-backend-dev:latest
+    build:
+      context: .
+    container_name: migrations
+    command: ["yarn", "run", "migration:run"]
+    env_file:
+      - .env
+    networks:
+      - backend
+    depends_on:
+      - db
+
+  backend:
+    image: compound-reserve-growth-backend-dev:latest
+    build:
+      context: .
+    container_name: backend
+    ports:
+      - 3000:3000
+    env_file:
+      - .env
+    networks:
+      - backend
+    depends_on:
+      migrations:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://127.0.0.1:3000/api/health || exit 1"]
+      interval: 1m
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+networks:
+  backend:
+    name: backend

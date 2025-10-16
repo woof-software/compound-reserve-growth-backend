@@ -1,6 +1,7 @@
 export enum Algorithm {
   COMET = 'comet',
   MARKET_V2 = 'market_v2',
+  ETH_WALLET = 'eth_wallet',
   TIMELOCK = 'timelock',
   COMPTROLLER = 'comptroller',
   AVANTGARDE_TREASURY_GROWTH_PROPOSAL = 'avantgarde_treasury_growth_proposal',
@@ -13,4 +14,5 @@ export enum Algorithm {
   REWARDS = 'rewards',
   MANTLE = 'mantle',
   DELEGATE_RACE = 'delegate_race',
+  COMET_STATS = 'comet_stats',
 }

@@ -1,18 +1,19 @@
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Inject, Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ethers, JsonRpcProvider } from 'ethers';
-import { Cache } from 'cache-manager';
+import type { Cache } from 'cache-manager';
 import type { Redis } from 'ioredis';
 
+import { Incomes, Reserve, Spends } from 'modules/history/entities';
 import { REDIS_CLIENT } from 'modules/redis/redis.module';
 import { ProviderFactory } from 'modules/network/provider.factory';
 import { HistoryService } from 'modules/history/history.service';
-import { History } from 'modules/history/history.entity';
 import { Source } from 'modules/source/source.entity';
 import { SourceService } from 'modules/source/source.service';
 import { PriceService } from 'modules/price/price.service';
 import { MailService } from 'modules/mail/mail.service';
 import { STABLECOIN_PRICES } from 'modules/price/constants';
+import { AlgorithmService } from 'modules/contract/algorithm.service';
 
 import CometABI from './abi/CometABI.json';
 import CometExtensionABI from './abi/CometExtensionABI.json';
@@ -23,16 +24,11 @@ import LegacyRewardsABI from './abi/LegacyRewardsABI.json';
 import ERC20ABI from './abi/ERC20ABI.json';
 import Bytes32TokenABI from './abi/Bytes32TokenABI.json';
 import { MarketData, RootJson } from './contract.type';
+import { CachedBlock, ResponseStatsAlgorithm } from './interface';
 
 import { DAY_IN_SEC, SEC_IN_MS } from '@app/common/constants';
 import { Algorithm } from '@app/common/enum/algorithm.enum';
-
-interface CachedBlock {
-  blockNumber: number;
-  timestamp: number;
-  hash: string;
-  cachedAt: number;
-}
+import { calculateTimeRange } from '@/common/utils/calculate-time-range';
 
 @Injectable()
 export class ContractService implements OnModuleInit {
@@ -83,6 +79,7 @@ export class ContractService implements OnModuleInit {
     private readonly historyService: HistoryService,
     private readonly sourceService: SourceService,
     private readonly priceService: PriceService,
+    private readonly algorithmService: AlgorithmService,
     private readonly mailService: MailService,
   ) {}
 
@@ -162,6 +159,45 @@ export class ContractService implements OnModuleInit {
     } catch (error) {
       this.logger.error(`Error finding creation block for ${contractAddress}:`, error);
       throw error;
+    }
+  }
+
+  /**
+   * Gets the appropriate block number for a source based on date or creation block
+   * @param source - Source entity
+   * @param startDate - Optional date to start from
+   * @returns Block number to start from
+   */
+  async getSourceBlockNumber(source: Source, startDate?: Date): Promise<number> {
+    try {
+      if (startDate) {
+        const provider = this.providerFactory.get(source.network);
+
+        // Get contract creation block to compare with provided date
+        const creationBlock = await this.getContractCreationBlock(source.address, source.network);
+        const creationBlockData = await this.getCachedBlock(
+          source.network,
+          provider,
+          creationBlock,
+        );
+        const creationTimestamp = creationBlockData.timestamp;
+        const providedTimestamp = Math.floor(startDate.getTime() / 1000);
+
+        const targetTimestamp = Math.max(creationTimestamp, providedTimestamp);
+
+        if (providedTimestamp < creationTimestamp) {
+          return creationBlock;
+        } else {
+          return this.findBlockByTimestamp(source.network, provider, targetTimestamp);
+        }
+      } else {
+        return this.getContractCreationBlock(source.address, source.network);
+      }
+    } catch (error) {
+      this.logger.warn(
+        `Failed to get block number for source ${source.id} (${source.address}): ${error.message}. Using current block number ${source.blockNumber} as fallback.`,
+      );
+      return source.blockNumber;
     }
   }
 
@@ -483,7 +519,30 @@ export class ContractService implements OnModuleInit {
   }
 
   async getHistory(source: Source) {
-    const { address: contractAddress, network, asset, algorithm } = source;
+    const { algorithm } = source;
+
+    for (const alg of algorithm) {
+      switch (alg) {
+        case Algorithm.COMET:
+          await this.saveReserves(source, alg);
+          break;
+        case Algorithm.MARKET_V2:
+          await this.saveReserves(source, alg);
+          break;
+        case Algorithm.ETH_WALLET:
+          await this.saveReserves(source, alg);
+          break;
+        case Algorithm.COMET_STATS:
+          await this.saveStats(source, alg);
+          break;
+        default:
+          await this.saveReserves(source, alg);
+      }
+    }
+  }
+
+  public async saveReserves(source: Source, algorithm: string): Promise<void> {
+    const { address: contractAddress, network, asset } = source;
     const { address: assetAddress } = asset;
 
     this.logger.log(
@@ -497,9 +556,7 @@ export class ContractService implements OnModuleInit {
       const startBlockData = await this.getCachedBlock(network, provider, lastBlock);
       const startTs = startBlockData.timestamp;
 
-      const firstMidnightUTC = Math.floor(startTs / DAY_IN_SEC + 1) * DAY_IN_SEC;
-      const now = Math.floor(Date.now() / SEC_IN_MS);
-      const todayMidnightUTC = Math.floor(now / DAY_IN_SEC) * DAY_IN_SEC;
+      const { firstMidnightUTC, todayMidnightUTC, dailyTs } = calculateTimeRange(startTs);
 
       // Check if we have any days to process
       if (firstMidnightUTC > todayMidnightUTC) {
@@ -513,11 +570,6 @@ export class ContractService implements OnModuleInit {
         });
 
         return;
-      }
-
-      const dailyTs: number[] = [];
-      for (let ts = firstMidnightUTC; ts <= todayMidnightUTC; ts += DAY_IN_SEC) {
-        dailyTs.push(ts);
       }
 
       this.logger.log(
@@ -562,10 +614,13 @@ export class ContractService implements OnModuleInit {
           try {
             switch (algorithm) {
               case Algorithm.COMET:
-                reserves = await contract.getReserves({ blockTag });
+                reserves = await this.algorithmService.comet(contract, blockTag);
                 break;
               case Algorithm.MARKET_V2:
-                reserves = await contract.totalReserves({ blockTag });
+                reserves = await this.algorithmService.marketV2(contract, blockTag);
+                break;
+              case Algorithm.ETH_WALLET:
+                reserves = await provider.getBalance(contractAddress, blockTag);
                 break;
               default:
                 if (asset.symbol === 'ETH' || asset.symbol === 'MNT') {
@@ -621,15 +676,276 @@ export class ContractService implements OnModuleInit {
             continue;
           }
 
-          const newHistory = new History(source, blockTag, reserves.toString(), price, value, date);
+          const newHistory = new Reserve(source, blockTag, reserves.toString(), price, value, date);
 
-          await this.historyService.createWithSource(newHistory);
+          await this.historyService.createReservesWithSource(newHistory);
 
           await this.sourceService.updateWithSource({
             source,
             blockNumber: blockTag,
             checkedAt: new Date(),
           });
+
+          lastBlock = blockTag;
+          processedCount++;
+
+          if (processedCount % 50 === 0) {
+            this.logger.log(
+              `Progress: ${processedCount}/${dailyTs.length} days processed (${skippedCount} skipped)`,
+            );
+          }
+        } catch (error) {
+          this.logger.error(`Failed to process timestamp ${targetTs}: ${error.message}`);
+
+          // Fallback
+          if (network === 'arbitrum') {
+            const period = this.getArbitrumConfigForBlock(lastBlock);
+            lastBlock = lastBlock + period.blocksPerDay;
+          } else {
+            const networkConf = this.networkConfig[network];
+            lastBlock = lastBlock + (networkConf?.blocksPerDay || 43200);
+          }
+          skippedCount++;
+          continue;
+        }
+      }
+
+      // Calculate final statistics
+      const totalAttempted = dailyTs.length;
+      const successRate =
+        totalAttempted > 0 ? Math.round((processedCount / totalAttempted) * 100) : 0;
+
+      this.logger.log(
+        `Completed: ${successRate}% success (${processedCount}/${totalAttempted} processed, ${skippedCount} skipped)`,
+      );
+    } catch (error) {
+      const message = `Error processing source ${source.id} on ${network} for contract ${contractAddress}, algorithm ${algorithm}, asset ${asset.symbol}: ${error.message}`;
+      this.logger.error(message);
+      await this.mailService.notifyGetHistoryError(message);
+    }
+  }
+
+  public async saveStats(source: Source, algorithm: string, data?: Date): Promise<void> {
+    const { address: contractAddress, network, asset } = source;
+
+    this.logger.log(
+      `Starting history collection for source ${source.id} on ${network}, algorithm: ${algorithm}`,
+    );
+
+    try {
+      const provider = this.providerFactory.get(network);
+
+      let lastBlock: number | undefined;
+
+      if (data) {
+        try {
+          // Get contract creation block to compare with provided date
+          const creationBlock = await this.getContractCreationBlock(source.address, source.network);
+          const creationBlockData = await this.getCachedBlock(network, provider, creationBlock);
+          const creationTimestamp = creationBlockData.timestamp;
+          const providedTimestamp = Math.floor(data.getTime() / 1000);
+
+          // Use the later of creation block or provided date
+          const targetTimestamp = Math.max(creationTimestamp, providedTimestamp);
+
+          if (providedTimestamp < creationTimestamp) {
+            this.logger.log(
+              `Provided date ${data.toISOString()} is older than contract creation. Using creation block ${creationBlock} instead for ${source.address} on ${source.network}`,
+            );
+            lastBlock = creationBlock;
+          } else {
+            lastBlock = await this.findBlockByTimestamp(network, provider, targetTimestamp);
+            this.logger.log(
+              `Using provided date ${data.toISOString()} to start from block ${lastBlock} for ${source.address} on ${source.network}`,
+            );
+          }
+        } catch (e: any) {
+          this.logger.error(
+            `Failed to find block for date ${data.toISOString()} for ${source.address} on ${source.network}: ${e?.message}`,
+          );
+          return;
+        }
+      } else {
+        const spends = await this.historyService.findSpendsBySource(source);
+        const incomes = await this.historyService.findIncomesBySource(source);
+
+        if (incomes?.blockNumber) {
+          lastBlock = incomes.blockNumber;
+        }
+        if (spends?.blockNumber && (!lastBlock || spends.blockNumber < lastBlock)) {
+          lastBlock = spends.blockNumber;
+        }
+        if (!lastBlock) {
+          try {
+            // Start from the contract creation block if we have no prior events
+            const creationBlock = await this.getContractCreationBlock(
+              source.address,
+              source.network,
+            );
+            lastBlock = Math.max(creationBlock, 0);
+            this.logger.log(
+              `No previous liquidation events. Starting scan from creation block ${lastBlock} for ${source.address} on ${source.network}`,
+            );
+          } catch (e: any) {
+            this.logger.warn(
+              `Failed to determine creation block for ${source.address} on ${source.network}: ${e?.message}. Fallback to source.blockNumber=${lastBlock}`,
+            );
+            return;
+          }
+        }
+      }
+
+      const startBlockData = await this.getCachedBlock(network, provider, lastBlock);
+      const startTs = startBlockData.timestamp;
+
+      const { firstMidnightUTC, todayMidnightUTC, dailyTs } = calculateTimeRange(startTs);
+
+      // Check if we have any days to process
+      if (firstMidnightUTC > todayMidnightUTC) {
+        this.logger.log(`No historical data needed - source is already up to date`);
+        return;
+      }
+
+      this.logger.log(
+        `Processing ${dailyTs.length} daily timestamps from ${new Date(firstMidnightUTC * 1000).toISOString().slice(0, 10)} to ${new Date(todayMidnightUTC * 1000).toISOString().slice(0, 10)}`,
+      );
+
+      // Check if we have a reasonable number of days to process
+      if (dailyTs.length === 0) {
+        this.logger.warn(`No days to process for source ${source.id}`);
+        return;
+      }
+
+      // Prices preload
+      if (!STABLECOIN_PRICES[asset.symbol]) {
+        try {
+          const firstDate = new Date(firstMidnightUTC * 1000);
+          await this.priceService.getHistoricalPrice(
+            { address: asset.address, symbol: asset.symbol, decimals: asset.decimals },
+            firstDate,
+          );
+          this.logger.log(`Price data preloaded for ${asset.symbol}`);
+        } catch (error) {
+          this.logger.warn(`Failed to preload price data for ${asset.symbol}: ${error.message}`);
+        }
+      } else {
+        this.logger.log(`Skipping preload for stablecoin ${asset.symbol}`);
+      }
+
+      let processedCount = 0;
+      let skippedCount = 0;
+
+      const ABI = algorithm === Algorithm.COMET_STATS ? CometABI : MarketV2ABI;
+
+      const contract = new ethers.Contract(contractAddress, ABI, provider) as any;
+      const { symbol, decimals } = asset;
+
+      for (const targetTs of dailyTs) {
+        try {
+          const blockTag = await this.findBlockByTimestamp(network, provider, targetTs, lastBlock);
+
+          const assetCompToken = { address: null, symbol: 'COMP', decimals: null };
+          const compDate = new Date(targetTs * 1000);
+          let priceComp: number;
+          try {
+            priceComp = await this.priceService.getHistoricalPrice(assetCompToken, compDate);
+            if (priceComp <= 0) {
+              throw new Error(`Invalid price received: ${priceComp}`);
+            }
+          } catch (priceError: any) {
+            const message = `Price fetch failed for ${asset.symbol} on ${compDate.toISOString().slice(0, 10)}: ${priceError.message}. Stopping to retry on next cron run.`;
+            this.logger.error(message);
+            await this.mailService.notifyGetHistoryError(message);
+            return;
+          }
+
+          let marketAccounting: ResponseStatsAlgorithm;
+          try {
+            switch (algorithm) {
+              case Algorithm.COMET_STATS:
+                marketAccounting = await this.algorithmService.cometStats(
+                  contract,
+                  blockTag,
+                  decimals,
+                  priceComp,
+                );
+                break;
+              default:
+                throw new Error(
+                  `Unsupported algorithm: ${algorithm} for contract ${contractAddress} at network ${network}, asset ${asset.symbol}`,
+                );
+            }
+          } catch (e: any) {
+            if (e.code === 'CALL_EXCEPTION') {
+              const message = `Skip ${new Date(targetTs * SEC_IN_MS).toISOString().slice(0, 10)} block number ${blockTag} — reserves unavailable for contract ${contractAddress} at network ${network}, algorithm ${algorithm}, asset ${asset.symbol}`;
+              this.logger.warn(message);
+              lastBlock = blockTag;
+              skippedCount++;
+              await this.mailService.notifyGetHistoryError(message);
+              continue;
+            } else {
+              throw e;
+            }
+          }
+
+          const dayDate = new Date(targetTs * 1000);
+
+          // Get price using PriceService
+          let price = 1;
+          try {
+            price = await this.priceService.getHistoricalPrice(
+              { address: asset.address, symbol: asset.symbol, decimals: asset.decimals },
+              dayDate,
+            );
+
+            if (price <= 0) {
+              throw new Error(`Invalid price received: ${price}`);
+            }
+          } catch (priceError) {
+            const message = `Price fetch failed for ${symbol} on ${dayDate.toISOString().slice(0, 10)}: ${priceError.message}. Stopping to retry on next cron run.`;
+            this.logger.error(message);
+            await this.mailService.notifyGetHistoryError(message);
+
+            // Stop processing - will retry from this date on next cron run
+            return;
+          }
+
+          const incomeSupplyQuantity = marketAccounting.incomes.supply * price;
+          const incomeBorrowQuantity = marketAccounting.incomes.borrow * price;
+          const spendSupplyQuantity = marketAccounting.spends?.supplyUsd;
+          const spendBorrowQuantity = marketAccounting.spends?.borrowUsd;
+
+          const newIncomes = new Incomes(
+            source,
+            blockTag,
+            marketAccounting.incomes.supply.toString(),
+            marketAccounting.incomes.borrow.toString(),
+            price,
+            priceComp,
+            incomeSupplyQuantity,
+            incomeBorrowQuantity,
+            dayDate,
+          );
+          // Save spends only if provided by algorithm
+          if (
+            marketAccounting.spends !== undefined &&
+            typeof spendSupplyQuantity === 'number' &&
+            typeof spendBorrowQuantity === 'number'
+          ) {
+            const newSpends = new Spends(
+              source,
+              blockTag,
+              marketAccounting.spends.supplyUsd.toString(),
+              marketAccounting.spends.borrowUsd.toString(),
+              price,
+              priceComp,
+              spendSupplyQuantity,
+              spendBorrowQuantity,
+              dayDate,
+            );
+            await this.historyService.createSpendsWithSource(newSpends);
+          }
+          await this.historyService.createIncomesWithSource(newIncomes);
 
           lastBlock = blockTag;
           processedCount++;
