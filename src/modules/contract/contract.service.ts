@@ -529,6 +529,9 @@ export class ContractService implements OnModuleInit {
         case Algorithm.MARKET_V2:
           await this.saveReserves(source, alg);
           break;
+        case Algorithm.ETH_WALLET:
+          await this.saveReserves(source, alg);
+          break;
         case Algorithm.COMET_STATS:
           await this.saveStats(source, alg);
           break;
@@ -615,6 +618,9 @@ export class ContractService implements OnModuleInit {
                 break;
               case Algorithm.MARKET_V2:
                 reserves = await this.algorithmService.marketV2(contract, blockTag);
+                break;
+              case Algorithm.ETH_WALLET:
+                reserves = await provider.getBalance(contractAddress, blockTag);
                 break;
               default:
                 if (asset.symbol === 'ETH' || asset.symbol === 'MNT') {
