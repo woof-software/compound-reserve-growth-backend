@@ -235,6 +235,6 @@ export class HistoryService {
       };
     });
 
-    return new OffsetDataDto<IncentivesHistory>(data, spends.limit, spends.offset, spends.total);
+    return new OffsetDataDto<IncentivesHistory>(data, revenue.limit, revenue.offset, revenue.total);
   }
 }
