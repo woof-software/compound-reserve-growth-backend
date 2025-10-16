@@ -201,20 +201,20 @@ export class HistoryService {
       spendsMap.set(key, item);
     });
 
-    const pricesMap = new Map<number, number>();
-    {
-      const firstDate = revenue.data[0].date;
-      const lastDate = revenue.data[revenue.data.length - 1].date;
-
-      let startDate: Date;
-      let endDate: Date;
-      if (dto.order === Order.ASC) {
-        startDate = firstDate;
-        endDate = lastDate;
-      } else {
-        endDate = firstDate;
-        startDate = lastDate;
+    const datesNeedingPrices = new Set<number>();
+    revenue.data.forEach((item) => {
+      const key = generateDailyKey(item.source.id, item.date);
+      const spendsRecord = spendsMap.get(key);
+      if (!spendsRecord?.priceComp) {
+        datesNeedingPrices.add(dayId(item.date));
       }
+    });
+
+    const pricesMap = new Map<number, number>();
+    if (datesNeedingPrices.size > 0) {
+      const sortedDates = Array.from(datesNeedingPrices).sort((a, b) => a - b);
+      const startDate = new Date(sortedDates[0] * msInDay);
+      const endDate = new Date(sortedDates[sortedDates.length - 1] * msInDay);
 
       const prices = await this.priceRepo.findBySymbolInDateRange('COMP', startDate, endDate);
       prices.forEach((item) => {
@@ -223,30 +223,32 @@ export class HistoryService {
       });
     }
 
-    const indexesWithoutPrice: number[] = [];
-    let firstPrice = 0;
-    let previousPrice = 0;
-    const data: IncentivesHistory[] = revenue.data.map((revenue, index) => {
-      const spendsRecord = spendsMap.get(generateDailyKey(revenue.source.id, revenue.date));
-      const priceComp =
-        spendsRecord?.priceComp ?? pricesMap.get(dayId(revenue.date)) ?? previousPrice;
+    let lastKnownPrice = 0;
+    const data: IncentivesHistory[] = revenue.data.map((revenueItem) => {
+      const key = generateDailyKey(revenueItem.source.id, revenueItem.date);
+      const spendsRecord = spendsMap.get(key);
+
+      let priceComp = spendsRecord?.priceComp;
       if (!priceComp) {
-        indexesWithoutPrice.push(index);
-      } else {
-        previousPrice = priceComp;
-        firstPrice = firstPrice || priceComp;
+        priceComp = pricesMap.get(dayId(revenueItem.date));
       }
+      if (!priceComp) {
+        priceComp = lastKnownPrice;
+      }
+
+      if (priceComp > 0) {
+        lastKnownPrice = priceComp;
+      }
+
       return {
-        incomes: revenue.value,
+        incomes: revenueItem.value,
         rewardsSupply: spendsRecord?.valueSupply ?? 0,
         rewardsBorrow: spendsRecord?.valueBorrow ?? 0,
-        sourceId: revenue.source.id,
+        sourceId: revenueItem.source.id,
         priceComp,
-        date: revenue.date,
+        date: revenueItem.date,
       };
     });
-
-    indexesWithoutPrice.forEach((ind) => (data[ind].priceComp = firstPrice));
 
     return new OffsetDataDto<IncentivesHistory>(data, revenue.limit, revenue.offset, revenue.total);
   }
