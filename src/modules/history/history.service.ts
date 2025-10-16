@@ -189,7 +189,7 @@ export class HistoryService {
       this.spendsRepo.getOffsetStats(dto, allAlgorithms), // saves only COMET_STATS
     ]);
 
-    // Create a Map for quick lookup of revenue by sourceId and date
+    // Create a Map for quick lookup of spends by sourceId and date
     const spendsMap = new Map<string, Spends>();
     spends.data.forEach((item) => {
       const key = generateDailyKey(item.source.id, item.date);
