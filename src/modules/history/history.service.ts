@@ -28,6 +28,7 @@ export class HistoryService {
     private readonly sourceRepo: SourceRepository,
   ) {}
 
+  // ?: not in use
   async create(dto: CreateHistoryDto): Promise<Reserve> {
     const source = await this.sourceRepo.findById(dto.sourceId);
     if (!source) throw new NotFoundException(`Source ${dto.sourceId} not found`);
@@ -185,25 +186,25 @@ export class HistoryService {
 
     const [revenue, spends] = await Promise.all([
       this.reservesRepo.getOffsetRevenueReserves(dto, allAlgorithms),
-      this.spendsRepo.getOffsetStats(dto, allAlgorithms),
+      this.spendsRepo.getOffsetStats(dto, allAlgorithms), // saves only COMET_STATS
     ]);
 
     // Create a Map for quick lookup of revenue by sourceId and date
-    const revenueMap = new Map<string, Reserve>();
-    revenue.data.forEach((item) => {
+    const spendsMap = new Map<string, Spends>();
+    spends.data.forEach((item) => {
       const key = generateDailyKey(item.source.id, item.date);
-      revenueMap.set(key, item);
+      spendsMap.set(key, item);
     });
 
-    const data: IncentivesHistory[] = spends.data.map((spend) => {
-      const revenueRecord = revenueMap.get(generateDailyKey(spend.source.id, spend.date));
+    const data: IncentivesHistory[] = revenue.data.map((revenue) => {
+      const spendsRecord = spendsMap.get(generateDailyKey(revenue.source.id, revenue.date));
       return {
-        incomes: revenueRecord?.value ?? 0,
-        rewardsSupply: spend.valueSupply,
-        rewardsBorrow: spend.valueBorrow,
-        sourceId: spend.source.id,
-        priceComp: spend.priceComp,
-        date: spend.date,
+        incomes: revenue.value,
+        rewardsSupply: spendsRecord?.valueSupply ?? 0,
+        rewardsBorrow: spendsRecord?.valueBorrow ?? 0,
+        sourceId: revenue.source.id,
+        priceComp: spendsRecord?.priceComp ?? 0,
+        date: revenue.date,
       };
     });
 
