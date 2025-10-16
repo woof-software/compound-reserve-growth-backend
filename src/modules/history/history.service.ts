@@ -223,17 +223,30 @@ export class HistoryService {
       });
     }
 
-    const data: IncentivesHistory[] = revenue.data.map((revenue) => {
+    const indexesWithoutPrice: number[] = [];
+    let firstPrice = 0;
+    let previousPrice = 0;
+    const data: IncentivesHistory[] = revenue.data.map((revenue, index) => {
       const spendsRecord = spendsMap.get(generateDailyKey(revenue.source.id, revenue.date));
+      const priceComp =
+        spendsRecord?.priceComp ?? pricesMap.get(dayId(revenue.date)) ?? previousPrice;
+      if (!priceComp) {
+        indexesWithoutPrice.push(index);
+      } else {
+        previousPrice = priceComp;
+        firstPrice = firstPrice || priceComp;
+      }
       return {
         incomes: revenue.value,
         rewardsSupply: spendsRecord?.valueSupply ?? 0,
         rewardsBorrow: spendsRecord?.valueBorrow ?? 0,
         sourceId: revenue.source.id,
-        priceComp: spendsRecord?.priceComp ?? pricesMap.get(dayId(revenue.date)),
+        priceComp,
         date: revenue.date,
       };
     });
+
+    indexesWithoutPrice.forEach((ind) => (data[ind].priceComp = firstPrice));
 
     return new OffsetDataDto<IncentivesHistory>(data, revenue.limit, revenue.offset, revenue.total);
   }
