@@ -2,11 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 
-import { OffsetDto } from 'modules/history/dto/offset.dto';
-
 import { Price } from './price.entity';
-
-import { OffsetDataDto } from '@/common/dto/offset-data.dto';
 
 @Injectable()
 export class PriceRepository {
@@ -155,22 +151,5 @@ export class PriceRepository {
       earliest: new Date(result.earliest),
       latest: new Date(result.latest),
     };
-  }
-
-  async getOffsetForSymbol(dto: OffsetDto, symbol: string): Promise<OffsetDataDto<Price>> {
-    const query = this.priceRepository
-      .createQueryBuilder('price')
-      .where('price.symbol = :symbol', { symbol })
-      .orderBy('price.date', 'ASC');
-
-    if (dto.limit) {
-      query.orderBy('price.date', dto.order).offset(dto.offset ?? 0);
-    }
-
-    if (dto.limit) query.limit(dto.limit);
-
-    const [prices, total] = await query.getManyAndCount();
-
-    return new OffsetDataDto<Price>(prices, dto.limit ?? null, dto.offset ?? 0, total);
   }
 }
