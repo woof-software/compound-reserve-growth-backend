@@ -15,6 +15,7 @@ import { OffsetDto } from './dto/offset.dto';
 import { PaginatedDataDto } from '@app/common/dto/paginated-data.dto';
 import { OffsetDataDto } from '@app/common/dto/offset-data.dto';
 import { Algorithm } from '@/common/enum/algorithm.enum';
+import { Order } from '@/common/enum/order.enum';
 
 const msInDay = 86400000;
 const dayId = (date: Date): number => Math.floor(date.getTime() / msInDay);
@@ -186,6 +187,8 @@ export class HistoryService {
   async getIncentiveHistory(dto: OffsetDto): Promise<OffsetDataDto<IncentivesHistory>> {
     const allAlgorithms = Object.values(Algorithm) as Algorithm[];
 
+    if (!dto.order) dto.order = Order.ASC;
+
     const [revenue, spends] = await Promise.all([
       this.reservesRepo.getOffsetRevenueReserves(dto, allAlgorithms),
       this.spendsRepo.getOffsetStats(dto, allAlgorithms), // saves only COMET_STATS
@@ -200,8 +203,19 @@ export class HistoryService {
 
     const pricesMap = new Map<number, number>();
     {
-      const startDate = revenue.data[0].date;
-      const endDate = revenue.data[revenue.data.length - 1].date;
+      const firstDate = revenue.data[0].date;
+      const lastDate = revenue.data[revenue.data.length - 1].date;
+
+      let startDate: Date;
+      let endDate: Date;
+      if (dto.order === Order.ASC) {
+        startDate = firstDate;
+        endDate = lastDate;
+      } else {
+        endDate = firstDate;
+        startDate = lastDate;
+      }
+
       const prices = await this.priceRepo.findBySymbolInDateRange('COMP', startDate, endDate);
       prices.forEach((item) => {
         const key = dayId(item.date);
