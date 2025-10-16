@@ -185,7 +185,11 @@ export class HistoryService {
   }
 
   async getIncentiveHistory(dto: OffsetDto): Promise<OffsetDataDto<IncentivesHistory>> {
-    const allAlgorithms = Object.values(Algorithm) as Algorithm[];
+    const allAlgorithms = [
+      Algorithm.COMET_STATS,
+      Algorithm.MARKET_V2,
+      Algorithm.AERA_COMPOUND_RESERVES,
+    ];
 
     if (!dto.order) dto.order = Order.ASC;
 
