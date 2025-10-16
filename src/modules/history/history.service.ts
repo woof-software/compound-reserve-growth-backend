@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 
 import { SourceRepository } from 'modules/source/source.repository';
 import { Source } from 'modules/source/source.entity';
+import { PriceRepository } from 'modules/price/price.repository';
 
 import { ReservesRepository } from './reserves-repository.service';
 import { IncomesRepository } from './incomes-repository.service';
@@ -26,6 +27,7 @@ export class HistoryService {
     private readonly incomesRepo: IncomesRepository,
     private readonly spendsRepo: SpendsRepository,
     private readonly sourceRepo: SourceRepository,
+    private readonly priceRepo: PriceRepository,
   ) {}
 
   // ?: not in use
@@ -196,6 +198,17 @@ export class HistoryService {
       spendsMap.set(key, item);
     });
 
+    const pricesMap = new Map<number, number>();
+    {
+      const startDate = revenue.data[0].date;
+      const endDate = revenue.data[revenue.data.length - 1].date;
+      const prices = await this.priceRepo.findBySymbolInDateRange('COMP', startDate, endDate);
+      prices.forEach((item) => {
+        const key = dayId(item.date);
+        pricesMap.set(key, item.price);
+      });
+    }
+
     const data: IncentivesHistory[] = revenue.data.map((revenue) => {
       const spendsRecord = spendsMap.get(generateDailyKey(revenue.source.id, revenue.date));
       return {
@@ -203,7 +216,7 @@ export class HistoryService {
         rewardsSupply: spendsRecord?.valueSupply ?? 0,
         rewardsBorrow: spendsRecord?.valueBorrow ?? 0,
         sourceId: revenue.source.id,
-        priceComp: spendsRecord?.priceComp ?? 0,
+        priceComp: spendsRecord?.priceComp ?? pricesMap.get(dayId(revenue.date)),
         date: revenue.date,
       };
     });
