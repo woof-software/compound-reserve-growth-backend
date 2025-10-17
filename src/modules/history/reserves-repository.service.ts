@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
+import { DataSource, Repository } from 'typeorm';
 import { ethers } from 'ethers';
 
 import { Price } from 'modules/price/price.entity';
@@ -20,6 +20,7 @@ export class ReservesRepository {
     @InjectRepository(Reserve) private readonly reservesRepository: Repository<Reserve>,
     @InjectRepository(Spends) private readonly spendsRepository: Repository<Spends>,
     @InjectRepository(Price) private readonly priceRepository: Repository<Price>,
+    @InjectDataSource() private readonly dataSource: DataSource,
   ) {}
 
   async save(reserve: Reserve): Promise<Reserve> {
@@ -263,7 +264,7 @@ export class ReservesRepository {
         // previous quantity in the timeline per source
         `LAG(r0."quantity"::numeric) OVER (
          PARTITION BY r0."sourceId"
-         ORDER BY r0."date"
+         ORDER BY r0."date", r0."id"
        ) AS "prevQty"`,
       ]);
 
@@ -283,7 +284,7 @@ export class ReservesRepository {
       .where('p."symbol" = :comp', { comp: 'COMP' });
 
     // Data QB: merged rows (reserves + latest spends)
-    const dataQb = this.reservesRepository
+    const dataQb = this.dataSource
       .createQueryBuilder()
       .from(`(${rBase.getQuery()})`, 'rb')
       .setParameters(rBase.getParameters())
