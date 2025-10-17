@@ -3,19 +3,20 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ethers } from 'ethers';
 
-import { Reserve, Spends } from './entities';
+import { IncentivesHistory, Reserve, Spends } from './entities';
 import { PaginationDto } from './dto/pagination.dto';
 import { OffsetDto } from './dto/offset.dto';
 
 import { Algorithm } from '@app/common/enum/algorithm.enum';
 import { PaginatedDataDto } from '@app/common/dto/paginated-data.dto';
 import { OffsetDataDto } from '@app/common/dto/offset-data.dto';
-import { generateDailyKey } from '@/common/utils/generate-daily-key';
+import { Order } from '@/common/enum/order.enum';
 
 @Injectable()
 export class ReservesRepository {
   constructor(
     @InjectRepository(Reserve) private readonly reservesRepository: Repository<Reserve>,
+    @InjectRepository(Spends) private readonly spendsRepository: Repository<Spends>,
   ) {}
 
   async save(reserve: Reserve): Promise<Reserve> {
@@ -225,92 +226,63 @@ export class ReservesRepository {
   async getOffsetIncentivesHistory(
     dto: OffsetDto,
     algorithms = [Algorithm.COMET_STATS, Algorithm.MARKET_V2, Algorithm.AERA_COMPOUND_RESERVES],
-  ): Promise<OffsetDataDto<{ reserve: Reserve; spends?: Spends }>> {
-    // First, get the reserves with pagination
-    const reservesQuery = this.reservesRepository
-      .createQueryBuilder('reserves')
-      .leftJoinAndSelect('reserves.source', 'source')
-      .leftJoinAndSelect('source.asset', 'asset')
-      .where('source.algorithm && :algorithms::text[]', {
-        algorithms: `{${algorithms.join(',')}}`,
-      })
-      .orderBy('reserves.date', dto.order)
-      .addOrderBy('reserves.sourceId', 'ASC')
+  ): Promise<OffsetDataDto<IncentivesHistory>> {
+    const { order = Order.ASC } = dto;
+
+    // Subquery S: pick latest spends per (sourceId, date)
+    const sSub = this.spendsRepository.createQueryBuilder('s').select([
+      's.sourceId AS sourceId',
+      's.date AS date',
+      's.valueSupply AS valueSupply',
+      's.valueBorrow AS valueBorrow',
+      's.priceComp AS priceComp',
+      // pick the latest by created_at (fallback id)
+      `ROW_NUMBER() OVER (
+       PARTITION BY s.sourceId, s.date
+       ORDER BY s.createdAt DESC, s.id DESC
+     ) AS rn`,
+    ]);
+
+    // Data QB: merged rows (reserves + latest spends)
+    const dataQb = this.reservesRepository
+      .createQueryBuilder('r')
+      .innerJoin('r.source', 'src')
+      .leftJoin(
+        `(${sSub.getQuery()})`,
+        'ls',
+        'ls.sourceId = r.sourceId AND ls.date = r.date AND ls.rn = 1',
+      )
+      .setParameters(sSub.getParameters())
+      .where('src.algorithm && :algorithms::text[]', { algorithms }) // pass string[]
+      .select([
+        'r.sourceId AS "sourceId"',
+        'r.date AS "date"',
+        'r.value AS "incomes"',
+        'COALESCE(ls.valueSupply, 0) AS "rewardsSupply"',
+        'COALESCE(ls.valueBorrow, 0) AS "rewardsBorrow"',
+        'COALESCE(ls.priceComp, 0) AS "priceComp"',
+      ])
+      .orderBy('r.date', order)
       .offset(dto.offset ?? 0);
 
-    if (dto.limit) reservesQuery.limit(dto.limit);
+    if (dto.limit) dataQb.limit(dto.limit);
 
-    const [reserves, total] = await reservesQuery.getManyAndCount();
+    // Count QB: count ONLY reserves under the same filter (no joins to spends)
+    const countQb = this.reservesRepository
+      .createQueryBuilder('r')
+      .innerJoin('r.source', 'src')
+      .where('src.algorithm && :algorithms::text[]', { algorithms });
 
-    if (reserves.length === 0) {
-      return new OffsetDataDto<{ reserve: Reserve; spends?: Spends }>(
-        [],
-        dto.limit ?? null,
-        dto.offset ?? 0,
-        total,
-      );
-    }
+    const [rows, totalReserves] = await Promise.all([
+      dataQb.getRawMany<IncentivesHistory>(),
+      countQb.getCount(),
+    ]);
 
-    // Get corresponding spends records for the reserves
-    const sourceIds = [...new Set(reserves.map((r) => r.source.id))];
-
-    // Create date range for more flexible date matching
-    const minDate = new Date(Math.min(...reserves.map((r) => r.date.getTime())));
-    const maxDate = new Date(Math.max(...reserves.map((r) => r.date.getTime())));
-
-    // Set time to start and end of day for proper range
-    minDate.setHours(0, 0, 0, 0);
-    maxDate.setHours(23, 59, 59, 999);
-
-    const spendsQuery = this.reservesRepository.manager
-      .createQueryBuilder()
-      .select('spends.*')
-      .from('spends', 'spends')
-      .where('spends.sourceId IN (:...sourceIds)', { sourceIds })
-      .andWhere('spends.date >= :minDate AND spends.date <= :maxDate', { minDate, maxDate });
-
-    const spendsResults = await spendsQuery.getRawMany();
-
-    // Create a map for quick lookup of spends by sourceId and date
-    const spendsMap = new Map<string, any>();
-    spendsResults.forEach((spend) => {
-      const key = generateDailyKey(spend.sourceId, new Date(spend.date));
-      spendsMap.set(key, spend);
-    });
-
-    // Combine reserves with their corresponding spends
-    const combinedResults = reserves.map((reserve) => {
-      const key = generateDailyKey(reserve.source.id, reserve.date);
-      const spendsData = spendsMap.get(key);
-
-      let spends: Spends | undefined;
-      if (spendsData) {
-        spends = new Spends(
-          reserve.source,
-          spendsData.blockNumber,
-          spendsData.quantitySupply,
-          spendsData.quantityBorrow,
-          spendsData.price,
-          spendsData.priceComp,
-          spendsData.valueSupply,
-          spendsData.valueBorrow,
-          spendsData.date,
-        );
-        spends.id = spendsData.id;
-        spends.createdAt = spendsData.createdAt;
-      }
-
-      return {
-        reserve,
-        spends,
-      };
-    });
-
-    return new OffsetDataDto<{ reserve: Reserve; spends?: Spends }>(
-      combinedResults,
+    return new OffsetDataDto<IncentivesHistory>(
+      rows,
       dto.limit ?? null,
       dto.offset ?? 0,
-      total,
+      totalReserves,
     );
   }
 }

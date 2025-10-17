@@ -201,8 +201,8 @@ export class HistoryService {
 
     const pricesMap = new Map<number, number>();
     {
-      const firstDate = incentivesData.data[0].reserve.date;
-      const lastDate = incentivesData.data[incentivesData.data.length - 1].reserve.date;
+      const firstDate = incentivesData.data[0].date;
+      const lastDate = incentivesData.data[incentivesData.data.length - 1].date;
 
       let startDate: Date;
       let endDate: Date;
@@ -225,30 +225,22 @@ export class HistoryService {
     let firstPrice = 0;
     let previousPrice = 0;
     const data: IncentivesHistory[] = incentivesData.data.map((item, index) => {
-      const { reserve, spends } = item;
-      let priceComp = spends?.priceComp ?? pricesMap.get(dayId(reserve.date));
-      if (!priceComp) {
-        this.logger.warn(`incentives -> priceComp not found for ${reserve.date}`, reserve);
+      item.priceComp = item.priceComp || pricesMap.get(dayId(item.date));
+      if (!item.priceComp) {
+        this.logger.warn(`incentives -> priceComp not found for ${item.date}`, item);
         if (previousPrice) {
-          priceComp = previousPrice;
+          item.priceComp = previousPrice;
         } else {
           indexesWithoutPrice.push(index);
         }
       } else {
-        firstPrice = firstPrice || priceComp;
-        previousPrice = priceComp;
+        firstPrice = firstPrice || item.priceComp;
+        previousPrice = item.priceComp;
       }
-      return {
-        incomes: reserve.value,
-        rewardsSupply: spends?.valueSupply ?? 0,
-        rewardsBorrow: spends?.valueBorrow ?? 0,
-        sourceId: reserve.source.id,
-        priceComp,
-        date: reserve.date,
-      };
+      return item;
     });
 
-    indexesWithoutPrice.forEach((ind) => (data[ind].priceComp = firstPrice));
+    if (firstPrice) indexesWithoutPrice.forEach((ind) => (data[ind].priceComp = firstPrice));
 
     return new OffsetDataDto<IncentivesHistory>(
       data,
