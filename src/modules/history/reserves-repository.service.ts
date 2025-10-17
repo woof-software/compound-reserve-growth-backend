@@ -246,6 +246,27 @@ export class ReservesRepository {
      ) AS rn`,
     ]);
 
+    // !: we also bring asset.decimals to normalize raw quantity
+    const rBase = this.reservesRepository
+      .createQueryBuilder('r0')
+      .innerJoin('r0.source', 'src0')
+      .innerJoin('src0.asset', 'a0')
+      .where('src0.algorithm && :algorithms::text[]', { algorithms })
+      .select([
+        `r0."sourceId" AS "sourceId"`,
+        `r0."date"     AS "date"`,
+        `r0."price"    AS "price"`,
+        `r0."value"    AS "value"`, // original stored value (used for the very first row)
+        // store quantity as numeric for math
+        `r0."quantity"::numeric AS "qty"`,
+        `a0."decimals"          AS "decimals"`,
+        // previous quantity in the timeline per source
+        `LAG(r0."quantity"::numeric) OVER (
+         PARTITION BY r0."sourceId"
+         ORDER BY r0."date"
+       ) AS "prevQty"`,
+      ]);
+
     // Subquery P: one price per (symbol, date) for COMP (latest if duplicates)
     // !: equality join on date;
     const pSub = this.priceRepository
@@ -263,29 +284,36 @@ export class ReservesRepository {
 
     // Data QB: merged rows (reserves + latest spends)
     const dataQb = this.reservesRepository
-      .createQueryBuilder('r')
-      .innerJoin('r.source', 'src')
-      // latest spends per (sourceId,date)
+      .createQueryBuilder()
+      .from(`(${rBase.getQuery()})`, 'rb')
+      .setParameters(rBase.getParameters())
+      // join latest spends per (sourceId, date)
       .leftJoin(
         `(${sSub.getQuery()})`,
         'ls',
-        `ls."sourceId" = r."sourceId" AND ls."date" = r."date" AND ls.rn = 1`,
+        `ls."sourceId" = rb."sourceId" AND ls."date" = rb."date" AND ls.rn = 1`,
       )
-      // one COMP price per date
-      .leftJoin(`(${pSub.getQuery()})`, 'cp', `cp."date" = r."date" AND cp.rn = 1`)
       .setParameters(sSub.getParameters())
-      .setParameters(pSub.getParameters())
-      .where('src.algorithm && :algorithms::text[]', { algorithms })
+      .leftJoin(`(${pSub.getQuery()})`, 'cp', `cp."date" = rb."date" AND cp.rn = 1`)
+      .setParameters(pSub.getParameters());
+
+    dataQb
       .select([
-        'r."sourceId" AS "sourceId"',
-        'r."date" AS "date"',
-        'r."value" AS "incomes"',
-        'COALESCE(ls."valueSupply", 0) AS "rewardsSupply"',
-        'COALESCE(ls."valueBorrow", 0) AS "rewardsBorrow"',
-        // Fallback: ls.priceComp -> cp.price -> 0
+        `rb."sourceId" AS "sourceId"`,
+        `rb."date"     AS "date"`,
+        `
+    CASE
+      WHEN rb."prevQty" IS NULL
+      THEN rb."value"::double precision
+      ELSE ((rb."qty" - rb."prevQty") / POWER(10::numeric, rb."decimals")) * rb."price"
+    END
+    AS "incomes"
+    `,
+        `COALESCE(ls."valueSupply", 0) AS "rewardsSupply"`,
+        `COALESCE(ls."valueBorrow", 0) AS "rewardsBorrow"`,
         `COALESCE(ls."priceComp", cp."price", 0) AS "priceComp"`,
       ])
-      .orderBy('r."date"', order)
+      .orderBy(`rb."date"`, order)
       .offset(dto.offset ?? 0);
 
     if (dto.limit) dataQb.limit(dto.limit);
