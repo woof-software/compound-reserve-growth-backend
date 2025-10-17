@@ -12,27 +12,27 @@ export const events = [
     date: '2025-06-22T07:00:00.000Z',
   },
   {
-    name: 'Market crush',
+    name: 'Market crash',
     date: '2024-08-05T12:00:00.000Z',
   },
   {
-    name: 'Market crush',
+    name: 'Market crash',
     date: '2025-02-26T12:00:00.000Z',
   },
   {
-    name: 'Market crush',
+    name: 'Market crash',
     date: '2025-03-09T12:00:00.000Z',
   },
   {
-    name: 'Market crush',
+    name: 'Market crash',
     date: '2025-04-06T12:00:00.000Z',
   },
   {
-    name: 'Market crush',
+    name: 'Market crash',
     date: '2025-04-13T12:00:00.000Z',
   },
   {
-    name: 'Market crush',
+    name: 'Market crash',
     date: '2025-06-22T12:00:00.000Z',
   },
 ];
