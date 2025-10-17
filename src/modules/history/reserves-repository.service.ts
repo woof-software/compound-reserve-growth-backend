@@ -234,15 +234,15 @@ export class ReservesRepository {
 
     // Subquery S: pick latest spends per (sourceId, date)
     const sSub = this.spendsRepository.createQueryBuilder('s').select([
-      's.sourceId AS sourceId',
-      's.date AS date',
-      's.valueSupply AS valueSupply',
-      's.valueBorrow AS valueBorrow',
-      's.priceComp AS priceComp',
+      's."sourceId" AS "sourceId"',
+      's."date" AS "date"',
+      's."valueSupply" AS "valueSupply"',
+      's."valueBorrow" AS "valueBorrow"',
+      's."priceComp" AS "priceComp"',
       // pick the latest by created_at (fallback id)
       `ROW_NUMBER() OVER (
-       PARTITION BY s.sourceId, s.date
-       ORDER BY s.createdAt DESC, s.id DESC
+       PARTITION BY s."sourceId", s."date"
+       ORDER BY s."createdAt" DESC, s."id" DESC
      ) AS rn`,
     ]);
 
@@ -251,15 +251,15 @@ export class ReservesRepository {
     const pSub = this.priceRepository
       .createQueryBuilder('p')
       .select([
-        `p.symbol AS "symbol"`,
-        `p.date   AS "date"`,
-        `p.price  AS "price"`,
+        `p."symbol" AS "symbol"`,
+        `p."date"   AS "date"`,
+        `p."price"  AS "price"`,
         `ROW_NUMBER() OVER (
-         PARTITION BY p.symbol, p.date
-         ORDER BY p.createdAt DESC, p.id DESC
+         PARTITION BY p."symbol", p."date"
+         ORDER BY p."createdAt" DESC, p."id" DESC
        ) AS rn`,
       ])
-      .where('p.symbol = :comp', { comp: 'COMP' });
+      .where('p."symbol" = :comp', { comp: 'COMP' });
 
     // Data QB: merged rows (reserves + latest spends)
     const dataQb = this.reservesRepository
@@ -277,15 +277,15 @@ export class ReservesRepository {
       .setParameters(pSub.getParameters())
       .where('src.algorithm && :algorithms::text[]', { algorithms })
       .select([
-        'r.sourceId AS "sourceId"',
-        'r.date AS "date"',
-        'r.value AS "incomes"',
-        'COALESCE(ls.valueSupply, 0) AS "rewardsSupply"',
-        'COALESCE(ls.valueBorrow, 0) AS "rewardsBorrow"',
+        'r."sourceId" AS "sourceId"',
+        'r."date" AS "date"',
+        'r."value" AS "incomes"',
+        'COALESCE(ls."valueSupply", 0) AS "rewardsSupply"',
+        'COALESCE(ls."valueBorrow", 0) AS "rewardsBorrow"',
         // Fallback: ls.priceComp -> cp.price -> 0
         `COALESCE(ls."priceComp", cp."price", 0) AS "priceComp"`,
       ])
-      .orderBy('r.date', order)
+      .orderBy('r."date"', order)
       .offset(dto.offset ?? 0);
 
     if (dto.limit) dataQb.limit(dto.limit);
