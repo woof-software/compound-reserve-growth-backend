@@ -295,9 +295,7 @@ export class ReservesRepository {
       )
       .setParameters(sSub.getParameters())
       .leftJoin(`(${pSub.getQuery()})`, 'cp', `cp."date" = rb."date" AND cp.rn = 1`)
-      .setParameters(pSub.getParameters());
-
-    dataQb
+      .setParameters(pSub.getParameters())
       .select([
         `rb."sourceId" AS "sourceId"`,
         `rb."date"     AS "date"`,
