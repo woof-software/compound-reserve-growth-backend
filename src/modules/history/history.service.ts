@@ -16,10 +16,8 @@ import { PaginatedDataDto } from '@app/common/dto/paginated-data.dto';
 import { OffsetDataDto } from '@app/common/dto/offset-data.dto';
 import { Algorithm } from '@/common/enum/algorithm.enum';
 import { Order } from '@/common/enum/order.enum';
-
-const msInDay = 86400000;
-const dayId = (date: Date): number => Math.floor(date.getTime() / msInDay);
-const generateDailyKey = (sourceId: number, date: Date): string => `${sourceId}_${dayId(date)}`;
+import { generateDailyKey } from '@/common/utils/generate-daily-key';
+import { dayId } from '@/common/utils/day-id';
 
 @Injectable()
 export class HistoryService {
@@ -195,22 +193,16 @@ export class HistoryService {
 
     if (!dto.order) dto.order = Order.ASC;
 
-    const [revenue, spends] = await Promise.all([
-      this.reservesRepo.getOffsetRevenueReserves(dto, allAlgorithms),
-      this.spendsRepo.getOffsetStats(dto, allAlgorithms), // saves only COMET_STATS
-    ]);
+    const incentivesData = await this.reservesRepo.getOffsetIncentivesHistory(dto, allAlgorithms);
 
-    // Create a Map for quick lookup of spends by sourceId and date
-    const spendsMap = new Map<string, Spends>();
-    spends.data.forEach((item) => {
-      const key = generateDailyKey(item.source.id, item.date);
-      spendsMap.set(key, item);
-    });
+    if (incentivesData.data.length === 0) {
+      return new OffsetDataDto<IncentivesHistory>([], dto.limit ?? null, dto.offset ?? 0, 0);
+    }
 
     const pricesMap = new Map<number, number>();
     {
-      const firstDate = revenue.data[0].date;
-      const lastDate = revenue.data[revenue.data.length - 1].date;
+      const firstDate = incentivesData.data[0].reserve.date;
+      const lastDate = incentivesData.data[incentivesData.data.length - 1].reserve.date;
 
       let startDate: Date;
       let endDate: Date;
@@ -232,11 +224,11 @@ export class HistoryService {
     const indexesWithoutPrice: number[] = [];
     let firstPrice = 0;
     let previousPrice = 0;
-    const data: IncentivesHistory[] = revenue.data.map((revenue, index) => {
-      const spendsRecord = spendsMap.get(generateDailyKey(revenue.source.id, revenue.date));
-      let priceComp = spendsRecord?.priceComp ?? pricesMap.get(dayId(revenue.date));
+    const data: IncentivesHistory[] = incentivesData.data.map((item, index) => {
+      const { reserve, spends } = item;
+      let priceComp = spends?.priceComp ?? pricesMap.get(dayId(reserve.date));
       if (!priceComp) {
-        this.logger.warn(`incentives -> priceComp not found for ${revenue.date}`, revenue);
+        this.logger.warn(`incentives -> priceComp not found for ${reserve.date}`, reserve);
         if (previousPrice) {
           priceComp = previousPrice;
         } else {
@@ -247,17 +239,22 @@ export class HistoryService {
         previousPrice = priceComp;
       }
       return {
-        incomes: revenue.value,
-        rewardsSupply: spendsRecord?.valueSupply ?? 0,
-        rewardsBorrow: spendsRecord?.valueBorrow ?? 0,
-        sourceId: revenue.source.id,
+        incomes: reserve.value,
+        rewardsSupply: spends?.valueSupply ?? 0,
+        rewardsBorrow: spends?.valueBorrow ?? 0,
+        sourceId: reserve.source.id,
         priceComp,
-        date: revenue.date,
+        date: reserve.date,
       };
     });
 
     indexesWithoutPrice.forEach((ind) => (data[ind].priceComp = firstPrice));
 
-    return new OffsetDataDto<IncentivesHistory>(data, revenue.limit, revenue.offset, revenue.total);
+    return new OffsetDataDto<IncentivesHistory>(
+      data,
+      incentivesData.limit,
+      incentivesData.offset,
+      incentivesData.total,
+    );
   }
 }
