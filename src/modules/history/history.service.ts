@@ -2,7 +2,6 @@ import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 
 import { SourceRepository } from 'modules/source/source.repository';
 import { Source } from 'modules/source/source.entity';
-import { PriceRepository } from 'modules/price/price.repository';
 
 import { ReservesRepository } from './reserves-repository.service';
 import { IncomesRepository } from './incomes-repository.service';
@@ -17,7 +16,6 @@ import { OffsetDataDto } from '@app/common/dto/offset-data.dto';
 import { Algorithm } from '@/common/enum/algorithm.enum';
 import { Order } from '@/common/enum/order.enum';
 import { generateDailyKey } from '@/common/utils/generate-daily-key';
-import { dayId } from '@/common/utils/day-id';
 
 @Injectable()
 export class HistoryService {
@@ -28,7 +26,6 @@ export class HistoryService {
     private readonly incomesRepo: IncomesRepository,
     private readonly spendsRepo: SpendsRepository,
     private readonly sourceRepo: SourceRepository,
-    private readonly priceRepo: PriceRepository,
   ) {}
 
   // ?: not in use
@@ -199,33 +196,11 @@ export class HistoryService {
       return new OffsetDataDto<IncentivesHistory>([], dto.limit ?? null, dto.offset ?? 0, 0);
     }
 
-    const pricesMap = new Map<number, number>();
-    {
-      const firstDate = incentivesData.data[0].date;
-      const lastDate = incentivesData.data[incentivesData.data.length - 1].date;
-
-      let startDate: Date;
-      let endDate: Date;
-      if (dto.order === Order.ASC) {
-        startDate = firstDate;
-        endDate = lastDate;
-      } else {
-        endDate = firstDate;
-        startDate = lastDate;
-      }
-
-      const prices = await this.priceRepo.findBySymbolInDateRange('COMP', startDate, endDate);
-      prices.forEach((item) => {
-        const key = dayId(item.date);
-        pricesMap.set(key, item.price);
-      });
-    }
-
     const indexesWithoutPrice: number[] = [];
     let firstPrice = 0;
     let previousPrice = 0;
     const data: IncentivesHistory[] = incentivesData.data.map((item, index) => {
-      item.priceComp = item.priceComp || pricesMap.get(dayId(item.date));
+      item.priceComp;
       if (!item.priceComp) {
         this.logger.warn(`incentives -> priceComp not found for ${item.date}`, item);
         if (previousPrice) {

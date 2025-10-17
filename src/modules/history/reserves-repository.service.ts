@@ -3,6 +3,8 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ethers } from 'ethers';
 
+import { Price } from 'modules/price/price.entity';
+
 import { IncentivesHistory, Reserve, Spends } from './entities';
 import { PaginationDto } from './dto/pagination.dto';
 import { OffsetDto } from './dto/offset.dto';
@@ -17,6 +19,7 @@ export class ReservesRepository {
   constructor(
     @InjectRepository(Reserve) private readonly reservesRepository: Repository<Reserve>,
     @InjectRepository(Spends) private readonly spendsRepository: Repository<Spends>,
+    @InjectRepository(Price) private readonly priceRepository: Repository<Price>,
   ) {}
 
   async save(reserve: Reserve): Promise<Reserve> {
@@ -243,24 +246,44 @@ export class ReservesRepository {
      ) AS rn`,
     ]);
 
+    // Subquery P: one price per (symbol, date) for COMP (latest if duplicates)
+    // !: equality join on date;
+    const pSub = this.priceRepository
+      .createQueryBuilder('p')
+      .select([
+        `p.symbol AS "symbol"`,
+        `p.date   AS "date"`,
+        `p.price  AS "price"`,
+        `ROW_NUMBER() OVER (
+         PARTITION BY p.symbol, p.date
+         ORDER BY p.createdAt DESC, p.id DESC
+       ) AS rn`,
+      ])
+      .where('p.symbol = :comp', { comp: 'COMP' });
+
     // Data QB: merged rows (reserves + latest spends)
     const dataQb = this.reservesRepository
       .createQueryBuilder('r')
       .innerJoin('r.source', 'src')
+      // latest spends per (sourceId,date)
       .leftJoin(
         `(${sSub.getQuery()})`,
         'ls',
-        'ls.sourceId = r.sourceId AND ls.date = r.date AND ls.rn = 1',
+        `ls."sourceId" = r."sourceId" AND ls."date" = r."date" AND ls.rn = 1`,
       )
+      // one COMP price per date
+      .leftJoin(`(${pSub.getQuery()})`, 'cp', `cp."date" = r."date" AND cp.rn = 1`)
       .setParameters(sSub.getParameters())
-      .where('src.algorithm && :algorithms::text[]', { algorithms }) // pass string[]
+      .setParameters(pSub.getParameters())
+      .where('src.algorithm && :algorithms::text[]', { algorithms })
       .select([
         'r.sourceId AS "sourceId"',
         'r.date AS "date"',
         'r.value AS "incomes"',
         'COALESCE(ls.valueSupply, 0) AS "rewardsSupply"',
         'COALESCE(ls.valueBorrow, 0) AS "rewardsBorrow"',
-        'COALESCE(ls.priceComp, 0) AS "priceComp"',
+        // Fallback: ls.priceComp -> cp.price -> 0
+        `COALESCE(ls."priceComp", cp."price", 0) AS "priceComp"`,
       ])
       .orderBy('r.date', order)
       .offset(dto.offset ?? 0);
