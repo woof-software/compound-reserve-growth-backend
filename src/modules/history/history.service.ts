@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 
 import { SourceRepository } from 'modules/source/source.repository';
 import { Source } from 'modules/source/source.entity';
@@ -23,6 +23,8 @@ const generateDailyKey = (sourceId: number, date: Date): string => `${sourceId}_
 
 @Injectable()
 export class HistoryService {
+  private readonly logger = new Logger(HistoryService.name);
+
   constructor(
     private readonly reservesRepo: ReservesRepository,
     private readonly incomesRepo: IncomesRepository,
@@ -228,13 +230,17 @@ export class HistoryService {
     let previousPrice = 0;
     const data: IncentivesHistory[] = revenue.data.map((revenue, index) => {
       const spendsRecord = spendsMap.get(generateDailyKey(revenue.source.id, revenue.date));
-      const priceComp =
-        spendsRecord?.priceComp ?? pricesMap.get(dayId(revenue.date)) ?? previousPrice;
+      let priceComp = spendsRecord?.priceComp ?? pricesMap.get(dayId(revenue.date));
       if (!priceComp) {
-        indexesWithoutPrice.push(index);
+        this.logger.warn(`incentives -> priceComp not found for ${revenue.date}`, revenue);
+        if (previousPrice) {
+          priceComp = previousPrice;
+        } else {
+          indexesWithoutPrice.push(index);
+        }
       } else {
-        previousPrice = priceComp;
         firstPrice = firstPrice || priceComp;
+        previousPrice = priceComp;
       }
       return {
         incomes: revenue.value,
