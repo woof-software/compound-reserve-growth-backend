@@ -1,8 +1,7 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 
 import { SourceRepository } from 'modules/source/source.repository';
 import { Source } from 'modules/source/source.entity';
-import { PriceRepository } from 'modules/price/price.repository';
 
 import { ReservesRepository } from './reserves-repository.service';
 import { IncomesRepository } from './incomes-repository.service';
@@ -16,19 +15,17 @@ import { PaginatedDataDto } from '@app/common/dto/paginated-data.dto';
 import { OffsetDataDto } from '@app/common/dto/offset-data.dto';
 import { Algorithm } from '@/common/enum/algorithm.enum';
 import { Order } from '@/common/enum/order.enum';
-
-const msInDay = 86400000;
-const dayId = (date: Date): number => Math.floor(date.getTime() / msInDay);
-const generateDailyKey = (sourceId: number, date: Date): string => `${sourceId}_${dayId(date)}`;
+import { generateDailyKey } from '@/common/utils/generate-daily-key';
 
 @Injectable()
 export class HistoryService {
+  private readonly logger = new Logger(HistoryService.name);
+
   constructor(
     private readonly reservesRepo: ReservesRepository,
     private readonly incomesRepo: IncomesRepository,
     private readonly spendsRepo: SpendsRepository,
     private readonly sourceRepo: SourceRepository,
-    private readonly priceRepo: PriceRepository,
   ) {}
 
   // ?: not in use
@@ -193,65 +190,38 @@ export class HistoryService {
 
     if (!dto.order) dto.order = Order.ASC;
 
-    const [revenue, spends] = await Promise.all([
-      this.reservesRepo.getOffsetRevenueReserves(dto, allAlgorithms),
-      this.spendsRepo.getOffsetStats(dto, allAlgorithms), // saves only COMET_STATS
-    ]);
+    const incentivesData = await this.reservesRepo.getOffsetIncentivesHistory(dto, allAlgorithms);
 
-    // Create a Map for quick lookup of spends by sourceId and date
-    const spendsMap = new Map<string, Spends>();
-    spends.data.forEach((item) => {
-      const key = generateDailyKey(item.source.id, item.date);
-      spendsMap.set(key, item);
-    });
-
-    const pricesMap = new Map<number, number>();
-    {
-      const firstDate = revenue.data[0].date;
-      const lastDate = revenue.data[revenue.data.length - 1].date;
-
-      let startDate: Date;
-      let endDate: Date;
-      if (dto.order === Order.ASC) {
-        startDate = firstDate;
-        endDate = lastDate;
-      } else {
-        endDate = firstDate;
-        startDate = lastDate;
-      }
-
-      const prices = await this.priceRepo.findBySymbolInDateRange('COMP', startDate, endDate);
-      prices.forEach((item) => {
-        const key = dayId(item.date);
-        pricesMap.set(key, item.price);
-      });
+    if (incentivesData.data.length === 0) {
+      return new OffsetDataDto<IncentivesHistory>([], dto.limit ?? null, dto.offset ?? 0, 0);
     }
 
     const indexesWithoutPrice: number[] = [];
     let firstPrice = 0;
     let previousPrice = 0;
-    const data: IncentivesHistory[] = revenue.data.map((revenue, index) => {
-      const spendsRecord = spendsMap.get(generateDailyKey(revenue.source.id, revenue.date));
-      const priceComp =
-        spendsRecord?.priceComp ?? pricesMap.get(dayId(revenue.date)) ?? previousPrice;
-      if (!priceComp) {
-        indexesWithoutPrice.push(index);
+    const data: IncentivesHistory[] = incentivesData.data.map((item, index) => {
+      item.priceComp;
+      if (!item.priceComp) {
+        this.logger.warn(`incentives -> priceComp not found for ${item.date}`, item);
+        if (previousPrice) {
+          item.priceComp = previousPrice;
+        } else {
+          indexesWithoutPrice.push(index);
+        }
       } else {
-        previousPrice = priceComp;
-        firstPrice = firstPrice || priceComp;
+        firstPrice = firstPrice || item.priceComp;
+        previousPrice = item.priceComp;
       }
-      return {
-        incomes: revenue.value,
-        rewardsSupply: spendsRecord?.valueSupply ?? 0,
-        rewardsBorrow: spendsRecord?.valueBorrow ?? 0,
-        sourceId: revenue.source.id,
-        priceComp,
-        date: revenue.date,
-      };
+      return item;
     });
 
-    indexesWithoutPrice.forEach((ind) => (data[ind].priceComp = firstPrice));
+    if (firstPrice) indexesWithoutPrice.forEach((ind) => (data[ind].priceComp = firstPrice));
 
-    return new OffsetDataDto<IncentivesHistory>(data, revenue.limit, revenue.offset, revenue.total);
+    return new OffsetDataDto<IncentivesHistory>(
+      data,
+      incentivesData.limit,
+      incentivesData.offset,
+      incentivesData.total,
+    );
   }
 }

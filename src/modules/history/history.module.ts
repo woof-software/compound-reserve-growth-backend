@@ -6,6 +6,7 @@ import { SourceModule } from 'modules/source/source.module';
 import { ContractModule } from 'modules/contract/contract.module';
 import { PriceModule } from 'modules/price/price.module';
 import { RedisModule } from 'modules/redis/redis.module';
+import { Price } from 'modules/price/price.entity';
 
 import { Reserve, Incomes, Spends } from './entities';
 import { ReservesRepository } from './reserves-repository.service';
@@ -20,7 +21,7 @@ import { SpendsRepository } from './spends-repository.service';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Reserve, Incomes, Spends]),
+    TypeOrmModule.forFeature([Reserve, Incomes, Spends, Price]),
     SourceModule,
     AssetModule,
     forwardRef(() => ContractModule),

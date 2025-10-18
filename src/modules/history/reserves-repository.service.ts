@@ -1,20 +1,26 @@
 import { Injectable } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
+import { DataSource, Repository } from 'typeorm';
 import { ethers } from 'ethers';
 
-import { Reserve } from './entities';
+import { Price } from 'modules/price/price.entity';
+
+import { IncentivesHistory, Reserve, Spends } from './entities';
 import { PaginationDto } from './dto/pagination.dto';
 import { OffsetDto } from './dto/offset.dto';
 
 import { Algorithm } from '@app/common/enum/algorithm.enum';
 import { PaginatedDataDto } from '@app/common/dto/paginated-data.dto';
 import { OffsetDataDto } from '@app/common/dto/offset-data.dto';
+import { Order } from '@/common/enum/order.enum';
 
 @Injectable()
 export class ReservesRepository {
   constructor(
     @InjectRepository(Reserve) private readonly reservesRepository: Repository<Reserve>,
+    @InjectRepository(Spends) private readonly spendsRepository: Repository<Spends>,
+    @InjectRepository(Price) private readonly priceRepository: Repository<Price>,
+    @InjectDataSource() private readonly dataSource: DataSource,
   ) {}
 
   async save(reserve: Reserve): Promise<Reserve> {
@@ -219,5 +225,114 @@ export class ReservesRepository {
       .delete()
       .where('sourceId IN (:...sourceIds)', { sourceIds })
       .execute();
+  }
+
+  async getOffsetIncentivesHistory(
+    dto: OffsetDto,
+    algorithms = [Algorithm.COMET_STATS, Algorithm.MARKET_V2, Algorithm.AERA_COMPOUND_RESERVES],
+  ): Promise<OffsetDataDto<IncentivesHistory>> {
+    const { order = Order.ASC } = dto;
+
+    // Subquery S: pick latest spends per (sourceId, date)
+    const sSub = this.spendsRepository.createQueryBuilder('s').select([
+      's."sourceId" AS "sourceId"',
+      's."date" AS "date"',
+      's."valueSupply" AS "valueSupply"',
+      's."valueBorrow" AS "valueBorrow"',
+      's."priceComp" AS "priceComp"',
+      // pick the latest by created_at (fallback id)
+      `ROW_NUMBER() OVER (
+       PARTITION BY s."sourceId", s."date"
+       ORDER BY s."createdAt" DESC, s."id" DESC
+     ) AS rn`,
+    ]);
+
+    // !: we also bring asset.decimals to normalize raw quantity
+    const rBase = this.reservesRepository
+      .createQueryBuilder('r0')
+      .innerJoin('r0.source', 'src0')
+      .innerJoin('src0.asset', 'a0')
+      .where('src0.algorithm && :algorithms::text[]', { algorithms })
+      .select([
+        `r0."sourceId" AS "sourceId"`,
+        `r0."date"     AS "date"`,
+        `r0."price"    AS "price"`,
+        `r0."value"    AS "value"`, // original stored value (used for the very first row)
+        // store quantity as numeric for math
+        `r0."quantity"::numeric AS "qty"`,
+        `a0."decimals"          AS "decimals"`,
+        // previous quantity in the timeline per source
+        `LAG(r0."quantity"::numeric) OVER (
+         PARTITION BY r0."sourceId"
+         ORDER BY r0."date", r0."id"
+       ) AS "prevQty"`,
+      ]);
+
+    // Subquery P: one price per (symbol, date) for COMP (latest if duplicates)
+    // !: equality join on date;
+    const pSub = this.priceRepository
+      .createQueryBuilder('p')
+      .select([
+        `p."symbol" AS "symbol"`,
+        `p."date"   AS "date"`,
+        `p."price"  AS "price"`,
+        `ROW_NUMBER() OVER (
+         PARTITION BY p."symbol", p."date"
+         ORDER BY p."createdAt" DESC, p."id" DESC
+       ) AS rn`,
+      ])
+      .where('p."symbol" = :comp', { comp: 'COMP' });
+
+    // Data QB: merged rows (reserves + latest spends)
+    const dataQb = this.dataSource
+      .createQueryBuilder()
+      .from(`(${rBase.getQuery()})`, 'rb')
+      .setParameters(rBase.getParameters())
+      // join latest spends per (sourceId, date)
+      .leftJoin(
+        `(${sSub.getQuery()})`,
+        'ls',
+        `ls."sourceId" = rb."sourceId" AND ls."date" = rb."date" AND ls.rn = 1`,
+      )
+      .setParameters(sSub.getParameters())
+      .leftJoin(`(${pSub.getQuery()})`, 'cp', `cp."date" = rb."date" AND cp.rn = 1`)
+      .setParameters(pSub.getParameters())
+      .select([
+        `rb."sourceId" AS "sourceId"`,
+        `rb."date"     AS "date"`,
+        `
+    CASE
+      WHEN rb."prevQty" IS NULL
+      THEN rb."value"::double precision
+      ELSE ((rb."qty" - rb."prevQty") / POWER(10::numeric, rb."decimals")) * rb."price"
+    END
+    AS "incomes"
+    `,
+        `COALESCE(ls."valueSupply", 0) AS "rewardsSupply"`,
+        `COALESCE(ls."valueBorrow", 0) AS "rewardsBorrow"`,
+        `COALESCE(ls."priceComp", cp."price", 0) AS "priceComp"`,
+      ])
+      .orderBy(`rb."date"`, order)
+      .offset(dto.offset ?? 0);
+
+    if (dto.limit) dataQb.limit(dto.limit);
+
+    // Count QB: count ONLY reserves under the same filter (no joins to spends)
+    const countQb = this.reservesRepository
+      .createQueryBuilder('r')
+      .innerJoin('r.source', 'src')
+      .where('src.algorithm && :algorithms::text[]', { algorithms });
+
+    const [rows, totalReserves] = await Promise.all([
+      dataQb.getRawMany<IncentivesHistory>(),
+      countQb.getCount(),
+    ]);
+
+    return new OffsetDataDto<IncentivesHistory>(
+      rows,
+      dto.limit ?? null,
+      dto.offset ?? 0,
+      totalReserves,
+    );
   }
 }
