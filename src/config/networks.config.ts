@@ -68,6 +68,6 @@ export default registerAs('networks', (): NetworkConfig[] => [
   {
     network: 'linea',
     chainId: 59144,
-    url: `https://rpc.ankr.com/linea/${process.env.ANKR_KEY}`,
+    url: `https://omniscient-hardworking-gas.linea-mainnet.quiknode.pro/${process.env.LINEA_QUICKNODE_KEY}/`,
   },
 ]);
