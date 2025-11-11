@@ -8,6 +8,8 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 
+import { ApiKeyEndpoint } from 'modules/api-key/decorators/api-key-endpoint';
+
 import { EventService } from './event.service';
 import { EventResponse } from './response/event.response';
 
@@ -16,6 +18,7 @@ import { EventResponse } from './response/event.response';
 export class EventController {
   constructor(private readonly eventService: EventService) {}
 
+  @ApiKeyEndpoint()
   @ApiOperation({ summary: 'Get event list' })
   @ApiResponse({ type: [EventResponse] })
   @HttpCode(HttpStatus.OK)

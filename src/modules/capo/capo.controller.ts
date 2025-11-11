@@ -2,6 +2,8 @@ import { Controller, Injectable, Get, HttpCode, HttpStatus, Query } from '@nestj
 import { Throttle } from '@nestjs/throttler';
 import { ApiOkResponse, ApiOperation } from '@nestjs/swagger';
 
+import { ApiKeyEndpoint } from 'modules/api-key/decorators/api-key-endpoint';
+
 import { CapoResponse } from './response/capo.response';
 import { CapoRequest } from './request/capo.request';
 import { CapoService } from './capo.service';
@@ -14,6 +16,7 @@ export class CapoController {
   constructor(private readonly capoService: CapoService) {}
 
   @Throttle({ default: { limit: 15, ttl: 1000 } })
+  @ApiKeyEndpoint()
   @ApiOperation({ summary: 'Get CAPO aggregations (plain list)' })
   @ApiOkResponse({ type: [CapoResponse] })
   @HttpCode(HttpStatus.OK)

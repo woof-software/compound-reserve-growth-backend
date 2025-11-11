@@ -4,6 +4,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { GithubModule } from 'modules/github/github.module';
 import { AssetModule } from 'modules/asset/asset.module';
 import { ContractModule } from 'modules/contract/contract.module';
+import { ApiKeyModule } from 'modules/api-key/api-key.module';
 
 import { Source } from './source.entity';
 import { SourceRepository } from './source.repository';
@@ -17,6 +18,7 @@ import { SourceController } from './source.controller';
     GithubModule,
     AssetModule,
     forwardRef(() => ContractModule),
+    ApiKeyModule,
   ],
   providers: [SourceRepository, SourceService, SourceFillCommand],
   exports: [SourceService, SourceRepository],

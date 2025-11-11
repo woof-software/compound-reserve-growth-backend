@@ -6,6 +6,7 @@ import { SourceModule } from 'modules/source/source.module';
 import { ContractModule } from 'modules/contract/contract.module';
 import { PriceModule } from 'modules/price/price.module';
 import { RedisModule } from 'modules/redis/redis.module';
+import { ApiKeyModule } from 'modules/api-key/api-key.module';
 import { Price } from 'modules/price/price.entity';
 
 import { Reserve, Incomes, Spends } from './entities';
@@ -27,6 +28,7 @@ import { SpendsRepository } from './spends-repository.service';
     forwardRef(() => ContractModule),
     PriceModule,
     RedisModule,
+    ApiKeyModule,
   ],
   providers: [
     ReservesRepository,

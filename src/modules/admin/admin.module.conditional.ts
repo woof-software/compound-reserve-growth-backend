@@ -1,6 +1,7 @@
 import { DynamicModule, Module } from '@nestjs/common';
 
 import { HistoryModule } from 'modules/history/history.module';
+import { ApiKeyModule } from 'modules/api-key/api-key.module';
 
 import { AdminController } from './admin.controller';
 import { AdminService } from './admin.service';
@@ -23,7 +24,7 @@ export class AdminModuleConditional {
 
     return {
       module: AdminModuleConditional,
-      imports: [HistoryModule],
+      imports: [HistoryModule, ApiKeyModule],
       providers: [AdminService],
       exports: [AdminService],
       controllers: [AdminController],
