@@ -9,9 +9,8 @@ import { Request } from 'express';
 
 import { ApiKeyService } from 'modules/api-key/api-key.service';
 
-import { validateBearerHeader } from 'common/guards/validate-bearer-header';
-import { extractToken } from 'common/guards/exctract-token';
-
+import { validateBearerHeader } from '@/common/guards/validate-bearer-header';
+import { extractToken } from '@/common/guards/exctract-token';
 import { ApiKeyStatus } from '@/common/enum/api-key-status.enum';
 
 @Injectable()
@@ -59,9 +58,6 @@ export class ApiKeyGuard implements CanActivate {
         throw new ForbiddenException('Domain not allowed');
       }
     }
-
-    // Attach API key to request for potential use in controllers
-    (request as any).apiKey = apiKey;
 
     return true;
   }

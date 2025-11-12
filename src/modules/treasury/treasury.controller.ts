@@ -4,7 +4,8 @@ import { Throttle } from '@nestjs/throttler';
 
 import { HistoryService } from 'modules/history/history.service';
 import { ReserveResponse } from 'modules/history/response/reserve.response';
-import { ApiKeyEndpoint } from 'modules/api-key/decorators/api-key-endpoint';
+
+import { ApiKeyEndpoint } from '@/common/decorators';
 
 @Injectable()
 @Controller('treasury')

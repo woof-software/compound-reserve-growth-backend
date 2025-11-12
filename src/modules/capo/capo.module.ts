@@ -8,12 +8,13 @@ import { Source } from 'modules/source/source.entity';
 import { OracleModule } from 'modules/oracle/oracle.module';
 import { AlertModule } from 'modules/alert/alert.module';
 import { Oracle } from 'modules/oracle/oracle.entity';
-import { ApiKeyModule } from 'modules/api-key/api-key.module';
 
 import { CapoController } from './capo.controller';
 import { CapoService } from './capo.service';
 import { Snapshot } from './snapshot.entity';
 import { DailyAggregation } from './daily.entity';
+
+import { ApiKeyGuardModule } from '@/common/guards/api-key';
 
 @Module({
   imports: [
@@ -22,7 +23,7 @@ import { DailyAggregation } from './daily.entity';
     MailModule,
     OracleModule,
     AlertModule,
-    ApiKeyModule,
+    ApiKeyGuardModule,
     TypeOrmModule.forFeature([Snapshot, DailyAggregation, Source]),
     TypeOrmModule.forFeature([Oracle]),
   ],

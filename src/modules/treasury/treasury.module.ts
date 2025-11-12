@@ -3,15 +3,16 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 
 import { SourceModule } from 'modules/source/source.module';
 import { HistoryModule } from 'modules/history/history.module';
-import { ApiKeyModule } from 'modules/api-key/api-key.module';
 
 import { Treasury } from './treasury.entity';
 import { TreasuryRepository } from './treasury.repository';
 import { TreasuryService } from './treasury.service';
 import { TreasuryController } from './treasury.controller';
 
+import { ApiKeyGuardModule } from '@/common/guards/api-key';
+
 @Module({
-  imports: [TypeOrmModule.forFeature([Treasury]), SourceModule, HistoryModule, ApiKeyModule],
+  imports: [TypeOrmModule.forFeature([Treasury]), SourceModule, HistoryModule, ApiKeyGuardModule],
   providers: [TreasuryRepository, TreasuryService],
   exports: [TreasuryService, TreasuryRepository],
   controllers: [TreasuryController],

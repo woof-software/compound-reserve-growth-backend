@@ -1,5 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
 
+import { ApiKeyStatus } from '@/common/enum/api-key-status.enum';
+
 export class ApiKeyResponse {
   @ApiProperty()
   id: number;
@@ -16,7 +18,7 @@ export class ApiKeyResponse {
   @ApiProperty({ type: [String] })
   domainWhitelist: string[];
 
-  @ApiProperty({ enum: ['active', 'paused', 'deleted'] })
+  @ApiProperty({ enum: ApiKeyStatus })
   status: string;
 
   @ApiProperty({ example: 1750809600 })

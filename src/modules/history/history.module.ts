@@ -6,7 +6,6 @@ import { SourceModule } from 'modules/source/source.module';
 import { ContractModule } from 'modules/contract/contract.module';
 import { PriceModule } from 'modules/price/price.module';
 import { RedisModule } from 'modules/redis/redis.module';
-import { ApiKeyModule } from 'modules/api-key/api-key.module';
 import { Price } from 'modules/price/price.entity';
 
 import { Reserve, Incomes, Spends } from './entities';
@@ -19,6 +18,7 @@ import { HistoryGetCron } from './cron/history-get.cron';
 import { GetHistoryService } from './cron/history-get.service';
 import { IncomesRepository } from './incomes-repository.service';
 import { SpendsRepository } from './spends-repository.service';
+import { ApiKeyGuardModule } from '@/common/guards/api-key';
 
 @Module({
   imports: [
@@ -28,7 +28,7 @@ import { SpendsRepository } from './spends-repository.service';
     forwardRef(() => ContractModule),
     PriceModule,
     RedisModule,
-    ApiKeyModule,
+    ApiKeyGuardModule,
   ],
   providers: [
     ReservesRepository,

@@ -1,13 +1,13 @@
 import { Module } from '@nestjs/common';
 
 import { HistoryModule } from 'modules/history/history.module';
-import { ApiKeyModule } from 'modules/api-key/api-key.module';
 
 import { AdminController } from './admin.controller';
 import { AdminService } from './admin.service';
+import { ApiKeyGuardModule } from '@/common/guards/api-key';
 
 @Module({
-  imports: [HistoryModule, ApiKeyModule],
+  imports: [HistoryModule, ApiKeyGuardModule],
   providers: [AdminService],
   exports: [AdminService],
   controllers: [AdminController],

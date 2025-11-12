@@ -1,6 +1,6 @@
 import { randomBytes } from 'crypto';
 
-import { Injectable, Logger, NotFoundException, BadRequestException, Inject } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import Redis from 'ioredis';
 
 import { REDIS_CLIENT } from 'modules/redis/redis.module';
@@ -57,7 +57,7 @@ export class ApiKeyService {
   }
 
   /**
-   * Get API key from cache or database
+   * Get API key from cache
    */
   async getApiKeyByKey(key: string): Promise<ApiKey | null> {
     try {
@@ -65,9 +65,7 @@ export class ApiKeyService {
       const cached = await this.redisClient.get(cacheKey);
 
       if (cached) {
-        const cacheData = JSON.parse(cached);
-        // Return the cached data directly (it's already in the right format)
-        return cacheData as ApiKey;
+        return JSON.parse(cached) as ApiKey;
       }
 
       const apiKey = await this.apiKeyRepository.findByKey(key);
@@ -79,8 +77,6 @@ export class ApiKeyService {
       return apiKey;
     } catch (error) {
       this.logger.error(`Failed to get API key: ${error.message}`);
-      // Fallback to database
-      return this.apiKeyRepository.findByKey(key);
     }
   }
 
@@ -185,13 +181,6 @@ export class ApiKeyService {
    */
   async search(searchDto: SearchApiKeyDto): Promise<ApiKey[]> {
     return this.apiKeyRepository.search(searchDto);
-  }
-
-  /**
-   * Get all API keys
-   */
-  async findAll(): Promise<ApiKey[]> {
-    return this.apiKeyRepository.findAllOrdered();
   }
 
   /**

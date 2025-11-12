@@ -1,12 +1,12 @@
 import { DynamicModule, Module } from '@nestjs/common';
 
 import { HistoryModule } from 'modules/history/history.module';
-import { ApiKeyModule } from 'modules/api-key/api-key.module';
 
 import { AdminController } from './admin.controller';
 import { AdminService } from './admin.service';
 
 import adminConfig from 'config/admin';
+import { ApiKeyGuardModule } from '@/common/guards/api-key';
 
 @Module({})
 export class AdminModuleConditional {
@@ -24,7 +24,7 @@ export class AdminModuleConditional {
 
     return {
       module: AdminModuleConditional,
-      imports: [HistoryModule, ApiKeyModule],
+      imports: [HistoryModule, ApiKeyGuardModule],
       providers: [AdminService],
       exports: [AdminService],
       controllers: [AdminController],

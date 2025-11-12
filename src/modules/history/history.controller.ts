@@ -5,7 +5,6 @@ import Redis from 'ioredis';
 
 import { REDIS_CLIENT } from 'modules/redis/redis.module';
 import { IncentiveHistoryResponse } from 'modules/history/response/incentives-history.response';
-import { ApiKeyEndpoint } from 'modules/api-key/decorators/api-key-endpoint';
 
 import { HistoryService } from './history.service';
 import { ReserveResponse } from './response/reserve.response';
@@ -14,6 +13,7 @@ import { StatsHistoryResponse } from './response/stats-history.response';
 import { OffsetRequest } from './request/offset.request';
 import { OffsetDto } from './dto/offset.dto';
 
+import { ApiKeyEndpoint } from '@/common/decorators';
 import { OffsetDataResponse } from '@app/common/response/offset-data.response';
 import { OffsetMetaResponse } from '@app/common/response/offset-meta.response';
 import { ApiOffsetResponse } from '@app/common/swagger/api-offset-response.decorator';

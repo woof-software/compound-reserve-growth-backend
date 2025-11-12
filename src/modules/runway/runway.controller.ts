@@ -4,7 +4,8 @@ import { Throttle } from '@nestjs/throttler';
 
 import { RunwayResponse } from './response/runway.response';
 import { RunwayService } from './runway.service';
-import { ApiKeyEndpoint } from 'modules/api-key/decorators/api-key-endpoint';
+
+import { ApiKeyEndpoint } from '@/common/decorators';
 
 @Injectable()
 @Controller('runway')

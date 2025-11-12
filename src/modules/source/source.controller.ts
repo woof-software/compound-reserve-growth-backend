@@ -3,7 +3,8 @@ import { Controller, Injectable, HttpStatus, HttpCode, Get } from '@nestjs/commo
 
 import { SourceService } from './source.service';
 import { SourcesWithAssetsResponse } from './response/sourcesWithAssets.response';
-import { ApiKeyEndpoint } from 'modules/api-key/decorators/api-key-endpoint';
+
+import { ApiKeyEndpoint } from '@/common/decorators';
 
 @Injectable()
 @Controller('sources')

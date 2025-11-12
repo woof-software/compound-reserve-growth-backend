@@ -2,12 +2,11 @@ import { Controller, Injectable, Get, HttpCode, HttpStatus, Query } from '@nestj
 import { Throttle } from '@nestjs/throttler';
 import { ApiOkResponse, ApiOperation } from '@nestjs/swagger';
 
-import { ApiKeyEndpoint } from 'modules/api-key/decorators/api-key-endpoint';
-
 import { CapoResponse } from './response/capo.response';
 import { CapoRequest } from './request/capo.request';
 import { CapoService } from './capo.service';
 
+import { ApiKeyEndpoint } from '@/common/decorators';
 import { OffsetDataDto } from '@/common/dto/offset-data.dto';
 
 @Injectable()
