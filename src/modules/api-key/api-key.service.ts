@@ -148,6 +148,32 @@ export class ApiKeyService {
   }
 
   /**
+   * Activate an API key
+   */
+  async activate(id: number): Promise<ApiKey> {
+    const apiKey = await this.apiKeyRepository.findById(id);
+
+    if (!apiKey) {
+      throw new NotFoundException(`API key with ID ${id} not found`);
+    }
+
+    if (apiKey.status === ApiKeyStatus.DELETED) {
+      throw new BadRequestException('Cannot activate a deleted API key');
+    }
+
+    if (apiKey.status === ApiKeyStatus.ACTIVE) {
+      return apiKey;
+    }
+
+    apiKey.status = ApiKeyStatus.ACTIVE;
+    const updated = await this.apiKeyRepository.save(apiKey);
+    await this.resetCache(apiKey.keyHash, true);
+
+    this.logger.log(`Activated API key: ${updated.keyHash}`);
+    return updated;
+  }
+
+  /**
    * Delete an API key (soft delete)
    */
   async delete(id: number): Promise<ApiKey> {

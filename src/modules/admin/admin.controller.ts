@@ -116,6 +116,19 @@ export class AdminController {
     return new ApiKeyResponse(apiKey);
   }
 
+  @Post('/api-keys/:id/activate')
+  @AdminEndpoint()
+  @ApiOperation({
+    summary: 'Activate API key',
+    description: 'Sets the API key status to active.',
+  })
+  @ApiResponse({ status: 200, type: ApiKeyResponse })
+  @SerializeOptions({ type: ApiKeyResponse })
+  async activateApiKey(@Param('id', ParseIntPipe) id: number): Promise<ApiKeyResponse> {
+    const apiKey = await this.apiKeyService.activate(id);
+    return new ApiKeyResponse(apiKey);
+  }
+
   @Delete('/api-keys/:id')
   @AdminEndpoint()
   @ApiOperation({
