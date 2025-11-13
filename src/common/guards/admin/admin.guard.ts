@@ -1,4 +1,4 @@
-import { BadRequestException, CanActivate, ExecutionContext, Injectable } from '@nestjs/common';
+import { CanActivate, ExecutionContext, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
 import { validateAdminHeader } from './validate-admin-header';
@@ -17,10 +17,6 @@ export class AdminGuard implements CanActivate {
     }
 
     const headers = await validateAdminHeader(context);
-
-    if (!headers.token) {
-      throw new BadRequestException('X-Admin-Token header is required');
-    }
 
     return this.adminToken === headers.token;
   }
