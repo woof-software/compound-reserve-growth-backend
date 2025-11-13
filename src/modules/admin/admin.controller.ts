@@ -2,13 +2,13 @@ import {
   Controller,
   Get,
   Post,
-  Put,
   Delete,
   Body,
   Param,
   Query,
   SerializeOptions,
   ParseIntPipe,
+  Patch,
 } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 
@@ -87,7 +87,7 @@ export class AdminController {
     return new ApiKeyResponse(apiKey);
   }
 
-  @Put('/api-keys/:id')
+  @Patch('/api-keys/:id')
   @AdminEndpoint()
   @ApiOperation({
     summary: 'Update API key',
