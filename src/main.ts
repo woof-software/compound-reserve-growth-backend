@@ -6,7 +6,8 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 
 import { AppModule } from './app.module';
 import { TAppConfig } from './config/app';
-import { Logger } from './infrastructure/logger';
+
+import { Logger } from 'infrastructure/logger';
 
 async function bootstrap() {
   const logLevel = (process.env.LOG_LEVEL?.split(',') || ['error']) as LogLevel[];
@@ -66,7 +67,7 @@ async function bootstrap() {
   await app.listen(appConfig.port, appConfig.host);
 
   logger.log(
-    `Application is running on http://${appConfig.host}:${appConfig.port}/${globalPrefix}`,
+    `Application is running on https://${appConfig.host}:${appConfig.port}/${globalPrefix}`,
   );
 }
 
