@@ -1,8 +1,7 @@
-import { CanActivate, ExecutionContext, Injectable } from '@nestjs/common';
+import { BadRequestException, CanActivate, ExecutionContext, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
-import { validateBearerHeader } from 'common/guards/validate-bearer-header';
-import { extractToken } from 'common/guards/exctract-token';
+import { validateAdminHeader } from './validate-admin-header';
 
 @Injectable()
 export class AdminGuard implements CanActivate {
@@ -17,8 +16,12 @@ export class AdminGuard implements CanActivate {
       return false;
     }
 
-    const headers = await validateBearerHeader(context);
+    const headers = await validateAdminHeader(context);
 
-    return this.adminToken === extractToken(headers.authorization);
+    if (!headers.token) {
+      throw new BadRequestException('X-Admin-Token header is required');
+    }
+
+    return this.adminToken === headers.token;
   }
 }

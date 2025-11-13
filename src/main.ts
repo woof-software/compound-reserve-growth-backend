@@ -26,7 +26,18 @@ async function bootstrap() {
       .setDescription('Compound Reserve Growth API project REST API documentation')
       .setVersion('1.0.1')
       .addTag('Compound Reserve Growth API project documentation')
-      .addBearerAuth()
+      .addSecurity('AdminToken', {
+        type: 'apiKey',
+        in: 'header',
+        name: 'X-Admin-Token',
+        description: 'Administrative access token',
+      })
+      .addSecurity('ApiKeyAuth', {
+        type: 'apiKey',
+        in: 'header',
+        name: 'X-Api-Key',
+        description: 'API access key',
+      })
       .build();
 
     const document = SwaggerModule.createDocument(app, config);

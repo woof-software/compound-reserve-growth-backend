@@ -9,8 +9,8 @@ import { Request } from 'express';
 
 import { ApiKeyService } from 'modules/api-key/api-key.service';
 
-import { validateBearerHeader } from '@/common/guards/validate-bearer-header';
-import { extractToken } from '@/common/guards/exctract-token';
+import { validateApiKeyHeader } from './validate-api-key-header';
+
 import { ApiKeyStatus } from '@/common/enum/api-key-status.enum';
 
 @Injectable()
@@ -20,12 +20,12 @@ export class ApiKeyGuard implements CanActivate {
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest<Request>();
 
-    // Extract API key from Authorization header
-    const headers = await validateBearerHeader(context);
-    const token = extractToken(headers.authorization);
+    // Extract API key from X-Api-Key header
+    const headers = await validateApiKeyHeader(context);
+    const token = headers.key;
 
     if (!token) {
-      throw new UnauthorizedException('API key is required');
+      throw new UnauthorizedException('X-Api-Key header is required');
     }
 
     // Get API key from cache or database
