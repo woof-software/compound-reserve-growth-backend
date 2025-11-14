@@ -18,9 +18,9 @@ export class ApiKey {
   @Index()
   public clientName: string;
 
-  @Column({ name: 'key_hash', length: 64, unique: true })
+  @Column({ name: 'key', length: 64, unique: true })
   @Index()
-  public keyHash: string;
+  public key: string;
 
   @Column('jsonb')
   public ipWhitelist: string[];

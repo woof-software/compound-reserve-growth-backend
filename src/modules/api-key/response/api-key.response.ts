@@ -1,10 +1,8 @@
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiProperty } from '@nestjs/swagger';
 
 import { ApiKey } from 'modules/api-key';
 
 import { ApiKeyStatus } from '@/common/enum/api-key-status.enum';
-
-type FullApiKey = ApiKey & { plainKey?: string };
 
 export class ApiKeyResponse {
   @ApiProperty()
@@ -13,11 +11,8 @@ export class ApiKeyResponse {
   @ApiProperty()
   clientName: string;
 
-  @ApiProperty({ description: 'SHA-256 hash of the API key' })
-  keyHash: string;
-
-  @ApiPropertyOptional({ description: 'Plain API key (returned only after creation)' })
-  plainKey?: string;
+  @ApiProperty({ description: 'API key' })
+  key: string;
 
   @ApiProperty({ type: [String] })
   ipWhitelist: string[];
@@ -34,13 +29,10 @@ export class ApiKeyResponse {
   @ApiProperty({ example: 1750809600 })
   updatedAt: number;
 
-  constructor(apiKey: FullApiKey) {
+  constructor(apiKey: ApiKey) {
     this.id = apiKey.id;
     this.clientName = apiKey.clientName;
-    this.keyHash = apiKey.keyHash;
-    if (apiKey.plainKey && apiKey.plainKey.length > 0) {
-      this.plainKey = apiKey.plainKey;
-    }
+    this.key = apiKey.key;
     this.ipWhitelist = apiKey.ipWhitelist;
     this.domainWhitelist = apiKey.domainWhitelist;
     this.status = apiKey.status;

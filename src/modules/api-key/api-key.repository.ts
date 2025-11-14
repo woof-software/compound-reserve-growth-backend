@@ -23,8 +23,8 @@ export class ApiKeyRepository {
     return this.repository.findOne({ where: { id } });
   }
 
-  async findByKeyHash(keyHash: string): Promise<ApiKey | null> {
-    return this.repository.findOne({ where: { keyHash } });
+  async findByKey(key: string): Promise<ApiKey | null> {
+    return this.repository.findOne({ where: { key } });
   }
 
   async findActive(): Promise<ApiKey[]> {

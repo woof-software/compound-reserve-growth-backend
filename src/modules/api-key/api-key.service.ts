@@ -10,7 +10,6 @@ import { SearchApiKeyDto } from './dto/search-api-key.dto';
 import { ApiKeyRepository } from './api-key.repository';
 
 import { ApiKeyStatus } from '@/common/enum/api-key-status.enum';
-import { hashKey } from '@/common/utils/hash-key';
 import { generateSecretKey } from '@/common/utils/generate-secret-key';
 
 @Injectable()
@@ -29,11 +28,11 @@ export class ApiKeyService {
    */
   private async cacheApiKey(apiKey: ApiKey): Promise<void> {
     try {
-      const cacheKey = `${this.CACHE_PREFIX}${apiKey.keyHash}`;
+      const cacheKey = `${this.CACHE_PREFIX}${apiKey.key}`;
       const cacheData = {
         id: apiKey.id,
         clientName: apiKey.clientName,
-        keyHash: apiKey.keyHash,
+        key: apiKey.key,
         ipWhitelist: apiKey.ipWhitelist,
         domainWhitelist: apiKey.domainWhitelist,
         status: apiKey.status,
@@ -52,15 +51,14 @@ export class ApiKeyService {
    */
   async getApiKeyByKey(key: string): Promise<ApiKey | null> {
     try {
-      const keyHash = hashKey(key);
-      const cacheKey = `${this.CACHE_PREFIX}${keyHash}`;
+      const cacheKey = `${this.CACHE_PREFIX}${key}`;
       const cached = await this.redisClient.get(cacheKey);
 
       if (cached) {
         return JSON.parse(cached) as ApiKey;
       }
 
-      const apiKey = await this.apiKeyRepository.findByKeyHash(keyHash);
+      const apiKey = await this.apiKeyRepository.findByKey(key);
 
       if (apiKey) {
         await this.cacheApiKey(apiKey);
@@ -75,12 +73,11 @@ export class ApiKeyService {
   /**
    * Create a new API key
    */
-  async create(createDto: CreateApiKeyDto): Promise<ApiKey & { plainKey: string }> {
-    const plainKey = generateSecretKey();
-    const keyHash = hashKey(plainKey);
+  async create(createDto: CreateApiKeyDto): Promise<ApiKey> {
+    const key = generateSecretKey();
     const apiKey = this.apiKeyRepository.create({
       clientName: createDto.clientName,
-      keyHash,
+      key,
       ipWhitelist: createDto.ipWhitelist || [],
       domainWhitelist: createDto.domainWhitelist || [],
       status: ApiKeyStatus.ACTIVE,
@@ -90,7 +87,7 @@ export class ApiKeyService {
     await this.cacheApiKey(saved);
 
     this.logger.log(`Created API key for client: ${saved.clientName}`);
-    return Object.assign(saved, { plainKey });
+    return saved;
   }
 
   /**
@@ -118,10 +115,10 @@ export class ApiKeyService {
     }
 
     const updated = await this.apiKeyRepository.save(apiKey);
-    // Reset cache for updated key hash
-    await this.resetCache(apiKey.keyHash, true);
+    // Reset cache for updated key
+    await this.resetCache(apiKey.key);
 
-    this.logger.log(`Updated API key: ${updated.keyHash}`);
+    this.logger.log(`Updated API key: ${updated.key}`);
     return updated;
   }
 
@@ -141,9 +138,9 @@ export class ApiKeyService {
 
     apiKey.status = ApiKeyStatus.PAUSED;
     const updated = await this.apiKeyRepository.save(apiKey);
-    await this.resetCache(apiKey.keyHash, true);
+    await this.resetCache(apiKey.key);
 
-    this.logger.log(`Paused API key: ${updated.keyHash}`);
+    this.logger.log(`Paused API key: ${updated.key}`);
     return updated;
   }
 
@@ -167,9 +164,9 @@ export class ApiKeyService {
 
     apiKey.status = ApiKeyStatus.ACTIVE;
     const updated = await this.apiKeyRepository.save(apiKey);
-    await this.resetCache(apiKey.keyHash, true);
+    await this.resetCache(apiKey.key);
 
-    this.logger.log(`Activated API key: ${updated.keyHash}`);
+    this.logger.log(`Activated API key: ${updated.key}`);
     return updated;
   }
 
@@ -185,9 +182,9 @@ export class ApiKeyService {
 
     apiKey.status = ApiKeyStatus.DELETED;
     const updated = await this.apiKeyRepository.save(apiKey);
-    await this.resetCache(apiKey.keyHash, true);
+    await this.resetCache(apiKey.key);
 
-    this.logger.log(`Deleted API key: ${updated.keyHash}`);
+    this.logger.log(`Deleted API key: ${updated.key}`);
     return updated;
   }
 
@@ -214,20 +211,19 @@ export class ApiKeyService {
   /**
    * Reset cache for a specific API key
    */
-  async resetCache(key?: string, isHash = false): Promise<void> {
+  async resetCache(key?: string): Promise<void> {
     try {
       if (key) {
-        const keyHash = isHash ? key : /^[a-f0-9]{64}$/.test(key) ? key : hashKey(key);
-        const cacheKey = `${this.CACHE_PREFIX}${keyHash}`;
+        const cacheKey = `${this.CACHE_PREFIX}${key}`;
         await this.redisClient.del(cacheKey);
 
         // Reload from database and cache again
-        const apiKey = await this.apiKeyRepository.findByKeyHash(keyHash);
+        const apiKey = await this.apiKeyRepository.findByKey(key);
         if (apiKey) {
           await this.cacheApiKey(apiKey);
         }
 
-        this.logger.log(`Reset cache for API key hash: ${keyHash}`);
+        this.logger.log(`Reset cache for API key: ${key}`);
       } else {
         // Reset cache for all keys
         const keys = await this.redisClient.keys(`${this.CACHE_PREFIX}*`);
