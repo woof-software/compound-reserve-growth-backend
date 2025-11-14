@@ -669,12 +669,16 @@ export class ContractService implements OnModuleInit {
           const quantity = ethers.formatUnits(reserves, decimals);
           const value = Number(quantity) * price;
 
-          if (isNaN(value) || value < 0) {
+          if (isNaN(value)) {
             this.logger.warn(`Invalid value: ${value}, skipping`);
             lastBlock = blockTag;
             skippedCount++;
             continue;
           }
+          if (value < 0)
+            this.logger.warn(
+              `Reserves have a negative value: ${value}, contractAddress: ${contractAddress}, network: ${network}`,
+            );
 
           const newHistory = new Reserve(source, blockTag, reserves.toString(), price, value, date);
 
