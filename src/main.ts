@@ -6,7 +6,8 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 
 import { AppModule } from './app.module';
 import { TAppConfig } from './config/app';
-import { Logger } from './infrastructure/logger';
+
+import { Logger } from 'infrastructure/logger';
 
 async function bootstrap() {
   const logLevel = (process.env.LOG_LEVEL?.split(',') || ['error']) as LogLevel[];
@@ -26,7 +27,18 @@ async function bootstrap() {
       .setDescription('Compound Reserve Growth API project REST API documentation')
       .setVersion('1.0.1')
       .addTag('Compound Reserve Growth API project documentation')
-      .addBearerAuth()
+      .addSecurity('AdminToken', {
+        type: 'apiKey',
+        in: 'header',
+        name: 'X-Admin-Token',
+        description: 'Administrative access token',
+      })
+      .addSecurity('ApiKeyAuth', {
+        type: 'apiKey',
+        in: 'header',
+        name: 'X-Api-Key',
+        description: 'API access key',
+      })
       .build();
 
     const document = SwaggerModule.createDocument(app, config);
@@ -55,7 +67,7 @@ async function bootstrap() {
   await app.listen(appConfig.port, appConfig.host);
 
   logger.log(
-    `Application is running on http://${appConfig.host}:${appConfig.port}/${globalPrefix}`,
+    `Application is running on https://${appConfig.host}:${appConfig.port}/${globalPrefix}`,
   );
 }
 

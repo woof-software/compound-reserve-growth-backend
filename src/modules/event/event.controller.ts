@@ -11,11 +11,14 @@ import {
 import { EventService } from './event.service';
 import { EventResponse } from './response/event.response';
 
+import { ApiKeyEndpoint } from '@/common/decorators';
+
 @Injectable()
 @Controller('events')
 export class EventController {
   constructor(private readonly eventService: EventService) {}
 
+  @ApiKeyEndpoint()
   @ApiOperation({ summary: 'Get event list' })
   @ApiResponse({ type: [EventResponse] })
   @HttpCode(HttpStatus.OK)

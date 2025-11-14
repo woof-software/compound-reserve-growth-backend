@@ -11,12 +11,15 @@ import { SourceService } from './source.service';
 import { SourceFillCommand } from './cli/source-fill.command';
 import { SourceController } from './source.controller';
 
+import { ApiKeyGuardModule } from '@/common/guards/api-key';
+
 @Module({
   imports: [
     TypeOrmModule.forFeature([Source]),
     GithubModule,
     AssetModule,
     forwardRef(() => ContractModule),
+    ApiKeyGuardModule,
   ],
   providers: [SourceRepository, SourceService, SourceFillCommand],
   exports: [SourceService, SourceRepository],

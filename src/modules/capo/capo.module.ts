@@ -14,6 +14,8 @@ import { CapoService } from './capo.service';
 import { Snapshot } from './snapshot.entity';
 import { DailyAggregation } from './daily.entity';
 
+import { ApiKeyGuardModule } from '@/common/guards/api-key';
+
 @Module({
   imports: [
     NetworkModule,
@@ -21,6 +23,7 @@ import { DailyAggregation } from './daily.entity';
     MailModule,
     OracleModule,
     AlertModule,
+    ApiKeyGuardModule,
     TypeOrmModule.forFeature([Snapshot, DailyAggregation, Source]),
     TypeOrmModule.forFeature([Oracle]),
   ],
