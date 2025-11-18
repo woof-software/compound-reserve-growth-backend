@@ -58,7 +58,7 @@ export class ContractService implements OnModuleInit {
       startBlock: 24965737,
       endBlock: Infinity,
       avgBlockTime: 1,
-      blocksPerDay: 28800,
+      blocksPerDay: 86400,
       description: 'Upgrade',
     },
   ];
