@@ -43,9 +43,25 @@ export class ContractService implements OnModuleInit {
     polygon: { avgBlockTime: 2, blocksPerDay: 43200 },
     linea: { avgBlockTime: 2.5, blocksPerDay: 34560 },
     ronin: { avgBlockTime: 3, blocksPerDay: 28800 },
-    scroll: { avgBlockTime: 3, blocksPerDay: 28800 },
     unichain: { avgBlockTime: 1, blocksPerDay: 86400 },
   };
+
+  private readonly scrollPeriods = [
+    {
+      startBlock: 0,
+      endBlock: 24965736,
+      avgBlockTime: 3,
+      blocksPerDay: 28800,
+      description: 'Classic',
+    },
+    {
+      startBlock: 24965737,
+      endBlock: Infinity,
+      avgBlockTime: 1,
+      blocksPerDay: 86400,
+      description: 'Upgrade',
+    },
+  ];
 
   // Arbitrum periods
   private readonly arbitrumPeriods = [
@@ -395,9 +411,12 @@ export class ContractService implements OnModuleInit {
     if (network === 'arbitrum' && toBlock - fromBlock > 100000) {
       return this.findArbitrumBlockByTimestamp(provider, targetTs, fromBlock, toBlock);
     }
+    if (network === 'scroll') {
+      return this.findScrollBlockByTimestamp(provider, targetTs, fromBlock, toBlock);
+    }
 
     // Simple estimation based on network config
-    const networkConf = this.networkConfig[network];
+    const networkConf = this.getNetworkConfigForBlock(network, fromBlock);
     const avgBlockTime = networkConf?.avgBlockTime || 2;
 
     const referenceBlock = await this.getCachedBlock(network, provider, fromBlock);
@@ -509,6 +528,31 @@ export class ContractService implements OnModuleInit {
     return currentBlock;
   }
 
+  private async findScrollBlockByTimestamp(
+    provider: JsonRpcProvider,
+    targetTs: number,
+    fromBlock: number,
+    toBlock: number,
+  ): Promise<number> {
+    let left = fromBlock;
+    let right = toBlock ?? (await provider.getBlockNumber());
+    let result = left;
+
+    while (left <= right) {
+      const mid = Math.floor((left + right) / 2);
+      const midBlock = await this.getCachedBlock('scroll', provider, mid);
+
+      if (midBlock.timestamp < targetTs) {
+        left = mid + 1;
+      } else {
+        result = mid;
+        right = mid - 1;
+      }
+    }
+
+    return result;
+  }
+
   private getArbitrumConfigForBlock(blockNumber: number): any {
     for (const period of this.arbitrumPeriods) {
       if (blockNumber >= period.startBlock && blockNumber <= period.endBlock) {
@@ -516,6 +560,28 @@ export class ContractService implements OnModuleInit {
       }
     }
     return this.arbitrumPeriods[this.arbitrumPeriods.length - 1];
+  }
+
+  private getScrollConfigForBlock(blockNumber: number): any {
+    for (const period of this.scrollPeriods) {
+      if (blockNumber >= period.startBlock && blockNumber <= period.endBlock) {
+        return period;
+      }
+    }
+
+    return this.scrollPeriods[this.scrollPeriods.length - 1];
+  }
+
+  private getNetworkConfigForBlock(network: string, blockNumber: number): any {
+    if (network === 'arbitrum') {
+      return this.getArbitrumConfigForBlock(blockNumber);
+    }
+
+    if (network === 'scroll') {
+      return this.getScrollConfigForBlock(blockNumber);
+    }
+
+    return this.networkConfig[network];
   }
 
   async getHistory(source: Source) {
@@ -704,6 +770,9 @@ export class ContractService implements OnModuleInit {
           // Fallback
           if (network === 'arbitrum') {
             const period = this.getArbitrumConfigForBlock(lastBlock);
+            lastBlock = lastBlock + period.blocksPerDay;
+          } else if (network === 'scroll') {
+            const period = this.getScrollConfigForBlock(lastBlock);
             lastBlock = lastBlock + period.blocksPerDay;
           } else {
             const networkConf = this.networkConfig[network];
@@ -965,6 +1034,9 @@ export class ContractService implements OnModuleInit {
           // Fallback
           if (network === 'arbitrum') {
             const period = this.getArbitrumConfigForBlock(lastBlock);
+            lastBlock = lastBlock + period.blocksPerDay;
+          } else if (network === 'scroll') {
+            const period = this.getScrollConfigForBlock(lastBlock);
             lastBlock = lastBlock + period.blocksPerDay;
           } else {
             const networkConf = this.networkConfig[network];
