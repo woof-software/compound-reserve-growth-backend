@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 
-import { ApiKeyUsageEvent } from './api-usage.entity';
+import { ApiKeyUsageEvent } from './entities';
 
 @Injectable()
 export class ApiKeyUsageRepository {

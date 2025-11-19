@@ -1,6 +1,6 @@
 import { Column, CreateDateColumn, Entity, Index, PrimaryGeneratedColumn } from 'typeorm';
 
-import type { TRequestContextSnapshot } from './api-usage.types';
+import type { TRequestContextSnapshot } from 'modules/api-usage';
 
 @Entity({ name: 'api_key_usage_events' })
 @Index(['apiKey', 'createdAt'])

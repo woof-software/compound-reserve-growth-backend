@@ -1,7 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 
+import { TApiKeyUsageJobData } from 'common/types/api-usage';
+
 import { ApiKeyUsageRepository } from './api-usage.repository';
-import { TApiKeyUsageJobData } from './api-usage.types';
 
 @Injectable()
 export class ApiKeyUsageService {

@@ -2,9 +2,10 @@ import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { Injectable, Logger } from '@nestjs/common';
 import { Job } from 'bullmq';
 
+import { TApiKeyUsageJobData } from 'common/types/api-usage';
+
 import { ApiKeyUsageService } from './api-usage.service';
 import { API_KEY_USAGE_QUEUE } from './api-usage.constants';
-import { TApiKeyUsageJobData } from './api-usage.types';
 
 @Injectable()
 @Processor(API_KEY_USAGE_QUEUE, {

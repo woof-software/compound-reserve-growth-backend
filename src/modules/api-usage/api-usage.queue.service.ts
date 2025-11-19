@@ -2,8 +2,9 @@ import { InjectQueue } from '@nestjs/bullmq';
 import { Injectable, Logger } from '@nestjs/common';
 import { Queue } from 'bullmq';
 
+import { TApiKeyUsageJobData } from 'common/types/api-usage';
+
 import { API_KEY_USAGE_JOB, API_KEY_USAGE_QUEUE } from './api-usage.constants';
-import { TApiKeyUsageJobData } from './api-usage.types';
 
 @Injectable()
 export class ApiKeyUsageQueueService {

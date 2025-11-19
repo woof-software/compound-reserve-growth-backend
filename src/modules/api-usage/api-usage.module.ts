@@ -2,7 +2,7 @@ import { Global, Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { BullModule } from '@nestjs/bullmq';
 
-import { ApiKeyUsageEvent } from './api-usage.entity';
+import { ApiKeyUsageEvent } from './entities';
 import { ApiKeyUsageRepository } from './api-usage.repository';
 import { ApiKeyUsageService } from './api-usage.service';
 import { ApiKeyUsageQueueService } from './api-usage.queue.service';
