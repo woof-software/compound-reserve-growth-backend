@@ -13,18 +13,14 @@ export class ApiKeyUsageService {
   async persistEvent(payload: TApiKeyUsageJobData): Promise<void> {
     try {
       const entity = this.repository.create({
-        apiKeyId: payload.apiKeyId,
         apiKey: payload.apiKey,
         clientName: payload.clientName,
         method: payload.method,
         targetUrl: payload.targetUrl,
         statusCode: payload.statusCode,
-        durationMs: payload.durationMs,
         ip: payload.ip,
         domain: payload.domain,
         host: payload.host,
-        userAgent: payload.userAgent,
-        requestContext: payload.requestContext,
         occurredAt: new Date(payload.occurredAt),
       });
 
