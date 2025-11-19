@@ -12,6 +12,8 @@ import { tap } from 'rxjs/operators';
 import { ApiKeyUsageQueueService } from 'modules/api-usage';
 import { TRequestContextSnapshot } from 'modules/api-usage/api-usage.types';
 
+import { getApiKeyFromRequest } from '@/common/guards/api-key/api-key-storage';
+
 @Injectable()
 export class ApiKeyUsageInterceptor implements NestInterceptor {
   private readonly sensitiveKeys = ['password', 'secret', 'token', 'key', 'authorization'];
@@ -28,7 +30,7 @@ export class ApiKeyUsageInterceptor implements NestInterceptor {
     }
 
     const apiKeyHeader = this.extractApiKeyHeader(request);
-    const apiKeyEntity = request.apiKey;
+    const apiKeyEntity = getApiKeyFromRequest(request);
 
     if (!apiKeyHeader && !apiKeyEntity) {
       return next.handle();
