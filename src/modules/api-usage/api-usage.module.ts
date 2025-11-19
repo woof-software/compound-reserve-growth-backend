@@ -9,8 +9,6 @@ import { ApiKeyUsageQueueService } from './api-usage.queue.service';
 import { ApiKeyUsageProcessor } from './api-usage.processor';
 import { API_KEY_USAGE_QUEUE } from './constants';
 
-import { ApiKeyUsageInterceptor } from '@/common/interceptors/api-key-usage.interceptor';
-
 @Global()
 @Module({
   imports: [
@@ -22,8 +20,7 @@ import { ApiKeyUsageInterceptor } from '@/common/interceptors/api-key-usage.inte
     ApiKeyUsageService,
     ApiKeyUsageQueueService,
     ApiKeyUsageProcessor,
-    ApiKeyUsageInterceptor,
   ],
-  exports: [ApiKeyUsageQueueService, ApiKeyUsageInterceptor],
+  exports: [ApiKeyUsageQueueService],
 })
 export class ApiUsageModule {}

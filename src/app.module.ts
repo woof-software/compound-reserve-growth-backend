@@ -25,6 +25,7 @@ import { CoinGeckoModule } from 'modules/price/providers/coingecko/coingecko.mod
 import { CapoModule } from 'modules/capo/capo.module';
 import { QueueModule } from 'modules/queue/queue.module';
 import { ApiUsageModule } from 'modules/api-usage';
+import { ApiKeyUsageInterceptorModule } from '@/common/interceptors/api-key-usage-interceptor.module';
 import { getAdminModule } from 'modules/admin';
 
 import { AppController } from './app.controller';
@@ -77,6 +78,7 @@ import { ExceptionInterceptor } from 'infrastructure/http/interceptors/exception
     ...getAdminModule(),
     QueueModule,
     ApiUsageModule,
+    ApiKeyUsageInterceptorModule,
     DatabaseModule,
     GithubModule,
     NetworkModule,
