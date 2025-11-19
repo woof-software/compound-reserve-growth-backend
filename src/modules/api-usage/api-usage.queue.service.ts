@@ -4,7 +4,7 @@ import { Queue } from 'bullmq';
 
 import { TApiKeyUsageJobData } from 'common/types/api-usage';
 
-import { API_KEY_USAGE_JOB, API_KEY_USAGE_QUEUE } from './api-usage.constants';
+import { API_KEY_USAGE_JOB, API_KEY_USAGE_QUEUE } from './constants';
 
 @Injectable()
 export class ApiKeyUsageQueueService {

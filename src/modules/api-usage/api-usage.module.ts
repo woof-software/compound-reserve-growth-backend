@@ -7,7 +7,7 @@ import { ApiKeyUsageRepository } from './api-usage.repository';
 import { ApiKeyUsageService } from './api-usage.service';
 import { ApiKeyUsageQueueService } from './api-usage.queue.service';
 import { ApiKeyUsageProcessor } from './api-usage.processor';
-import { API_KEY_USAGE_QUEUE } from './api-usage.constants';
+import { API_KEY_USAGE_QUEUE } from './constants';
 
 import { ApiKeyUsageInterceptor } from '@/common/interceptors/api-key-usage.interceptor';
 
