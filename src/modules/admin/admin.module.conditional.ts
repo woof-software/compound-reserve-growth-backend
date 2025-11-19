@@ -6,6 +6,7 @@ import { AdminController } from './admin.controller';
 import { AdminService } from './admin.service';
 
 import adminConfig from 'config/admin';
+import { ApiKeyGuardModule } from '@/common/guards/api-key';
 
 @Module({})
 export class AdminModuleConditional {
@@ -23,7 +24,7 @@ export class AdminModuleConditional {
 
     return {
       module: AdminModuleConditional,
-      imports: [HistoryModule],
+      imports: [HistoryModule, ApiKeyGuardModule],
       providers: [AdminService],
       exports: [AdminService],
       controllers: [AdminController],

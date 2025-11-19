@@ -8,18 +8,12 @@ import { IncentiveHistoryResponse } from 'modules/history/response/incentives-hi
 
 import { HistoryService } from './history.service';
 import { ReserveResponse } from './response/reserve.response';
-import { PaginationDto } from './dto/pagination.dto';
-import { PaginationRequest } from './request/pagination.request';
 import { RevenueHistoryResponse } from './response/revenue-history.response';
-import { RevenueHistoryFullResponse } from './response/revenue-history-full.response';
 import { StatsHistoryResponse } from './response/stats-history.response';
-import { ReserveFullResponse } from './response/reserve-full.response';
 import { OffsetRequest } from './request/offset.request';
 import { OffsetDto } from './dto/offset.dto';
 
-import { ApiPaginatedResponse } from '@app/common/swagger/api-paginated-response.decorator';
-import { PaginatedDataResponse } from '@app/common/response/paginated-data.response';
-import { PaginationMetaResponse } from '@app/common/response/pagination-meta.response';
+import { ApiKeyEndpoint } from '@/common/decorators';
 import { OffsetDataResponse } from '@app/common/response/offset-data.response';
 import { OffsetMetaResponse } from '@app/common/response/offset-meta.response';
 import { ApiOffsetResponse } from '@app/common/swagger/api-offset-response.decorator';
@@ -34,45 +28,7 @@ export class HistoryController {
   ) {}
 
   @Throttle({ default: { limit: 15, ttl: 1000 } })
-  @ApiOperation({ summary: 'Get treasury history full response' })
-  @ApiPaginatedResponse(ReserveFullResponse)
-  @HttpCode(HttpStatus.OK)
-  @Get('treasury')
-  async getTreasuryHistoryFull(
-    @Query() request: PaginationRequest,
-  ): Promise<PaginatedDataResponse<ReserveFullResponse>> {
-    const paginatedData = await this.historyService.getPaginatedTreasuryHistory(
-      new PaginationDto(request?.page, request?.perPage, request?.order),
-    );
-    return new PaginatedDataResponse<ReserveFullResponse>(
-      paginatedData.data.map((reserve) => {
-        return new ReserveFullResponse(reserve);
-      }),
-      new PaginationMetaResponse(paginatedData.page, paginatedData.perPage, paginatedData.total),
-    );
-  }
-
-  @Throttle({ default: { limit: 15, ttl: 1000 } })
-  @ApiOperation({ summary: 'Get revenue history full response' })
-  @ApiPaginatedResponse(RevenueHistoryFullResponse)
-  @HttpCode(HttpStatus.OK)
-  @Get('revenue')
-  async getRevenueHistoryFull(
-    @Query() request: PaginationRequest,
-  ): Promise<PaginatedDataResponse<RevenueHistoryFullResponse>> {
-    const paginatedData = await this.historyService.getPaginatedRevenueHistory(
-      new PaginationDto(request?.page, request?.perPage, request?.order),
-    );
-    const paginatedResponse = new PaginatedDataResponse<RevenueHistoryFullResponse>(
-      paginatedData.data.map((reserve) => {
-        return new RevenueHistoryFullResponse(reserve);
-      }),
-      new PaginationMetaResponse(paginatedData.page, paginatedData.perPage, paginatedData.total),
-    );
-    return paginatedResponse;
-  }
-
-  @Throttle({ default: { limit: 15, ttl: 1000 } })
+  @ApiKeyEndpoint()
   @ApiOperation({ summary: 'Get treasury history reduced response' })
   @ApiOffsetResponse(ReserveResponse)
   @HttpCode(HttpStatus.OK)
@@ -100,6 +56,7 @@ export class HistoryController {
   }
 
   @Throttle({ default: { limit: 15, ttl: 1000 } })
+  @ApiKeyEndpoint()
   @ApiOperation({ summary: 'Get revenue history reduced response' })
   @ApiOffsetResponse(RevenueHistoryResponse)
   @HttpCode(HttpStatus.OK)
@@ -127,6 +84,7 @@ export class HistoryController {
   }
 
   @Throttle({ default: { limit: 15, ttl: 1000 } })
+  @ApiKeyEndpoint()
   @ApiOperation({ summary: 'Get statistics on FE' })
   @ApiOffsetResponse(StatsHistoryResponse)
   @HttpCode(HttpStatus.OK)
@@ -154,6 +112,7 @@ export class HistoryController {
   }
 
   @Throttle({ default: { limit: 15, ttl: 1000 } })
+  @ApiKeyEndpoint()
   @ApiOperation({ summary: 'Get incentives (incomes + spends) data' })
   @ApiOffsetResponse(IncentiveHistoryResponse)
   @HttpCode(HttpStatus.OK)

@@ -5,12 +5,15 @@ import { Throttle } from '@nestjs/throttler';
 import { RunwayResponse } from './response/runway.response';
 import { RunwayService } from './runway.service';
 
+import { ApiKeyEndpoint } from '@/common/decorators';
+
 @Injectable()
 @Controller('runway')
 export class RunwayController {
   constructor(private readonly runwayService: RunwayService) {}
 
   @Throttle({ default: { limit: 15, ttl: 1000 } })
+  @ApiKeyEndpoint()
   @ApiOperation({ summary: 'Get runway data' })
   @ApiResponse({ type: [RunwayResponse] })
   @HttpCode(HttpStatus.OK)
