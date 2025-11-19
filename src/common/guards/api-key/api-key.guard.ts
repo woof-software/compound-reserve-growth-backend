@@ -59,6 +59,8 @@ export class ApiKeyGuard implements CanActivate {
       }
     }
 
+    request.apiKey = apiKey;
+
     return true;
   }
 

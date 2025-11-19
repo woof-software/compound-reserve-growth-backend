@@ -30,6 +30,7 @@
   },
   "dependencies": {
     "@nestjs-modules/mailer": "^2.0.2",
+    "@nestjs/bullmq": "^11.0.4",
     "@nestjs/cache-manager": "^3.0.1",
     "@nestjs/common": "^10.0.0",
     "@nestjs/config": "^4.0.1",
@@ -42,6 +43,7 @@
     "@nestjs/typeorm": "^11.0.0",
     "@types/cache-manager": "^5.0.0",
     "axios": "^1.8.3",
+    "bullmq": "^5.63.2",
     "cache-manager": "^7.0.0",
     "cache-manager-ioredis-yet": "^2.1.2",
     "class-transformer": "^0.5.1",

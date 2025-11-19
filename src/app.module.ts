@@ -23,6 +23,8 @@ import { MailModule } from 'modules/mail/mail.module';
 import { EventModule } from 'modules/event/event.module';
 import { CoinGeckoModule } from 'modules/price/providers/coingecko/coingecko.module';
 import { CapoModule } from 'modules/capo/capo.module';
+import { QueueModule } from 'modules/queue/queue.module';
+import { ApiUsageModule } from 'modules/api-usage';
 import { getAdminModule } from 'modules/admin';
 
 import { AppController } from './app.controller';
@@ -73,6 +75,8 @@ import { ExceptionInterceptor } from 'infrastructure/http/interceptors/exception
       },
     }),
     ...getAdminModule(),
+    QueueModule,
+    ApiUsageModule,
     DatabaseModule,
     GithubModule,
     NetworkModule,
