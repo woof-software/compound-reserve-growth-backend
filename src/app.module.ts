@@ -25,11 +25,11 @@ import { CoinGeckoModule } from 'modules/price/providers/coingecko/coingecko.mod
 import { CapoModule } from 'modules/capo/capo.module';
 import { QueueModule } from 'modules/queue/queue.module';
 import { ApiUsageModule } from 'modules/api-usage';
-import { ApiKeyUsageInterceptorModule } from '@/common/interceptors/api-key-usage-interceptor.module';
 import { getAdminModule } from 'modules/admin';
 
 import { AppController } from './app.controller';
 
+import { ApiKeyUsageInterceptorModule } from '@/common/interceptors/api-key-usage-interceptor.module';
 import appConfig from 'config/app';
 import databaseConfig from 'config/database';
 import networksConfig from 'config/networks.config';

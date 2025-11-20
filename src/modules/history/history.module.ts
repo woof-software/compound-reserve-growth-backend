@@ -18,6 +18,7 @@ import { HistoryGetCron } from './cron/history-get.cron';
 import { GetHistoryService } from './cron/history-get.service';
 import { IncomesRepository } from './incomes-repository.service';
 import { SpendsRepository } from './spends-repository.service';
+
 import { ApiKeyGuardModule } from '@/common/guards/api-key';
 
 @Module({
