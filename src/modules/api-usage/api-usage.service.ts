@@ -3,6 +3,8 @@ import { Injectable, Logger } from '@nestjs/common';
 import { TApiKeyUsageJobData } from 'common/types/api-usage';
 
 import { ApiKeyUsageRepository } from './api-usage.repository';
+import { SearchApiUsageEventsDto } from './dto/search-api-usage-events.dto';
+import { ApiKeyUsageEvent } from './entities';
 
 @Injectable()
 export class ApiKeyUsageService {
@@ -28,5 +30,9 @@ export class ApiKeyUsageService {
     } catch (error) {
       this.logger.error(`Failed to persist API usage event: ${error.message}`, error.stack);
     }
+  }
+
+  async searchEvents(filters: SearchApiUsageEventsDto): Promise<ApiKeyUsageEvent[]> {
+    return this.repository.findByFilters(filters);
   }
 }

@@ -21,6 +21,6 @@ import { API_KEY_USAGE_QUEUE } from './constants';
     ApiKeyUsageQueueService,
     ApiKeyUsageProcessor,
   ],
-  exports: [ApiKeyUsageQueueService],
+  exports: [ApiKeyUsageQueueService, ApiKeyUsageService],
 })
 export class ApiUsageModule {}
