@@ -2,6 +2,8 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 
+import { Order } from '@/common/enum/order.enum';
+
 import { ApiKeyUsageEvent } from './entities';
 import { SearchApiUsageEventsDto } from './dto/search-api-usage-events.dto';
 
@@ -21,10 +23,12 @@ export class ApiKeyUsageRepository {
   }
 
   findByFilters(filters: SearchApiUsageEventsDto): Promise<ApiKeyUsageEvent[]> {
-    const qb = this.repository.createQueryBuilder('event').orderBy('event.createdAt', 'DESC');
+    const qb = this.repository
+      .createQueryBuilder('event')
+      .orderBy('event.createdAt', filters.order ?? Order.DESC);
 
     if (filters.apiKey) {
-      qb.andWhere('event.apiKey ILIKE :apiKey', { apiKey: filters.apiKey });
+      qb.andWhere('event.apiKey = :apiKey', { apiKey: filters.apiKey });
     }
 
     if (filters.clientName) {
