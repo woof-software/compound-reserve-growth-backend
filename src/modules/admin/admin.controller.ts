@@ -13,12 +13,14 @@ import {
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 
 import { AdminService } from 'modules/admin/admin.service';
-import { StartCollectionResponse } from 'modules/admin/response';
+import { StartCollectionResponse, ApiKeyUsageEventResponse } from 'modules/admin/response';
 import { ApiKeyService } from 'modules/api-key/api-key.service';
 import { CreateApiKeyDto } from 'modules/api-key/dto/create-api-key.dto';
 import { UpdateApiKeyDto } from 'modules/api-key/dto/update-api-key.dto';
 import { SearchApiKeyDto } from 'modules/api-key/dto/search-api-key.dto';
 import { ApiKeyResponse } from 'modules/api-key/response/api-key.response';
+import { ApiKeyUsageService } from 'modules/api-usage/api-usage.service';
+import { SearchApiUsageEventsDto } from 'modules/api-usage/dto/search-api-usage-events.dto';
 
 import { AdminEndpoint } from '@/common/decorators';
 
@@ -28,6 +30,7 @@ export class AdminController {
   constructor(
     private readonly admin: AdminService,
     private readonly apiKeyService: ApiKeyService,
+    private readonly apiUsageService: ApiKeyUsageService,
   ) {}
 
   @Get('/access')
@@ -179,5 +182,20 @@ export class AdminController {
   async resetCache(@Query('key') key?: string): Promise<string> {
     await this.apiKeyService.resetCache(key);
     return key ? `Cache reset for key: ${key}` : 'Cache reset for all keys';
+  }
+
+  @Get('/api-usage/events')
+  @AdminEndpoint()
+  @ApiOperation({
+    summary: 'List API key usage events',
+    description: 'Returns API usage events filtered by apiKey, clientName, or method.',
+  })
+  @ApiResponse({ status: 200, type: [ApiKeyUsageEventResponse] })
+  @SerializeOptions({ type: ApiKeyUsageEventResponse })
+  async listApiUsageEvents(
+    @Query() filters: SearchApiUsageEventsDto,
+  ): Promise<ApiKeyUsageEventResponse[]> {
+    const events = await this.apiUsageService.searchEvents(filters);
+    return events.map((event) => new ApiKeyUsageEventResponse(event));
   }
 }

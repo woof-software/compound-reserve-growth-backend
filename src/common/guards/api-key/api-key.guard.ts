@@ -10,6 +10,7 @@ import { Request } from 'express';
 import { ApiKeyService } from 'modules/api-key/api-key.service';
 
 import { validateApiKeyHeader } from './validate-api-key-header';
+import { setApiKeyForRequest } from './api-key-storage';
 
 import { ApiKeyStatus } from '@/common/enum/api-key-status.enum';
 
@@ -58,6 +59,9 @@ export class ApiKeyGuard implements CanActivate {
         throw new ForbiddenException('Domain not allowed');
       }
     }
+
+    // Store API key in WeakMap for interceptor to access
+    setApiKeyForRequest(request, apiKey);
 
     return true;
   }
