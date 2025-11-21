@@ -36,6 +36,7 @@ import networksConfig from 'config/networks.config';
 import redis from 'config/redis';
 import google from 'config/google';
 import admin from 'config/admin';
+import bullmqConfig from 'config/bullmq';
 import { DatabaseModule } from 'database/database.module';
 import { Logger } from 'infrastructure/logger';
 import { ExceptionInterceptor } from 'infrastructure/http/interceptors/exception.interceptor';
@@ -44,7 +45,7 @@ import { ExceptionInterceptor } from 'infrastructure/http/interceptors/exception
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      load: [appConfig, databaseConfig, networksConfig, redis, google, admin],
+      load: [appConfig, databaseConfig, networksConfig, redis, google, admin, bullmqConfig],
     }),
     ScheduleModule.forRoot(),
     ThrottlerModule.forRoot({
