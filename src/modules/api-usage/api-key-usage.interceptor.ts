@@ -9,9 +9,9 @@ import { Request, Response } from 'express';
 import { Observable } from 'rxjs';
 import { tap } from 'rxjs/operators';
 
-import { ApiKeyUsageQueueService } from 'modules/api-usage';
+import { ApiKeyUsageQueueService } from './api-usage.queue.service';
 
-import { TApiKeyUsageJobData } from '@/common/types/api-usage';
+import { ApiKeyUsageJobData } from '@/common/types/api-key-usage-job-data';
 import { getApiKeyFromRequest } from '@/common/guards/api-key/api-key-storage';
 
 @Injectable()
@@ -34,7 +34,7 @@ export class ApiKeyUsageInterceptor implements NestInterceptor {
     }
 
     const publish = (statusCode: number): void => {
-      const payload: TApiKeyUsageJobData = {
+      const payload: ApiKeyUsageJobData = {
         apiKey: apiKeyEntity.key,
         clientName: apiKeyEntity.clientName,
         targetUrl: this.buildTargetUrl(request),

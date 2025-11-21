@@ -1,13 +1,13 @@
-export type TBullmqJobOptions = {
+export type BullmqJobOptions = {
   removeOnComplete: number;
   removeOnFail: number;
 };
 
-export type TBullmqConfig = {
-  apiUsageQueue: TBullmqJobOptions;
+export type BullmqConfig = {
+  apiUsageQueue: BullmqJobOptions;
 };
 
-export default (): { bullmq: TBullmqConfig } => ({
+export default (): { bullmq: BullmqConfig } => ({
   bullmq: {
     apiUsageQueue: {
       removeOnComplete: 5000,

@@ -1,10 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
 
-import { TApiKeyUsageJobData } from 'common/types/api-usage';
-
 import { ApiKeyUsageRepository } from './api-usage.repository';
 import { SearchApiUsageEventsDto } from './dto/search-api-usage-events.dto';
 import { ApiKeyUsageEvent } from './entities';
+
+import { ApiKeyUsageJobData } from '@/common/types/api-key-usage-job-data';
 
 @Injectable()
 export class ApiKeyUsageService {
@@ -12,7 +12,7 @@ export class ApiKeyUsageService {
 
   constructor(private readonly repository: ApiKeyUsageRepository) {}
 
-  async persistEvent(payload: TApiKeyUsageJobData): Promise<void> {
+  async persistEvent(payload: ApiKeyUsageJobData): Promise<void> {
     try {
       const entity = this.repository.create({
         apiKey: payload.apiKey,

@@ -29,7 +29,6 @@ import { getAdminModule } from 'modules/admin';
 
 import { AppController } from './app.controller';
 
-import { ApiKeyUsageInterceptorModule } from '@/common/interceptors/api-key-usage-interceptor.module';
 import appConfig from 'config/app';
 import databaseConfig from 'config/database';
 import networksConfig from 'config/networks.config';
@@ -79,7 +78,6 @@ import { ExceptionInterceptor } from 'infrastructure/http/interceptors/exception
     ...getAdminModule(),
     QueueModule,
     ApiUsageModule,
-    ApiKeyUsageInterceptorModule,
     DatabaseModule,
     GithubModule,
     NetworkModule,

@@ -1,4 +1,4 @@
-export type TApiKeyUsageJobData = {
+export type ApiKeyUsageJobData = {
   apiKey: string;
   clientName?: string;
   targetUrl: string;

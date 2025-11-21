@@ -1,5 +1,3 @@
-import * as process from 'node:process';
-
 import { Global, Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { BullModule } from '@nestjs/bullmq';
@@ -11,15 +9,14 @@ import { BullModule } from '@nestjs/bullmq';
       imports: [ConfigModule],
       inject: [ConfigService],
       useFactory: (config: ConfigService) => {
-        const environment =
-          config.get<string>('database.environment') ?? process.env.NODE_ENV ?? 'local';
+        const environment = config.get<string>('database.environment') ?? 'local';
 
         return {
           connection: {
-            host: config.get<string>('redis.host'),
-            port: config.get<number>('redis.port'),
+            host: config.getOrThrow<string>('redis.host'),
+            port: config.getOrThrow<number>('redis.port'),
             password: config.get<string>('redis.password'),
-            db: config.get<number>('redis.db'),
+            db: config.getOrThrow<number>('redis.db'),
             tls: config.get('redis.tls'),
           },
           defaultJobOptions: {

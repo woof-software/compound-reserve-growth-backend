@@ -3,11 +3,10 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Queue } from 'bullmq';
 
-import { TApiKeyUsageJobData } from 'common/types/api-usage';
-
 import { API_KEY_USAGE_JOB, API_KEY_USAGE_QUEUE } from './constants';
 
-import { TBullmqJobOptions } from 'config/bullmq';
+import { ApiKeyUsageJobData } from '@/common/types/api-key-usage-job-data';
+import { BullmqJobOptions } from 'config/bullmq';
 
 @Injectable()
 export class ApiKeyUsageQueueService {
@@ -15,15 +14,15 @@ export class ApiKeyUsageQueueService {
 
   constructor(
     @InjectQueue(API_KEY_USAGE_QUEUE)
-    private readonly queue: Queue<TApiKeyUsageJobData>,
+    private readonly queue: Queue<ApiKeyUsageJobData>,
     private readonly configService: ConfigService,
   ) {}
 
-  private get jobsOptions(): TBullmqJobOptions {
-    return this.configService.get<TBullmqJobOptions>('bullmq.apiUsageQueue');
+  private get jobsOptions(): BullmqJobOptions {
+    return this.configService.get<BullmqJobOptions>('bullmq.apiUsageQueue');
   }
 
-  async enqueue(payload: TApiKeyUsageJobData): Promise<void> {
+  async enqueue(payload: ApiKeyUsageJobData): Promise<void> {
     try {
       await this.queue.add(API_KEY_USAGE_JOB, payload, this.jobsOptions);
     } catch (error) {

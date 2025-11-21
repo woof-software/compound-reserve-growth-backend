@@ -2,10 +2,10 @@ import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { Injectable, Logger } from '@nestjs/common';
 import { Job } from 'bullmq';
 
-import { TApiKeyUsageJobData } from 'common/types/api-usage';
-
 import { ApiKeyUsageService } from './api-usage.service';
 import { API_KEY_USAGE_QUEUE } from './constants';
+
+import { ApiKeyUsageJobData } from '@/common/types/api-key-usage-job-data';
 
 @Injectable()
 @Processor(API_KEY_USAGE_QUEUE, {
@@ -18,7 +18,7 @@ export class ApiKeyUsageProcessor extends WorkerHost {
     super();
   }
 
-  async process(job: Job<TApiKeyUsageJobData>): Promise<void> {
+  async process(job: Job<ApiKeyUsageJobData>): Promise<void> {
     try {
       await this.service.persistEvent(job.data);
     } catch (error) {
