@@ -12,6 +12,7 @@ import { Reserve, Incomes, Spends } from './entities';
 import { ReservesRepository } from './reserves-repository.service';
 import { HistoryService } from './history.service';
 import { HistoryGetCommand } from './cli/history-get.command';
+import { RevenueDiffCommand } from './cli/revenue-diff.command';
 import { StatsGetCommand } from './cli/stats-get.command';
 import { HistoryController } from './history.controller';
 import { HistoryGetCron } from './cron/history-get.cron';
@@ -34,6 +35,7 @@ import { SpendsRepository } from './spends-repository.service';
     SpendsRepository,
     HistoryService,
     HistoryGetCommand,
+    RevenueDiffCommand,
     StatsGetCommand,
     HistoryGetCron,
     GetHistoryService,

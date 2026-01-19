@@ -14,6 +14,23 @@ import { PaginatedDataDto } from '@app/common/dto/paginated-data.dto';
 import { OffsetDataDto } from '@app/common/dto/offset-data.dto';
 import { Order } from '@/common/enum/order.enum';
 
+export type RevenueByDayRow = {
+  sourceId: number;
+  address: string;
+  date: Date;
+  dayId: number;
+  revenue: number;
+};
+
+export type RevenueAnomalyRow = {
+  sourceId: number;
+  address: string;
+  dayId: number;
+  total: number;
+  prevTotal: number;
+  deltaUsd: number;
+};
+
 @Injectable()
 export class ReservesRepository {
   constructor(
@@ -210,6 +227,144 @@ export class ReservesRepository {
     });
 
     return new OffsetDataDto<Reserve>(reserves, dto.limit ?? null, dto.offset ?? 0, total);
+  }
+
+  async getRevenueRowsForDayIds(
+    dayIds: number[],
+    targetDayEnd: Date,
+    algorithms = [Algorithm.COMET, Algorithm.MARKET_V2, Algorithm.AERA_COMPOUND_RESERVES],
+  ): Promise<RevenueByDayRow[]> {
+    const rBase = this.reservesRepository
+      .createQueryBuilder('r0')
+      .innerJoin('r0.source', 'src0')
+      .innerJoin('src0.asset', 'a0')
+      .where('src0.algorithm && :algorithms::text[]', { algorithms: `{${algorithms.join(',')}}` })
+      .andWhere('r0."date" < :targetDayEnd', { targetDayEnd })
+      .select([
+        `r0."sourceId" AS "sourceId"`,
+        `src0."address" AS "address"`,
+        `r0."date" AS "date"`,
+        `r0."price" AS "price"`,
+        `r0."value" AS "value"`,
+        `r0."quantity"::numeric AS "qty"`,
+        `a0."decimals" AS "decimals"`,
+        `LAG(r0."quantity"::numeric) OVER (
+          PARTITION BY r0."sourceId"
+          ORDER BY r0."date", r0."id"
+        ) AS "prevQty"`,
+      ]);
+
+    const dataQb = this.dataSource
+      .createQueryBuilder()
+      .from(`(${rBase.getQuery()})`, 'rb')
+      .setParameters(rBase.getParameters())
+      .select([
+        `rb."sourceId" AS "sourceId"`,
+        `rb."address" AS "address"`,
+        `rb."date" AS "date"`,
+        `FLOOR(EXTRACT(EPOCH FROM rb."date") / 86400) AS "dayId"`,
+        `
+        CASE
+          WHEN rb."prevQty" IS NULL
+          THEN rb."value"::double precision
+          ELSE ((rb."qty" - rb."prevQty") / POWER(10::numeric, rb."decimals")) * rb."price"
+        END
+        AS "revenue"
+        `,
+      ])
+      .where(`FLOOR(EXTRACT(EPOCH FROM rb."date") / 86400) IN (:...dayIds)`, { dayIds })
+      .orderBy(`rb."date"`, 'ASC');
+
+    return dataQb.getRawMany<RevenueByDayRow>();
+  }
+
+  async getRevenueAnomaliesAllDays(
+    thresholdUsd: number,
+    algorithms = [Algorithm.COMET, Algorithm.MARKET_V2, Algorithm.AERA_COMPOUND_RESERVES],
+  ): Promise<RevenueAnomalyRow[]> {
+    const rBase = this.reservesRepository
+      .createQueryBuilder('r0')
+      .innerJoin('r0.source', 'src0')
+      .innerJoin('src0.asset', 'a0')
+      .where('src0.algorithm && :algorithms::text[]', { algorithms: `{${algorithms.join(',')}}` })
+      .select([
+        `r0."sourceId" AS "sourceId"`,
+        `src0."address" AS "address"`,
+        `r0."date" AS "date"`,
+        `r0."price" AS "price"`,
+        `r0."value" AS "value"`,
+        `r0."quantity"::numeric AS "qty"`,
+        `a0."decimals" AS "decimals"`,
+        `LAG(r0."quantity"::numeric) OVER (
+          PARTITION BY r0."sourceId"
+          ORDER BY r0."date", r0."id"
+        ) AS "prevQty"`,
+      ]);
+
+    const rowsQb = this.dataSource
+      .createQueryBuilder()
+      .from(`(${rBase.getQuery()})`, 'rb')
+      .setParameters(rBase.getParameters())
+      .select([
+        `rb."sourceId" AS "sourceId"`,
+        `rb."address" AS "address"`,
+        `FLOOR(EXTRACT(EPOCH FROM rb."date") / 86400)::int AS "dayId"`,
+        `
+        CASE
+          WHEN rb."prevQty" IS NULL
+          THEN rb."value"::double precision
+          ELSE ((rb."qty" - rb."prevQty") / POWER(10::numeric, rb."decimals")) * rb."price"
+        END
+        AS "revenue"
+        `,
+      ]);
+
+    const dailyTotalsQb = this.dataSource
+      .createQueryBuilder()
+      .from(`(${rowsQb.getQuery()})`, 'rr')
+      .setParameters(rowsQb.getParameters())
+      .select([
+        `rr."sourceId" AS "sourceId"`,
+        `rr."address" AS "address"`,
+        `rr."dayId" AS "dayId"`,
+        `SUM(rr."revenue")::double precision AS "total"`,
+      ])
+      .groupBy(`rr."sourceId"`)
+      .addGroupBy(`rr."address"`)
+      .addGroupBy(`rr."dayId"`);
+
+    const withLagQb = this.dataSource
+      .createQueryBuilder()
+      .from(`(${dailyTotalsQb.getQuery()})`, 'dt')
+      .setParameters(dailyTotalsQb.getParameters())
+      .select([
+        `dt."sourceId" AS "sourceId"`,
+        `dt."address" AS "address"`,
+        `dt."dayId" AS "dayId"`,
+        `dt."total" AS "total"`,
+        `LAG(dt."total") OVER (
+          PARTITION BY dt."sourceId"
+          ORDER BY dt."dayId"
+        ) AS "prevTotal"`,
+      ]);
+
+    const finalQb = this.dataSource
+      .createQueryBuilder()
+      .from(`(${withLagQb.getQuery()})`, 'd')
+      .setParameters(withLagQb.getParameters())
+      .select([
+        `d."sourceId" AS "sourceId"`,
+        `d."address" AS "address"`,
+        `d."dayId" AS "dayId"`,
+        `d."total"::double precision AS "total"`,
+        `d."prevTotal"::double precision AS "prevTotal"`,
+        `ABS(d."total" - d."prevTotal")::double precision AS "deltaUsd"`,
+      ])
+      .where(`d."prevTotal" IS NOT NULL`)
+      .andWhere(`ABS(d."total" - d."prevTotal") > :thresholdUsd`, { thresholdUsd })
+      .orderBy(`d."dayId"`, 'ASC');
+
+    return finalQb.getRawMany<RevenueAnomalyRow>();
   }
 
   async deleteAll(): Promise<void> {
