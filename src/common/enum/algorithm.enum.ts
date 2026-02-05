@@ -1,5 +1,6 @@
 export enum Algorithm {
   COMET = 'comet',
+  COMET_COLLATERAL = 'comet_collect',
   MARKET_V2 = 'market_v2',
   ETH_WALLET = 'eth_wallet',
   TIMELOCK = 'timelock',

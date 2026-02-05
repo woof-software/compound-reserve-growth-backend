@@ -16,6 +16,14 @@ export class AlgorithmService {
     return contract.getReserves({ blockTag });
   }
 
+  public async comet_collect(
+    contract: ethers.Contract,
+    assetAddress: string,
+    blockTag: number,
+  ): Promise<bigint> {
+    return contract.getCollateralReserves(assetAddress, { blockTag });
+  }
+
   public async marketV2(contract: ethers.Contract, blockTag: number): Promise<bigint> {
     return contract.totalReserves({ blockTag });
   }

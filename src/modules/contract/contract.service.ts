@@ -592,6 +592,9 @@ export class ContractService implements OnModuleInit {
         case Algorithm.COMET:
           await this.saveReserves(source, alg);
           break;
+        case Algorithm.COMET_COLLATERAL:
+          await this.saveReserves(source, alg);
+          break;
         case Algorithm.MARKET_V2:
           await this.saveReserves(source, alg);
           break;
@@ -667,7 +670,10 @@ export class ContractService implements OnModuleInit {
       let processedCount = 0;
       let skippedCount = 0;
 
-      const ABI = algorithm === Algorithm.COMET ? CometABI : MarketV2ABI;
+      const ABI =
+        algorithm === Algorithm.COMET || algorithm === Algorithm.COMET_COLLATERAL
+          ? CometABI
+          : MarketV2ABI;
 
       const contract = new ethers.Contract(contractAddress, ABI, provider) as any;
       const assetContract = new ethers.Contract(assetAddress, ERC20ABI, provider) as any;
@@ -681,6 +687,13 @@ export class ContractService implements OnModuleInit {
             switch (algorithm) {
               case Algorithm.COMET:
                 reserves = await this.algorithmService.comet(contract, blockTag);
+                break;
+              case Algorithm.COMET_COLLATERAL:
+                reserves = await this.algorithmService.comet_collect(
+                  contract,
+                  assetAddress,
+                  blockTag,
+                );
                 break;
               case Algorithm.MARKET_V2:
                 reserves = await this.algorithmService.marketV2(contract, blockTag);
