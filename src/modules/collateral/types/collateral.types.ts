@@ -1,8 +1,18 @@
+export type CollateralLifecycleEntry = {
+  index: number;
+  asset: string;
+  appearanceBlock: number;
+  deactivationBlock: number | null;
+};
+
 export type CollateralSourceOutput = {
   sourceId: number;
   network: string;
   market: string | null;
   cometAddress: string;
+  fromBlock: number;
+  toBlock: number;
+  collaterals: CollateralLifecycleEntry[];
   collateralAddresses: string[];
 };
 
@@ -35,4 +45,14 @@ export type BlockTagOverride = {
 export type CometContract = {
   numAssets(overrides?: BlockTagOverride): Promise<bigint>;
   getAssetInfo(index: number, overrides?: BlockTagOverride): Promise<CometAssetInfo>;
+  getPrice(priceFeed: string, overrides?: BlockTagOverride): Promise<bigint>;
+};
+
+export type CollateralLifecycleOutput = {
+  network: string;
+  cometAddress: string;
+  fromBlock: number;
+  toBlock: number;
+  generatedAt: string;
+  assets: CollateralLifecycleEntry[];
 };

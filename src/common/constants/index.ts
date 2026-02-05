@@ -14,7 +14,6 @@ export const DAY_IN_MS = 86400000;
 export const WEEK_IN_MS = DAY_IN_MS * 7;
 export const YEAR_IN_DAYS = 365;
 export const DAY_IN_SEC = DAY_IN_MS / 1000;
-export const SEVEN_DAYS_IN_SEC = DAY_IN_SEC * 7;
 export const YEAR_IN_SECONDS = YEAR_IN_DAYS * DAY_IN_SEC;
 export const MINUTE_IN_MS = 60000;
 export const MINUTE_IN_SEC = 60;

@@ -40,6 +40,7 @@ export default registerAs('networks', (): NetworkConfig[] => [
     chainId: 130,
     url: `https://unichain.drpc.org`,
     // url: `https://multi-boldest-patina.unichain-mainnet.quiknode.pro/${process.env.UNICHAIN_QUICKNODE_KEY}`,
+    batchMaxCount: 3,
   },
   {
     network: 'base',

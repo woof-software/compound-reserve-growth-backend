@@ -5,15 +5,12 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ethers } from 'ethers';
 
 import { ContractService } from 'modules/contract/contract.service';
-import CometABI from 'modules/contract/abi/CometABI.json';
-import { ProviderFactory } from 'modules/network/provider.factory';
 import { SourceService } from 'modules/source/source.service';
 
-import type { CollateralSearchOutput, CometContract } from './types/collateral.types';
+import { CollateralAlgorithmService } from './collateral-algorithm.service';
+import type { CollateralLifecycleEntry, CollateralSearchOutput } from './types/collateral.types';
 
 import { Algorithm } from '@/common/enum/algorithm.enum';
-import { SEVEN_DAYS_IN_SEC } from '@/common/constants';
-import { calculateTimeRange } from '@/common/utils/calculate-time-range';
 
 @Injectable()
 export class CollateralService {
@@ -22,8 +19,8 @@ export class CollateralService {
 
   constructor(
     private readonly sourceService: SourceService,
-    private readonly providerFactory: ProviderFactory,
     private readonly contractService: ContractService,
+    private readonly collateralAlgorithmService: CollateralAlgorithmService,
   ) {}
 
   public async searchMarketsV3() {
@@ -42,15 +39,58 @@ export class CollateralService {
     };
 
     for (const source of sources) {
-      const collateralSet = new Set<string>();
-
       try {
-        const historical = await this.collectCollateralsByDailyScan(source.address, source.network);
-        for (const address of historical) {
-          this.addNormalizedAddress(collateralSet, address);
+        let creationBlock: number;
+        try {
+          creationBlock = await this.contractService.getContractCreationBlock(
+            source.address,
+            source.network,
+          );
+        } catch (error) {
+          this.logger.warn(
+            `Failed to resolve creation block for ${source.network}/${source.address}. Using source.blockNumber=${source.blockNumber}`,
+          );
+          creationBlock = source.blockNumber;
         }
+
+        const lifecycle = await this.collateralAlgorithmService.cometCollateralLifecycle(
+          source.network,
+          source.address,
+          creationBlock,
+        );
+
+        const collaterals = lifecycle.assets
+          .map((entry): CollateralLifecycleEntry | null => {
+            const normalized = this.toChecksum(entry.asset);
+            if (!normalized) {
+              return null;
+            }
+            return { ...entry, asset: normalized };
+          })
+          .filter((entry): entry is CollateralLifecycleEntry => entry !== null);
+
+        const collateralSet = new Set<string>();
+        for (const entry of collaterals) {
+          this.addNormalizedAddress(collateralSet, entry.asset);
+        }
+
+        const collateralAddresses = this.finalizeAddresses(collateralSet);
+        this.logger.log(
+          `Collected ${collaterals.length} collateral assets for ${source.network}/${source.market ?? source.address}`,
+        );
+
+        output.sources.push({
+          sourceId: source.id,
+          network: source.network,
+          market: source.market ?? null,
+          cometAddress: this.toChecksum(source.address) ?? source.address,
+          fromBlock: lifecycle.fromBlock,
+          toBlock: lifecycle.toBlock,
+          collaterals,
+          collateralAddresses,
+        });
       } catch (error) {
-        const reason = `Failed to scan comet assets for ${source.network}/${source.address}`;
+        const reason = `Failed to scan comet collateral lifecycle for ${source.network}/${source.address}`;
         this.logger.error(reason, error);
         output.missingSources.push({
           sourceId: source.id,
@@ -59,31 +99,6 @@ export class CollateralService {
           reason,
         });
       }
-
-      try {
-        const current = await this.collectCurrentCollaterals(source.address, source.network);
-        for (const address of current) {
-          this.addNormalizedAddress(collateralSet, address);
-        }
-      } catch (error) {
-        this.logger.error(
-          `Failed to load current collaterals for ${source.network}/${source.address}:`,
-          error,
-        );
-      }
-
-      const collateralAddresses = this.finalizeAddresses(collateralSet);
-      this.logger.log(
-        `Collected ${collateralAddresses.length} collateral assets for ${source.network}/${source.market ?? source.address}`,
-      );
-
-      output.sources.push({
-        sourceId: source.id,
-        network: source.network,
-        market: source.market ?? null,
-        cometAddress: this.toChecksum(source.address) ?? source.address,
-        collateralAddresses,
-      });
     }
 
     output.sources.sort((a, b) => {
@@ -99,118 +114,6 @@ export class CollateralService {
     writeFileSync(outputPath, JSON.stringify(output, null, 2), 'utf-8');
     this.logger.log(`Collateral list saved to ${outputPath}`);
     return;
-  }
-
-  private async collectCollateralsByDailyScan(
-    cometAddress: string,
-    network: string,
-  ): Promise<string[]> {
-    const provider = this.providerFactory.get(network);
-    const cometContract = new ethers.Contract(
-      cometAddress,
-      CometABI,
-      provider,
-    ) as unknown as CometContract;
-
-    const creationBlock = await this.contractService.getContractCreationBlock(
-      cometAddress,
-      network,
-    );
-    const creationBlockData = await provider.getBlock(creationBlock);
-    if (!creationBlockData) {
-      throw new Error(`Creation block ${creationBlock} not found for ${cometAddress}`);
-    }
-
-    const assets = new Set<string>();
-    let maxAssetsSeen = 0;
-    let lastBlock = creationBlock;
-
-    const addNewAssetsAtBlock = async (blockTag: number) => {
-      try {
-        const numAssetsRaw = await cometContract.numAssets({ blockTag });
-        const numAssets = Number(numAssetsRaw);
-
-        if (!Number.isFinite(numAssets) || numAssets <= maxAssetsSeen) {
-          return;
-        }
-
-        const newIndices = Array.from(
-          { length: numAssets - maxAssetsSeen },
-          (_, index) => index + maxAssetsSeen,
-        );
-        const assetInfos = await Promise.all(
-          newIndices.map((index) => cometContract.getAssetInfo(index, { blockTag })),
-        );
-
-        for (const assetInfo of assetInfos) {
-          if (assetInfo?.asset) {
-            this.addNormalizedAddress(assets, assetInfo.asset);
-          }
-        }
-
-        maxAssetsSeen = numAssets;
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        this.logger.warn(
-          `Skipping numAssets scan for ${network}/${cometAddress} at block ${blockTag}: ${message}`,
-        );
-      }
-    };
-
-    await addNewAssetsAtBlock(creationBlock);
-
-    const { firstMidnightUTC, todayMidnightUTC } = calculateTimeRange(creationBlockData.timestamp);
-    for (
-      let targetTs = firstMidnightUTC;
-      targetTs <= todayMidnightUTC;
-      targetTs += SEVEN_DAYS_IN_SEC
-    ) {
-      try {
-        const blockTag = await this.contractService.findBlockByTimestamp(
-          network,
-          provider,
-          targetTs,
-          lastBlock,
-        );
-        lastBlock = blockTag;
-        await addNewAssetsAtBlock(blockTag);
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        this.logger.warn(
-          `Skipping day ${new Date(targetTs * 1000).toISOString().slice(0, 10)} for ${network}/${cometAddress}: ${message}`,
-        );
-      }
-    }
-
-    return Array.from(assets);
-  }
-
-  private async collectCurrentCollaterals(
-    cometAddress: string,
-    network: string,
-  ): Promise<string[]> {
-    const provider = this.providerFactory.get(network);
-    const cometContract = new ethers.Contract(
-      cometAddress,
-      CometABI,
-      provider,
-    ) as unknown as CometContract;
-
-    const numAssetsRaw = await cometContract.numAssets();
-    const numAssets = Number(numAssetsRaw);
-
-    if (!Number.isFinite(numAssets) || numAssets <= 0) {
-      return [];
-    }
-
-    const assetIndices = Array.from({ length: numAssets }, (_, index) => index);
-    const assetInfos = await Promise.all(
-      assetIndices.map((index) => cometContract.getAssetInfo(index)),
-    );
-
-    return assetInfos
-      .map((assetInfo) => assetInfo?.asset)
-      .filter((asset): asset is string => ethers.isAddress(asset));
   }
 
   private addNormalizedAddress(set: Set<string>, address: string) {
