@@ -14,6 +14,7 @@ import { NetworkModule } from 'modules/network/network.module';
 import { AssetModule } from 'modules/asset/asset.module';
 import { SourceModule } from 'modules/source/source.module';
 import { HistoryModule } from 'modules/history/history.module';
+import { HistoryCronModule } from 'modules/history/cron/history-cron.module';
 import { TreasuryModule } from 'modules/treasury/treasury.module';
 import { RevenueModule } from 'modules/revenue/revenue.module';
 import { PriceModule } from 'modules/price/price.module';
@@ -81,6 +82,7 @@ import { ExceptionInterceptor } from 'infrastructure/http/interceptors/exception
     SourceModule,
     AssetModule,
     HistoryModule,
+    HistoryCronModule,
     TreasuryModule,
     RevenueModule,
     CoinGeckoModule,

@@ -14,7 +14,6 @@ import { HistoryService } from './history.service';
 import { HistoryGetCommand } from './cli/history-get.command';
 import { StatsGetCommand } from './cli/stats-get.command';
 import { HistoryController } from './history.controller';
-import { HistoryGetCron } from './cron/history-get.cron';
 import { GetHistoryService } from './cron/history-get.service';
 import { IncomesRepository } from './incomes-repository.service';
 import { SpendsRepository } from './spends-repository.service';
@@ -22,7 +21,7 @@ import { SpendsRepository } from './spends-repository.service';
 @Module({
   imports: [
     TypeOrmModule.forFeature([Reserve, Incomes, Spends, Price]),
-    SourceModule,
+    forwardRef(() => SourceModule),
     AssetModule,
     forwardRef(() => ContractModule),
     PriceModule,
@@ -35,7 +34,6 @@ import { SpendsRepository } from './spends-repository.service';
     HistoryService,
     HistoryGetCommand,
     StatsGetCommand,
-    HistoryGetCron,
     GetHistoryService,
   ],
   exports: [
