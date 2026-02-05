@@ -5,7 +5,6 @@ import { MailerModule } from '@nestjs-modules/mailer';
 import { redisStore } from 'cache-manager-ioredis-yet';
 import Redis from 'ioredis';
 
-import { DatabaseModule } from 'database/database.module';
 import { RedisModule, REDIS_CLIENT } from 'modules/redis/redis.module';
 import { SourceModule } from 'modules/source/source.module';
 import { HistoryModule } from 'modules/history/history.module';
@@ -13,6 +12,7 @@ import { PriceModule } from 'modules/price/price.module';
 import { EventModule } from 'modules/event/event.module';
 import { CollateralModule } from 'modules/collateral/collateral.module';
 
+import { DatabaseModule } from 'database/database.module';
 import appConfig from 'config/app';
 import databaseConfig from 'config/database';
 import networksConfig from 'config/networks.config';
