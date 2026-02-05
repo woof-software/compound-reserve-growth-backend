@@ -676,34 +676,11 @@ export class ContractService implements OnModuleInit {
         try {
           const blockTag = await this.findBlockByTimestamp(network, provider, targetTs, lastBlock);
 
-          const { symbol, decimals } = asset;
-          const date = new Date(targetTs * 1000);
-
-          // Get price using PriceService
-          let price = 1;
-          try {
-            price = await this.priceService.getHistoricalPrice(
-              { address: asset.address, symbol: asset.symbol, decimals: asset.decimals },
-              date,
-            );
-
-            if (price <= 0) {
-              throw new Error(`Invalid price received: ${price}`);
-            }
-          } catch (priceError) {
-            const message = `Price fetch failed for ${symbol} on ${date.toISOString().slice(0, 10)}: ${priceError.message}. Stopping to retry on next cron run.`;
-            this.logger.error(message);
-            await this.mailService.notifyGetHistoryError(message);
-
-            // Stop processing - will retry from this date on next cron run
-            return;
-          }
-
           let reserves: bigint;
           try {
             switch (algorithm) {
               case Algorithm.COMET:
-                reserves = await this.algorithmService.comet(contract, blockTag, price);
+                reserves = await this.algorithmService.comet(contract, blockTag);
                 break;
               case Algorithm.MARKET_V2:
                 reserves = await this.algorithmService.marketV2(contract, blockTag);
@@ -730,6 +707,29 @@ export class ContractService implements OnModuleInit {
             } else {
               throw e;
             }
+          }
+
+          const { symbol, decimals } = asset;
+          const date = new Date(targetTs * 1000);
+
+          // Get price using PriceService
+          let price = 1;
+          try {
+            price = await this.priceService.getHistoricalPrice(
+              { address: asset.address, symbol: asset.symbol, decimals: asset.decimals },
+              date,
+            );
+
+            if (price <= 0) {
+              throw new Error(`Invalid price received: ${price}`);
+            }
+          } catch (priceError) {
+            const message = `Price fetch failed for ${symbol} on ${date.toISOString().slice(0, 10)}: ${priceError.message}. Stopping to retry on next cron run.`;
+            this.logger.error(message);
+            await this.mailService.notifyGetHistoryError(message);
+
+            // Stop processing - will retry from this date on next cron run
+            return;
           }
 
           const quantity = ethers.formatUnits(reserves, decimals);
