@@ -18,6 +18,7 @@ export default registerAs('networks', (): NetworkConfig[] => [
     network: 'ronin',
     chainId: 2020,
     url: 'https://ronin.drpc.org',
+    batchMaxCount: 3,
   },
   {
     network: 'polygon',
