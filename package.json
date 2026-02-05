@@ -24,6 +24,7 @@
     "cli:stats:get": "nest build && node dist/src/cli.js stats:get",
     "cli:event-fill": "nest build && node dist/src/cli.js event:fill",
     "cli:price-preload": "nest build && node dist/src/cli.js price:preload",
+    "cli:collateral-search-markets-v3": "nest build && node dist/src/cli.js collateral:search-markets-v3",
     "docker:up": "docker-compose up -d",
     "docker:down": "docker-compose down",
     "docker:clean": "docker volume prune -f && docker system prune -f"
