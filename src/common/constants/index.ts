@@ -19,6 +19,5 @@ export const MINUTE_IN_MS = 60000;
 export const MINUTE_IN_SEC = 60;
 export const NULL_ADDRESS = '0x0000000000000000000000000000000000000000';
 export const USD_DECIMALS = 8;
-export const USD_SCALE = 10 ** USD_DECIMALS;
 export const BATCH_SIZE = 2000;
 export const MARKET_DECIMALS = 18;
