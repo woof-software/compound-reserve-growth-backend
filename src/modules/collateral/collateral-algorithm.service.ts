@@ -84,7 +84,6 @@ export class CollateralAlgorithmService {
       assetIndices,
       appearanceBlocks,
       resolvedToBlock,
-      latestAssetInfos,
       latestDeactivatedFlags,
     );
 
@@ -126,6 +125,26 @@ export class CollateralAlgorithmService {
     return assetInfo.supplyCap === 0n;
   }
 
+  private groupPositionsByMid(
+    pendingPositions: Set<number>,
+    left: number[],
+    right: number[],
+  ): Map<number, number[]> {
+    const midToPositions = new Map<number, number[]>();
+
+    for (const position of pendingPositions) {
+      const mid = Math.floor((left[position] + right[position]) / 2);
+      const bucket = midToPositions.get(mid);
+      if (bucket) {
+        bucket.push(position);
+      } else {
+        midToPositions.set(mid, [position]);
+      }
+    }
+
+    return midToPositions;
+  }
+
   private async findAppearanceBlocks(
     contract: CometContract,
     directContract: CometContract,
@@ -140,17 +159,7 @@ export class CollateralAlgorithmService {
     const numAssetsCache = new Map<number, number>();
 
     while (pendingPositions.size > 0) {
-      const midToPositions = new Map<number, number[]>();
-
-      for (const position of pendingPositions) {
-        const mid = Math.floor((left[position] + right[position]) / 2);
-        const bucket = midToPositions.get(mid);
-        if (bucket) {
-          bucket.push(position);
-        } else {
-          midToPositions.set(mid, [position]);
-        }
-      }
+      const midToPositions = this.groupPositionsByMid(pendingPositions, left, right);
 
       const mids = Array.from(midToPositions.keys());
       const unresolvedMids = mids.filter((mid) => !numAssetsCache.has(mid));
@@ -192,7 +201,6 @@ export class CollateralAlgorithmService {
     indices: number[],
     appearanceBlocks: number[],
     toBlock: number,
-    latestAssetInfos: CometAssetInfo[],
     latestDeactivatedFlags: boolean[],
   ): Promise<Array<number | null>> {
     const deactivation = indices.map(() => null as number | null);
@@ -208,17 +216,7 @@ export class CollateralAlgorithmService {
     }
 
     while (pendingPositions.size > 0) {
-      const midToPositions = new Map<number, number[]>();
-
-      for (const position of pendingPositions) {
-        const mid = Math.floor((left[position] + right[position]) / 2);
-        const bucket = midToPositions.get(mid);
-        if (bucket) {
-          bucket.push(position);
-        } else {
-          midToPositions.set(mid, [position]);
-        }
-      }
+      const midToPositions = this.groupPositionsByMid(pendingPositions, left, right);
 
       const calls: Array<Promise<CometAssetInfo>> = [];
       const callMetadata: Array<{ key: string; index: number; blockTag: number }> = [];
