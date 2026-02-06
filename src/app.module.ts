@@ -14,6 +14,7 @@ import { NetworkModule } from 'modules/network/network.module';
 import { AssetModule } from 'modules/asset/asset.module';
 import { SourceModule } from 'modules/source/source.module';
 import { HistoryModule } from 'modules/history/history.module';
+import { HistoryCronModule } from 'modules/history/cron/history-cron.module';
 import { TreasuryModule } from 'modules/treasury/treasury.module';
 import { RevenueModule } from 'modules/revenue/revenue.module';
 import { PriceModule } from 'modules/price/price.module';
@@ -23,6 +24,7 @@ import { MailModule } from 'modules/mail/mail.module';
 import { EventModule } from 'modules/event/event.module';
 import { CoinGeckoModule } from 'modules/price/providers/coingecko/coingecko.module';
 import { CapoModule } from 'modules/capo/capo.module';
+import { CollateralModule } from 'modules/collateral/collateral.module';
 import { getAdminModule } from 'modules/admin';
 
 import { AppController } from './app.controller';
@@ -80,6 +82,7 @@ import { ExceptionInterceptor } from 'infrastructure/http/interceptors/exception
     SourceModule,
     AssetModule,
     HistoryModule,
+    HistoryCronModule,
     TreasuryModule,
     RevenueModule,
     CoinGeckoModule,
@@ -88,6 +91,7 @@ import { ExceptionInterceptor } from 'infrastructure/http/interceptors/exception
     MailModule,
     EventModule,
     CapoModule,
+    CollateralModule,
   ],
   controllers: [AppController],
   providers: [
