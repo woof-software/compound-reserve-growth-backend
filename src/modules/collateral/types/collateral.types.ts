@@ -45,7 +45,6 @@ export type BlockTagOverride = {
 export type CometContract = {
   numAssets(overrides?: BlockTagOverride): Promise<bigint>;
   getAssetInfo(index: number, overrides?: BlockTagOverride): Promise<CometAssetInfo>;
-  getPrice(priceFeed: string, overrides?: BlockTagOverride): Promise<bigint>;
 };
 
 export type CollateralLifecycleOutput = {

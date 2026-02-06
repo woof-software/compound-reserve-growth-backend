@@ -68,12 +68,7 @@ export class CollateralAlgorithmService {
       assetIndices,
       resolvedToBlock,
     );
-    const latestDeactivatedFlags = await this.resolvePriceFeedDeactivationFlags(
-      contract,
-      directContract,
-      latestAssetInfos,
-      resolvedToBlock,
-    );
+    const latestDeactivatedFlags = latestAssetInfos.map((info) => this.isDeactivated(info));
 
     const appearanceBlocks = await this.findAppearanceBlocks(
       contract,
@@ -127,8 +122,8 @@ export class CollateralAlgorithmService {
     }
   }
 
-  private isPriceFeedDeactivated(priceFeed: string, priceValue: bigint | null): boolean {
-    return priceFeed === ethers.ZeroAddress || priceValue === null || priceValue === 0n;
+  private isDeactivated(assetInfo: CometAssetInfo): boolean {
+    return assetInfo.supplyCap === 0n;
   }
 
   private async findAppearanceBlocks(
@@ -205,7 +200,6 @@ export class CollateralAlgorithmService {
     const right = indices.map(() => toBlock);
     const pendingPositions = new Set<number>();
     const assetInfoCache = new Map<string, CometAssetInfo>();
-    const priceCache = new Map<string, bigint | null>();
 
     for (let position = 0; position < indices.length; position += 1) {
       if (latestDeactivatedFlags[position]) {
@@ -257,33 +251,6 @@ export class CollateralAlgorithmService {
         }
       }
 
-      const priceRequests: Array<{ key: string; priceFeed: string; blockTag: number }> = [];
-      for (const [mid, positions] of midToPositions) {
-        for (const position of positions) {
-          const index = indices[position];
-          const assetKey = `${mid}:${index}`;
-          const assetInfo = assetInfoCache.get(assetKey);
-          if (!assetInfo) {
-            continue;
-          }
-          const priceFeed = assetInfo.priceFeed;
-          if (priceFeed === ethers.ZeroAddress) {
-            continue;
-          }
-          const priceKey = `${mid}:${priceFeed}`;
-          if (!priceCache.has(priceKey)) {
-            priceRequests.push({ key: priceKey, priceFeed, blockTag: mid });
-          }
-        }
-      }
-
-      if (priceRequests.length > 0) {
-        const priceResults = await this.loadPrices(contract, directContract, priceRequests);
-        for (const [key, price] of priceResults) {
-          priceCache.set(key, price);
-        }
-      }
-
       for (const [mid, positions] of midToPositions) {
         for (const position of positions) {
           const index = indices[position];
@@ -293,10 +260,7 @@ export class CollateralAlgorithmService {
             throw new Error(`Missing asset info for index ${index} at block ${mid}`);
           }
 
-          const priceKey = `${mid}:${assetInfo.priceFeed}`;
-          const priceValue =
-            assetInfo.priceFeed === ethers.ZeroAddress ? null : (priceCache.get(priceKey) ?? null);
-          const isDeactivated = this.isPriceFeedDeactivated(assetInfo.priceFeed, priceValue);
+          const isDeactivated = this.isDeactivated(assetInfo);
 
           if (isDeactivated) {
             right[position] = mid;
@@ -337,68 +301,6 @@ export class CollateralAlgorithmService {
       map.set(blockTags[i], value);
     }
     return map;
-  }
-
-  private async resolvePriceFeedDeactivationFlags(
-    contract: CometContract,
-    directContract: CometContract,
-    assetInfos: CometAssetInfo[],
-    blockTag: number,
-  ): Promise<boolean[]> {
-    const priceRequests: Array<{ key: string; priceFeed: string; blockTag: number }> = [];
-    const priceKeys = assetInfos.map((info) => `${blockTag}:${info.priceFeed}`);
-
-    for (const assetInfo of assetInfos) {
-      if (assetInfo.priceFeed === ethers.ZeroAddress) {
-        continue;
-      }
-      const priceKey = `${blockTag}:${assetInfo.priceFeed}`;
-      priceRequests.push({ key: priceKey, priceFeed: assetInfo.priceFeed, blockTag });
-    }
-
-    const priceCache = new Map<string, bigint | null>();
-    if (priceRequests.length > 0) {
-      const priceResults = await this.loadPrices(contract, directContract, priceRequests);
-      for (const [key, price] of priceResults) {
-        priceCache.set(key, price);
-      }
-    }
-
-    return assetInfos.map((info, index) => {
-      const priceKey = priceKeys[index];
-      const priceValue =
-        info.priceFeed === ethers.ZeroAddress ? null : (priceCache.get(priceKey) ?? null);
-      return this.isPriceFeedDeactivated(info.priceFeed, priceValue);
-    });
-  }
-
-  private async loadPrices(
-    contract: CometContract,
-    directContract: CometContract,
-    requests: Array<{ key: string; priceFeed: string; blockTag: number }>,
-  ): Promise<Map<string, bigint | null>> {
-    const results = new Map<string, bigint | null>();
-    const calls = requests.map(({ priceFeed, blockTag }) =>
-      contract.getPrice(priceFeed, { blockTag }),
-    );
-
-    try {
-      const values = await Promise.all(calls);
-      for (let i = 0; i < values.length; i += 1) {
-        results.set(requests[i].key, values[i]);
-      }
-      return results;
-    } catch {
-      for (const { key, priceFeed, blockTag } of requests) {
-        try {
-          const value = await directContract.getPrice(priceFeed, { blockTag });
-          results.set(key, value);
-        } catch {
-          results.set(key, null);
-        }
-      }
-      return results;
-    }
   }
 
   private async findFirstReadableBlock(
