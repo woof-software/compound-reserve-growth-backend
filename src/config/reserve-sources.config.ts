@@ -12,8 +12,8 @@ export default registerAs('reserveSources', (): ReserveSourcesConfig => {
   const repoName = 'compound-reserve-sources';
   const repoBranch = 'main';
   const dataPath = 'data';
-  const assetsFile = 'asset.json';
-  const sourcesFile = 'source.json';
+  const assetsFile = 'assets.json';
+  const sourcesFile = 'sources.json';
   const rawBaseUrl = 'https://raw.githubusercontent.com';
 
   const repoUrl = `https://github.com/${repoOwner}/${repoName}`;
