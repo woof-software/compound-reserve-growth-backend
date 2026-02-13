@@ -1,3 +1,8 @@
+/**
+ * Types for remote reserve data (assets.json / sources.json from compound-reserve-sources repo).
+ * Used by asset and source update services.
+ */
+
 export type RemoteAsset = {
   id: number;
   address: string;

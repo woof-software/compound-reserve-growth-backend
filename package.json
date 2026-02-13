@@ -19,7 +19,7 @@
     "migration:create": "yarn run typeorm -- migration:create ./src/database/migrations/migration",
     "migration:revert": "yarn run typeorm -- -d ./src/database/typeorm.config.ts migration:revert",
     "migration:show": "yarn run typeorm -- migration:show -d ./src/database/typeorm.config.ts",
-    "cli:source-fill": "nest build && node dist/src/cli.js source:fill",
+    "cli:data-update": "nest build && node dist/src/cli.js data:update",
     "cli:history-get": "nest build && node dist/src/cli.js history:get",
     "cli:stats:get": "nest build && node dist/src/cli.js stats:get",
     "cli:event-fill": "nest build && node dist/src/cli.js event:fill",

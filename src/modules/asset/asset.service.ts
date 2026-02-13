@@ -26,6 +26,10 @@ export class AssetService {
     return this.assetRepository.save(asset);
   }
 
+  async update(asset: Asset): Promise<Asset> {
+    return this.assetRepository.save(asset);
+  }
+
   async findByAddressAndNetwork(dto: FindAssetDto): Promise<Asset> {
     return this.assetRepository.findByAddressAndNetwork(dto.address, dto.network);
   }
