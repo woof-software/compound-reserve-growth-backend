@@ -166,8 +166,9 @@ export class SourceUpdateService {
       source.blockNumber = remote.startBlock;
       changed = true;
     }
+    const currentMarket = source.market ?? undefined;
     const remoteMarket = remote.market ?? undefined;
-    if (source.market !== remoteMarket) {
+    if (currentMarket !== remoteMarket) {
       source.market = remoteMarket;
       changed = true;
     }
