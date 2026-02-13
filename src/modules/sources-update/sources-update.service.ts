@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectDataSource } from '@nestjs/typeorm';
 import axios from 'axios';
-import { DataSource } from 'typeorm';
+import { DataSource, QueryFailedError } from 'typeorm';
 
 import { Asset } from 'modules/asset/asset.entity';
 import { Source } from 'modules/source/source.entity';
@@ -103,6 +103,9 @@ export class SourcesUpdateService {
 
       if (assetInserts.length) {
         const toInsert = assetInserts.map((x) => x.asset);
+        this.logger.log(
+          `Inserting ${toInsert.length} asset(s): ${this.formatAssetBatchLog(toInsert)}`,
+        );
         const saved = await this.syncRepo.saveAssets(toInsert, qr.manager);
         for (let i = 0; i < saved.length; i++) {
           remoteIdToAsset.set(assetInserts[i].remoteId, saved[i]);
@@ -166,6 +169,9 @@ export class SourcesUpdateService {
       }
 
       if (sourceInserts.length) {
+        this.logger.log(
+          `Inserting ${sourceInserts.length} source(s): ${this.formatSourceBatchLog(sourceInserts)}`,
+        );
         await this.syncRepo.saveSources(sourceInserts, qr.manager);
         this.logger.log(`Inserted ${sourceInserts.length} source(s)`);
       }
@@ -181,6 +187,7 @@ export class SourcesUpdateService {
       await qr.rollbackTransaction();
       const message = err instanceof Error ? err.message : String(err);
       this.logger.error(`Sources update failed (transaction rolled back): ${message}`);
+      if (err instanceof QueryFailedError) this.logQueryFailedRow(err);
       throw err;
     } finally {
       await qr.release();
@@ -279,5 +286,21 @@ export class SourcesUpdateService {
       changed = true;
     }
     return changed;
+  }
+
+  private formatAssetBatchLog(assets: Asset[]): string {
+    return assets.map((a) => `${a.address} (${a.network}, ${a.symbol})`).join(', ');
+  }
+
+  private formatSourceBatchLog(sources: Source[]): string {
+    return sources.map((s) => `${s.address} (${s.network}, asset: ${s.asset.address})`).join(', ');
+  }
+
+  private logQueryFailedRow(err: QueryFailedError): void {
+    if (!err.parameters) return;
+    const params = Array.isArray(err.parameters) ? err.parameters : [err.parameters];
+    this.logger.error(
+      `Failed row data (query params): address=${params[0] ?? '?'}, decimals=${params[1] ?? '?'}, symbol=${params[2] ?? '?'}, network=${params[3] ?? '?'}`,
+    );
   }
 }
