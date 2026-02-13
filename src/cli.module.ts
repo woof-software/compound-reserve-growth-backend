@@ -1,11 +1,8 @@
 import { Module } from '@nestjs/common';
 import { CacheModule } from '@nestjs/cache-manager';
-import { ConfigModule, ConfigService } from '@nestjs/config';
+import { ConfigModule } from '@nestjs/config';
 import { MailerModule } from '@nestjs-modules/mailer';
-import { redisStore } from 'cache-manager-ioredis-yet';
-import Redis from 'ioredis';
 
-import { RedisModule, REDIS_CLIENT } from 'modules/redis/redis.module';
 import { SourceModule } from 'modules/source/source.module';
 import { SourcesUpdateModule } from 'modules/sources-update/sources-update.module';
 import { HistoryModule } from 'modules/history/history.module';
@@ -16,7 +13,6 @@ import { DatabaseModule } from 'database/database.module';
 import appConfig from 'config/app';
 import databaseConfig from 'config/database';
 import networksConfig from 'config/networks.config';
-import redis from 'config/redis';
 import google from 'config/google';
 import admin from 'config/admin';
 import reserveSourcesConfig from '@/config/reserve-sources.config';
@@ -25,18 +21,9 @@ import reserveSourcesConfig from '@/config/reserve-sources.config';
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      load: [appConfig, databaseConfig, networksConfig, redis, google, admin, reserveSourcesConfig],
+      load: [appConfig, databaseConfig, networksConfig, google, admin, reserveSourcesConfig],
     }),
-    CacheModule.registerAsync({
-      isGlobal: true,
-      imports: [ConfigModule, RedisModule],
-      inject: [ConfigService, REDIS_CLIENT],
-      useFactory: async (cfg: ConfigService, client: Redis) => ({
-        store: redisStore,
-        redisInstance: client,
-        ttl: cfg.get<number>('redis.ttl'),
-      }),
-    }),
+    CacheModule.register({ isGlobal: true }),
     MailerModule.forRoot({
       transport: {
         host: 'in-v3.mailjet.com',
