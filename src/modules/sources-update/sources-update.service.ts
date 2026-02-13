@@ -1,23 +1,32 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { InjectDataSource } from '@nestjs/typeorm';
 import axios from 'axios';
-
-import { getAssetKey, getSourceKey } from 'common/utils/reserve-data-keys';
-import { fetchJson } from 'common/utils/fetch-json';
-import type { RemoteAsset, RemoteSource } from 'common/types/remote-reserve-data.types';
+import { DataSource } from 'typeorm';
 
 import { Asset } from 'modules/asset/asset.entity';
 import { Source } from 'modules/source/source.entity';
 import { NetworkService } from 'modules/network/network.service';
 
-import type { ReserveSourcesConfig } from 'config/reserve-sources.config';
+import { getAssetKey, getSourceKey } from 'common/utils/reserve-data-keys';
+import { fetchJson } from 'common/utils/fetch-json';
+import type { RemoteAsset, RemoteSource } from 'common/types/remote-reserve-data.types';
 
 import { SyncRepository } from './repositories/sync.repository';
 
+import type { ReserveSourcesConfig } from 'config/reserve-sources.config';
+
+/** One asset to insert, with remote id for mapping sources later */
+interface AssetInsertItem {
+  remoteId: number;
+  asset: Asset;
+}
+
 /**
- * Syncs assets and sources from remote reserve data.
- * Fetches data once, then runs asset sync and source sync sequentially.
- * Uses own repository; only Asset and Source entities are imported from their modules.
+ * Syncs assets and sources from remote reserve data in a single transaction.
+ * 1. Prepares batches (assets then sources) from remote data and current DB state.
+ * 2. In one transaction: inserts/updates all assets, then inserts/updates all sources.
+ * 3. On any error rolls back and throws; no partial apply.
  */
 @Injectable()
 export class SourcesUpdateService {
@@ -27,6 +36,7 @@ export class SourcesUpdateService {
     private readonly configService: ConfigService,
     private readonly networkService: NetworkService,
     private readonly syncRepo: SyncRepository,
+    @InjectDataSource() private readonly dataSource: DataSource,
   ) {}
 
   async run(): Promise<void> {
@@ -39,18 +49,25 @@ export class SourcesUpdateService {
       fetchJson<unknown>(http, config.rawSourcesUrl),
     ]);
 
-    await this.syncAssetsFromRemote(rawAssets);
-    await this.syncSourcesFromRemote(rawSources);
+    const remoteAssets = this.parseAssets(rawAssets);
+    const remoteSources = this.parseSources(rawSources);
 
-    this.logger.log('Source update completed.');
-  }
+    const [dbAssets, dbSources] = await Promise.all([
+      this.syncRepo.listAllAssets(),
+      this.syncRepo.listAllSources(),
+    ]);
 
-  async syncAssetsFromRemote(rawData: unknown): Promise<void> {
-    const remoteAssets = this.parseAssets(rawData);
-    const dbAssets = await this.syncRepo.listAllAssets();
     const assetByKey = new Map<string, Asset>(
       dbAssets.map((a) => [getAssetKey(a.address, a.network), a]),
     );
+    const sourceByKey = new Map<string, Source>(
+      dbSources.map((s) => [getSourceKey(s.address, s.network, s.algorithm, s.asset.address), s]),
+    );
+
+    /** remote asset id (from JSON) -> Asset. Filled for existing now, for new after insert. */
+    const remoteIdToAsset = new Map<number, Asset>();
+    const assetInserts: AssetInsertItem[] = [];
+    const assetUpdates: Asset[] = [];
 
     for (const remote of remoteAssets) {
       const network = this.resolveNetwork(remote.chainId);
@@ -59,93 +76,81 @@ export class SourcesUpdateService {
         continue;
       }
       const key = getAssetKey(remote.address, network);
-      let asset = assetByKey.get(key);
+      const existing = assetByKey.get(key);
 
-      if (asset) {
-        const updated = this.applyRemoteToAsset(asset, remote);
-        if (updated) {
-          await this.syncRepo.saveAsset(asset);
-          this.logger.warn(`Updated asset: ${network}/${remote.symbol} (${remote.address})`);
-        }
+      if (existing) {
+        const changed = this.applyRemoteToAsset(existing, remote);
+        if (changed) assetUpdates.push(existing);
+        remoteIdToAsset.set(remote.id, existing);
       } else {
-        try {
-          asset = await this.findOrCreateAsset(remote, network);
-          assetByKey.set(key, asset);
-          this.logger.log(`Added asset: ${network}/${remote.symbol} (${remote.address})`);
-        } catch (err) {
-          const message = err instanceof Error ? err.message : String(err);
-          this.logger.error(
-            `Asset findOrCreate failed: network=${network}, symbol=${remote.symbol}, address=${remote.address}, chainId=${remote.chainId}, error=${message}`,
-          );
-          throw err;
-        }
+        const asset = new Asset(
+          remote.address,
+          remote.decimals,
+          remote.symbol,
+          network,
+          remote.type ?? undefined,
+        );
+        assetInserts.push({ remoteId: remote.id, asset });
       }
     }
-  }
 
-  async syncSourcesFromRemote(rawData: unknown): Promise<void> {
-    const remoteSources = this.parseSources(rawData);
-    const dbSources = await this.syncRepo.listAllSources();
-    const sourceByKey = new Map<string, Source>(
-      dbSources.map((s) => [getSourceKey(s.address, s.network, s.algorithm, s.asset.address), s]),
-    );
+    const qr = this.dataSource.createQueryRunner();
+    await qr.connect();
 
-    for (const remote of remoteSources) {
-      let asset: Asset | null;
-      try {
-        asset = await this.syncRepo.findAssetById(remote.assetId);
-      } catch (err) {
-        const message = err instanceof Error ? err.message : String(err);
-        this.logger.error(
-          `Source sync: missing asset for source id=${remote.id}, address=${remote.address}, assetId=${remote.assetId}, error=${message}`,
-        );
-        continue;
-      }
-      if (!asset) {
-        this.logger.error(
-          `Source sync: asset not found for source id=${remote.id}, assetId=${remote.assetId}`,
-        );
-        continue;
-      }
+    try {
+      await qr.startTransaction('READ COMMITTED');
 
-      const network = this.resolveNetwork(remote.chainId);
-      if (!network) {
-        this.logger.warn(`Unknown chainId for source ${remote.id}: ${remote.chainId}`);
-        continue;
-      }
-
-      const algorithms = this.normalizeAlgorithms(remote.algorithm);
-      if (!algorithms.length) {
-        this.logger.warn(`Missing algorithm for source ${remote.id}`);
-        continue;
-      }
-
-      if (!remote.type) {
-        this.logger.warn(`Missing type for source ${remote.id}`);
-        continue;
-      }
-
-      const key = getSourceKey(remote.address, network, algorithms, asset.address);
-      const source = sourceByKey.get(key);
-
-      if (source) {
-        const updated = this.applyRemoteToSource(source, remote);
-        if (updated) {
-          try {
-            source.checkedAt = new Date();
-            await this.syncRepo.saveSource(source);
-            this.logger.warn(`Updated source: ${network}/${remote.address}`);
-          } catch (err) {
-            const message = err instanceof Error ? err.message : String(err);
-            this.logger.error(
-              `Source update failed: network=${network}, address=${remote.address}, sourceId=${remote.id}, error=${message}`,
-            );
-            throw err;
-          }
+      if (assetInserts.length) {
+        const toInsert = assetInserts.map((x) => x.asset);
+        const saved = await this.syncRepo.saveAssets(toInsert, qr.manager);
+        for (let i = 0; i < saved.length; i++) {
+          remoteIdToAsset.set(assetInserts[i].remoteId, saved[i]);
+          assetByKey.set(getAssetKey(saved[i].address, saved[i].network), saved[i]);
         }
-      } else {
-        try {
-          const created = new Source(
+        this.logger.log(`Inserted ${saved.length} asset(s)`);
+      }
+
+      if (assetUpdates.length) {
+        await this.syncRepo.saveAssets(assetUpdates, qr.manager);
+        this.logger.warn(`Updated ${assetUpdates.length} asset(s)`);
+      }
+
+      const sourceInserts: Source[] = [];
+      const sourceUpdates: Source[] = [];
+
+      for (const remote of remoteSources) {
+        const asset = remoteIdToAsset.get(remote.assetId);
+        if (!asset) {
+          this.logger.warn(
+            `Skipping source id=${remote.id}: asset not found for assetId=${remote.assetId}`,
+          );
+          continue;
+        }
+
+        const network = this.resolveNetwork(remote.chainId);
+        if (!network) {
+          this.logger.warn(`Unknown chainId for source ${remote.id}: ${remote.chainId}`);
+          continue;
+        }
+
+        const algorithms = remote.algorithm;
+
+        if (!remote.type) {
+          this.logger.warn(`Missing type for source ${remote.id}`);
+          continue;
+        }
+
+        const key = getSourceKey(remote.address, network, algorithms, asset.address);
+        const existingSource = sourceByKey.get(key);
+
+        if (existingSource) {
+          const changed = this.applyRemoteToSource(existingSource, remote);
+          if (changed) {
+            existingSource.checkedAt = new Date();
+            sourceUpdates.push(existingSource);
+          }
+        } else {
+          const source = new Source(
             remote.address,
             network,
             algorithms,
@@ -154,17 +159,30 @@ export class SourcesUpdateService {
             asset,
             remote.market ?? undefined,
           );
-          const saved = await this.syncRepo.saveSource(created);
-          sourceByKey.set(key, saved);
-          this.logger.log(`Added source: ${network}/${remote.address}`);
-        } catch (err) {
-          const message = err instanceof Error ? err.message : String(err);
-          this.logger.error(
-            `Source create failed: network=${network}, address=${remote.address}, sourceId=${remote.id}, assetId=${remote.assetId}, error=${message}`,
-          );
-          throw err;
+          sourceInserts.push(source);
+          sourceByKey.set(key, source);
         }
       }
+
+      if (sourceInserts.length) {
+        await this.syncRepo.saveSources(sourceInserts, qr.manager);
+        this.logger.log(`Inserted ${sourceInserts.length} source(s)`);
+      }
+
+      if (sourceUpdates.length) {
+        await this.syncRepo.saveSources(sourceUpdates, qr.manager);
+        this.logger.warn(`Updated ${sourceUpdates.length} source(s)`);
+      }
+
+      await qr.commitTransaction();
+      this.logger.log('Sources update completed.');
+    } catch (err) {
+      await qr.rollbackTransaction();
+      const message = err instanceof Error ? err.message : String(err);
+      this.logger.error(`Sources update failed (transaction rolled back): ${message}`);
+      throw err;
+    } finally {
+      await qr.release();
     }
   }
 
@@ -178,19 +196,6 @@ export class SourcesUpdateService {
 
   private resolveNetwork(chainId: number): string | null {
     return this.networkService.byChainId(chainId)?.network ?? null;
-  }
-
-  private async findOrCreateAsset(remote: RemoteAsset, network: string): Promise<Asset> {
-    const existing = await this.syncRepo.findAssetByAddressAndNetwork(remote.address, network);
-    if (existing) return existing;
-    const asset = new Asset(
-      remote.address,
-      remote.decimals,
-      remote.symbol,
-      network,
-      remote.type ?? undefined,
-    );
-    return this.syncRepo.saveAsset(asset);
   }
 
   private parseAssets(data: unknown): RemoteAsset[] {
@@ -227,7 +232,7 @@ export class SourcesUpdateService {
         id: item.id,
         address: item.address,
         market: item.market ?? null,
-        algorithm: this.parseAlgorithm(item.algorithm),
+        algorithm: this.getAlgorithms(item.algorithm),
         startBlock: item.startBlock,
         endBlock: item.endBlock ?? null,
         chainId: item.chainId,
@@ -238,23 +243,26 @@ export class SourcesUpdateService {
     return result;
   }
 
-  private normalizeAlgorithms(algorithms: RemoteSource['algorithm']): string[] {
-    return algorithms.map((a) => a.trim()).filter((a) => a.length > 0);
-  }
-
-  private parseAlgorithm(value: unknown): string[] {
-    if (Array.isArray(value)) {
-      return value.map((e) => String(e).trim()).filter((e) => e.length > 0);
+  /**
+   * Validates the algorithm field: must be an array with at least one non-empty value.
+   * Data is not modified (no trim). Rejects string values that look like DB array literals (e.g. "{a,b}").
+   */
+  private getAlgorithms(value: unknown): string[] {
+    if (!Array.isArray(value)) {
+      if (typeof value === 'string' && /^\{.*\}$/.test(value)) {
+        throw new Error('Source algorithm must be a JSON array, not a string with braces');
+      }
+      throw new Error(`Source algorithm must be an array, got ${typeof value}`);
     }
-    if (typeof value !== 'string') return [];
-    const trimmed = value.trim();
-    if (!trimmed) return [];
-    const withoutBraces =
-      trimmed.startsWith('{') && trimmed.endsWith('}') ? trimmed.slice(1, -1) : trimmed;
-    return withoutBraces
-      .split(',')
-      .map((e) => e.trim())
-      .filter((e) => e.length > 0);
+    const list = value.map((e) => String(e));
+    if (list.length === 0) {
+      throw new Error('Source algorithm must not be empty');
+    }
+    const hasNonEmpty = list.some((s) => s.trim() !== '');
+    if (!hasNonEmpty) {
+      throw new Error('Source algorithm must contain at least one non-empty value');
+    }
+    return list;
   }
 
   private isRecord(value: unknown): value is Record<string, unknown> {

@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { EntityManager, Repository } from 'typeorm';
 
 import { Asset } from 'modules/asset/asset.entity';
 import { Source } from 'modules/source/source.entity';
@@ -18,16 +18,10 @@ export class SyncRepository {
     return this.assetRepo.find({ order: { id: 'ASC' } });
   }
 
-  async findAssetByAddressAndNetwork(address: string, network: string): Promise<Asset | null> {
-    return this.assetRepo.findOne({ where: { address, network } });
-  }
-
-  async findAssetById(id: number): Promise<Asset | null> {
-    return this.assetRepo.findOne({ where: { id } });
-  }
-
-  async saveAsset(asset: Asset): Promise<Asset> {
-    return this.assetRepo.save(asset);
+  /** Batch save assets. Pass manager to run inside a transaction. */
+  async saveAssets(assets: Asset[], manager?: EntityManager): Promise<Asset[]> {
+    if (manager) return manager.getRepository(Asset).save(assets);
+    return this.assetRepo.save(assets);
   }
 
   async listAllSources(): Promise<Source[]> {
@@ -37,7 +31,9 @@ export class SyncRepository {
     });
   }
 
-  async saveSource(source: Source): Promise<Source> {
-    return this.sourceRepo.save(source);
+  /** Batch save sources. Pass manager to run inside a transaction. */
+  async saveSources(sources: Source[], manager?: EntityManager): Promise<Source[]> {
+    if (manager) return manager.getRepository(Source).save(sources);
+    return this.sourceRepo.save(sources);
   }
 }
