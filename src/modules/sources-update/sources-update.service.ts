@@ -9,12 +9,12 @@ import { Source } from 'modules/source/source.entity';
 import { NetworkService } from 'modules/network/network.service';
 
 import { getAlgorithms } from 'common/utils/get-algorithms';
-import { getAssetKey, getSourceKey } from 'common/utils/reserve-data-keys';
 import { fetchJson } from 'common/utils/fetch-json';
-import type { RemoteAsset, RemoteSource } from 'common/types/remote-reserve-data.types';
 
 import { SyncRepository } from './repositories/sync.repository';
 
+import { getAssetKey, getSourceKey } from '@/common/utils/reserve-source-keys';
+import type { RemoteAsset, RemoteSource } from '@/common/types/remote-reserve-sources.types';
 import type { ReserveSourcesConfig } from 'config/reserve-sources.config';
 
 /** One asset to insert, with remote id for mapping sources later */
