@@ -27,41 +27,53 @@ describe('getAlgorithms', () => {
     });
   });
 
-  describe('invalid input: not an array', () => {
-    it('throws when value is a string with braces (DB array literal)', () => {
-      expect(() => getAlgorithms('{comet,comet_stats}')).toThrow(
-        'Source algorithm must be a JSON array, not a string with braces',
-      );
+  describe('valid input: PostgreSQL-style string "{...}"', () => {
+    it('parses single element "{timelock}" to ["timelock"]', () => {
+      expect(getAlgorithms('{timelock}')).toEqual(['timelock']);
     });
 
-    it('throws when value is a string with only braces', () => {
-      expect(() => getAlgorithms('{}')).toThrow(
-        'Source algorithm must be a JSON array, not a string with braces',
-      );
+    it('parses multiple elements "{comet,comet_stats}" to array', () => {
+      expect(getAlgorithms('{comet,comet_stats}')).toEqual(['comet', 'comet_stats']);
     });
 
+    it('trims whitespace in "{ a , b }"', () => {
+      expect(getAlgorithms('{ comet , comet_stats }')).toEqual(['comet', 'comet_stats']);
+    });
+  });
+
+  describe('invalid input: not an array and not "{...}" string', () => {
     it('throws when value is a plain string (no braces)', () => {
       expect(() => getAlgorithms(Algorithm.COMET)).toThrow(
-        'Source algorithm must be an array, got string',
+        'Source algorithm must be an array or "{...}" string, got string',
       );
     });
 
     it('throws when value is a number', () => {
-      expect(() => getAlgorithms(1)).toThrow('Source algorithm must be an array, got number');
+      expect(() => getAlgorithms(1)).toThrow(
+        'Source algorithm must be an array or "{...}" string, got number',
+      );
     });
 
     it('throws when value is null', () => {
-      expect(() => getAlgorithms(null)).toThrow('Source algorithm must be an array, got object');
+      expect(() => getAlgorithms(null)).toThrow(
+        'Source algorithm must be an array or "{...}" string, got object',
+      );
     });
 
     it('throws when value is a plain object', () => {
-      expect(() => getAlgorithms({})).toThrow('Source algorithm must be an array, got object');
+      expect(() => getAlgorithms({})).toThrow(
+        'Source algorithm must be an array or "{...}" string, got object',
+      );
     });
 
     it('throws when value is undefined', () => {
       expect(() => getAlgorithms(undefined)).toThrow(
-        'Source algorithm must be an array, got undefined',
+        'Source algorithm must be an array or "{...}" string, got undefined',
       );
+    });
+
+    it('throws when value is a string with only braces (empty PG array)', () => {
+      expect(() => getAlgorithms('{}')).toThrow('Source algorithm must not be empty');
     });
   });
 
@@ -90,10 +102,8 @@ describe('getAlgorithms', () => {
       );
     });
 
-    it('string with braces and spaces still triggers braces error', () => {
-      expect(() => getAlgorithms('{ comet , comet_stats }')).toThrow(
-        'Source algorithm must be a JSON array, not a string with braces',
-      );
+    it('PG string with only whitespace inside throws', () => {
+      expect(() => getAlgorithms('{   }')).toThrow('Source algorithm must not be empty');
     });
   });
 });
