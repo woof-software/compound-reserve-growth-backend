@@ -1,9 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
 
+import { NetworkService } from 'modules/network/network.service';
+
 import { getAssetKey } from 'common/utils/reserve-data-keys';
 import type { RemoteAsset } from 'common/types/remote-reserve-data.types';
-
-import { NetworkService } from 'modules/network/network.service';
 
 import { Asset } from './asset.entity';
 import { AssetService } from './asset.service';
@@ -44,15 +44,23 @@ export class AssetUpdateService {
           this.logger.warn(`Updated asset: ${network}/${remote.symbol} (${remote.address})`);
         }
       } else {
-        asset = await this.assetService.findOrCreate({
-          address: remote.address,
-          decimals: remote.decimals,
-          symbol: remote.symbol,
-          network,
-          type: remote.type ?? undefined,
-        });
-        assetByKey.set(key, asset);
-        this.logger.log(`Added asset: ${network}/${remote.symbol} (${remote.address})`);
+        try {
+          asset = await this.assetService.findOrCreate({
+            address: remote.address,
+            decimals: remote.decimals,
+            symbol: remote.symbol,
+            network,
+            type: remote.type ?? undefined,
+          });
+          assetByKey.set(key, asset);
+          this.logger.log(`Added asset: ${network}/${remote.symbol} (${remote.address})`);
+        } catch (err) {
+          const message = err instanceof Error ? err.message : String(err);
+          this.logger.error(
+            `Asset findOrCreate failed: network=${network}, symbol=${remote.symbol}, address=${remote.address}, chainId=${remote.chainId}, error=${message}`,
+          );
+          throw err;
+        }
       }
     }
   }

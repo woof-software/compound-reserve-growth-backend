@@ -36,8 +36,11 @@ export class SourceUpdateService {
       let asset: Asset;
       try {
         asset = await this.assetService.findById(remote.assetId);
-      } catch {
-        this.logger.warn(`Missing asset for source ${remote.id} (assetId: ${remote.assetId})`);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        this.logger.error(
+          `Source sync: missing asset for source id=${remote.id}, address=${remote.address}, assetId=${remote.assetId}, error=${message}`,
+        );
         continue;
       }
 
@@ -64,25 +67,41 @@ export class SourceUpdateService {
       if (source) {
         const updated = this.applyRemoteToSource(source, remote);
         if (updated) {
-          await this.sourceService.updateWithSource({
-            source,
-            blockNumber: remote.startBlock,
-            checkedAt: new Date(),
-          });
-          this.logger.warn(`Updated source: ${network}/${remote.address}`);
+          try {
+            await this.sourceService.updateWithSource({
+              source,
+              blockNumber: remote.startBlock,
+              checkedAt: new Date(),
+            });
+            this.logger.warn(`Updated source: ${network}/${remote.address}`);
+          } catch (err) {
+            const message = err instanceof Error ? err.message : String(err);
+            this.logger.error(
+              `Source update failed: network=${network}, address=${remote.address}, sourceId=${remote.id}, error=${message}`,
+            );
+            throw err;
+          }
         }
       } else {
-        const created = await this.sourceService.createWithAsset({
-          address: remote.address,
-          network,
-          algorithm: algorithms,
-          type: remote.type,
-          blockNumber: remote.startBlock,
-          asset,
-          market: remote.market ?? undefined,
-        });
-        sourceByKey.set(key, created);
-        this.logger.log(`Added source: ${network}/${remote.address}`);
+        try {
+          const created = await this.sourceService.createWithAsset({
+            address: remote.address,
+            network,
+            algorithm: algorithms,
+            type: remote.type,
+            blockNumber: remote.startBlock,
+            asset,
+            market: remote.market ?? undefined,
+          });
+          sourceByKey.set(key, created);
+          this.logger.log(`Added source: ${network}/${remote.address}`);
+        } catch (err) {
+          const message = err instanceof Error ? err.message : String(err);
+          this.logger.error(
+            `Source create failed: network=${network}, address=${remote.address}, sourceId=${remote.id}, assetId=${remote.assetId}, error=${message}`,
+          );
+          throw err;
+        }
       }
     }
   }
