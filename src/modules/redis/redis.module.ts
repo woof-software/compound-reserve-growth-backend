@@ -2,6 +2,8 @@ import { Global, Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import Redis from 'ioredis';
 
+import { getRedisNoop } from './redis-noop';
+
 import { Logger } from 'infrastructure/logger';
 
 export const REDIS_CLIENT = 'REDIS_CLIENT';
@@ -13,13 +15,16 @@ export const REDIS_CLIENT = 'REDIS_CLIENT';
     {
       provide: REDIS_CLIENT,
       inject: [ConfigService],
-      useFactory: (config: ConfigService) => {
+      useFactory: (config: ConfigService): Redis => {
         const logger = new Logger('RedisClient');
 
         const redisHost = config.get<string>('redis.host');
-        logger.log(`Connecting to Redis at ${redisHost}`);
-        if (!redisHost) throw new Error('REDIS_HOST is not set');
+        if (!redisHost) {
+          logger.log('REDIS_HOST not set, using no-op Redis (cache disabled)');
+          return getRedisNoop() as unknown as Redis;
+        }
 
+        logger.log(`Connecting to Redis at ${redisHost}`);
         const client = new Redis({
           lazyConnect: true,
           host: redisHost,
