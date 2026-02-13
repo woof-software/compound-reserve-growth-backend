@@ -1,25 +1,25 @@
 import { Logger } from '@nestjs/common';
 import { Command, CommandRunner } from 'nest-commander';
 
-import { DataUpdateService } from 'modules/data-update/data-update.service';
+import { SourcesUpdateService } from 'modules/sources-update/sources-update.service';
 
 @Command({
-  name: 'data:update',
+  name: 'sources:update',
   description: 'Update assets and sources from remote reserve data (creates new, updates existing)',
 })
-export class DataUpdateCommand extends CommandRunner {
-  private readonly logger = new Logger(DataUpdateCommand.name);
+export class SourcesUpdateCommand extends CommandRunner {
+  private readonly logger = new Logger(SourcesUpdateCommand.name);
 
-  constructor(private readonly dataUpdateService: DataUpdateService) {
+  constructor(private readonly sourcesUpdateService: SourcesUpdateService) {
     super();
   }
 
   async run(): Promise<void> {
     try {
-      await this.dataUpdateService.run();
+      await this.sourcesUpdateService.run();
     } catch (error) {
       this.logger.error(
-        'Data update failed:',
+        'Sources update failed:',
         error instanceof Error ? error.message : String(error),
       );
       throw error;

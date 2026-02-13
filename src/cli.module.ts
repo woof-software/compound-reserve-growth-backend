@@ -7,7 +7,7 @@ import Redis from 'ioredis';
 
 import { RedisModule, REDIS_CLIENT } from 'modules/redis/redis.module';
 import { SourceModule } from 'modules/source/source.module';
-import { DataUpdateModule } from 'modules/data-update/data-update.module';
+import { SourcesUpdateModule } from 'modules/sources-update/sources-update.module';
 import { HistoryModule } from 'modules/history/history.module';
 import { PriceModule } from 'modules/price/price.module';
 import { EventModule } from 'modules/event/event.module';
@@ -49,7 +49,7 @@ import reserveSourcesConfig from '@/config/reserve-sources.config';
     }),
     DatabaseModule,
     SourceModule,
-    DataUpdateModule,
+    SourcesUpdateModule,
     HistoryModule,
     PriceModule,
     EventModule,
