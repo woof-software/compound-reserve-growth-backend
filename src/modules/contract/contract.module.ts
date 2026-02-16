@@ -13,8 +13,8 @@ import { ContractService } from './contract.service';
 @Module({
   imports: [
     NetworkModule,
-    // Circular dependency: ContractService → HistoryService (this module needs HistoryModule),
-    // and HistoryModule's GetHistoryService → ContractService (history/cron/history-get.service.ts).
+    // Circular dependency: ContractService -> HistoryService (this module needs HistoryModule),
+    // and HistoryModule's GetHistoryService -> ContractService (history/cron/history-get.service.ts).
     // forwardRef is required; HistoryModule also uses forwardRef(() => ContractModule).
     forwardRef(() => HistoryModule),
     SourceModule,

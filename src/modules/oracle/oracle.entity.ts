@@ -8,6 +8,7 @@ import {
   Index,
   ManyToOne,
 } from 'typeorm';
+
 import { AssetEntity } from 'modules/asset/asset.entity';
 
 @Entity('oracles')
