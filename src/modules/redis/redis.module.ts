@@ -2,8 +2,6 @@ import { Global, Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import Redis from 'ioredis';
 
-import { getRedisNoop } from './redis-noop';
-
 import { Logger } from 'infrastructure/logger';
 
 export const REDIS_CLIENT = 'REDIS_CLIENT';
@@ -20,8 +18,7 @@ export const REDIS_CLIENT = 'REDIS_CLIENT';
 
         const redisHost = config.get<string>('redis.host');
         if (!redisHost) {
-          logger.log('REDIS_HOST not set, using no-op Redis (cache disabled)');
-          return getRedisNoop() as unknown as Redis;
+          throw new Error('REDIS_HOST is required');
         }
 
         logger.log(`Connecting to Redis at ${redisHost}`);

@@ -1,11 +1,11 @@
 import { LogLevel, Logger } from '@nestjs/common';
 import { CommandFactory } from 'nest-commander';
 
-import { CliModule } from './cli.module';
+import { SourcesUpdateCliModule } from './cli-modules';
 
 async function bootstrap() {
   const logLevel = ['log', 'error', 'warn', 'debug', 'verbose'] as LogLevel[];
-  await CommandFactory.run(CliModule, { logger: logLevel });
+  await CommandFactory.run(SourcesUpdateCliModule, { logger: logLevel });
   process.exit(0);
 }
 
