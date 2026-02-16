@@ -2,14 +2,14 @@ import { Injectable } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource, EntityManager } from 'typeorm';
 
-import { Asset } from 'modules/asset/asset.entity';
-import { Source } from 'modules/source/source.entity';
+import { AssetEntity } from 'modules/asset/asset.entity';
+import { SourceEntity } from 'modules/source/source.entity';
 
 @Injectable()
 export class SyncRepository {
   constructor(@InjectDataSource() private readonly dataSource: DataSource) {}
 
-  async inTransaction<T>(work: (manager: EntityManager) => Promise<T>): Promise<T> {
+  public async inTransaction<T>(work: (manager: EntityManager) => Promise<T>): Promise<T> {
     const qr = this.dataSource.createQueryRunner();
     await qr.connect();
 
@@ -32,22 +32,25 @@ export class SyncRepository {
     }
   }
 
-  async listAllAssets(manager: EntityManager): Promise<Asset[]> {
-    return manager.getRepository(Asset).find({ order: { id: 'ASC' } });
+  public async listAllAssets(manager: EntityManager): Promise<AssetEntity[]> {
+    return manager.getRepository(AssetEntity).find({ order: { id: 'ASC' } });
   }
 
-  async saveAssets(assets: Asset[], manager: EntityManager): Promise<Asset[]> {
-    return manager.getRepository(Asset).save(assets);
+  public async saveAssets(assets: AssetEntity[], manager: EntityManager): Promise<AssetEntity[]> {
+    return manager.getRepository(AssetEntity).save(assets);
   }
 
-  async listAllSources(manager: EntityManager): Promise<Source[]> {
-    return manager.getRepository(Source).find({
+  public async listAllSources(manager: EntityManager): Promise<SourceEntity[]> {
+    return manager.getRepository(SourceEntity).find({
       relations: { asset: true },
       order: { id: 'ASC' },
     });
   }
 
-  async saveSources(sources: Source[], manager: EntityManager): Promise<Source[]> {
-    return manager.getRepository(Source).save(sources);
+  public async saveSources(
+    sources: SourceEntity[],
+    manager: EntityManager,
+  ): Promise<SourceEntity[]> {
+    return manager.getRepository(SourceEntity).save(sources);
   }
 }

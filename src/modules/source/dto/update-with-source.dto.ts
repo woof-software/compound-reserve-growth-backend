@@ -1,7 +1,7 @@
-import { Source } from 'modules/source/source.entity';
+import { SourceEntity } from 'modules/source/source.entity';
 
 export class UpdateWithSourceDto {
-  public source: Source;
+  public source: SourceEntity;
   public blockNumber?: number;
   public checkedAt?: Date;
 }

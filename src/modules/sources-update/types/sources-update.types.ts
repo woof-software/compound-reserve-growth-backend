@@ -1,12 +1,12 @@
-import { Asset } from 'modules/asset/asset.entity';
-import { Source } from 'modules/source/source.entity';
+import { AssetEntity } from 'modules/asset/asset.entity';
+import { SourceEntity } from 'modules/source/source.entity';
 
 import { RemoteAsset, RemoteSource } from './remote-reserve-sources.types';
 
 /** One asset to insert, with remote id for mapping sources later */
 export interface AssetInsertItem {
   remoteId: number;
-  asset: Asset;
+  asset: AssetEntity;
 }
 
 export interface LoadedRemoteData {
@@ -15,17 +15,17 @@ export interface LoadedRemoteData {
 }
 
 export interface DbSyncState {
-  assetByKey: Map<string, Asset>;
-  sourceByKey: Map<string, Source>;
+  assetByKey: Map<string, AssetEntity>;
+  sourceByKey: Map<string, SourceEntity>;
 }
 
 export interface AssetSyncPlan {
-  remoteIdToAsset: Map<number, Asset>;
+  remoteIdToAsset: Map<number, AssetEntity>;
   inserts: AssetInsertItem[];
-  updates: Asset[];
+  updates: AssetEntity[];
 }
 
 export interface SourceSyncPlan {
-  inserts: Source[];
-  updates: Source[];
+  inserts: SourceEntity[];
+  updates: SourceEntity[];
 }

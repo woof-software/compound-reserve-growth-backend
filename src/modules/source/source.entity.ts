@@ -3,13 +3,13 @@ import { Column, Entity, ManyToOne, OneToMany, PrimaryGeneratedColumn } from 'ty
 import { Reserve, Incomes, Spends } from 'modules/history/entities';
 import { Revenue } from 'modules/revenue/revenue.entity';
 import { Treasury } from 'modules/treasury/treasury.entity';
-import { Asset } from 'modules/asset/asset.entity';
+import { AssetEntity } from 'modules/asset/asset.entity';
 import { DailyAggregation } from 'modules/capo/daily.entity';
 
-import { SourceEntity } from '@/common/types/source';
+import { Source } from '@/common/types/source';
 
 @Entity({ name: 'source' })
-export class Source implements SourceEntity {
+export class SourceEntity implements Source {
   @PrimaryGeneratedColumn()
   public id: number;
 
@@ -37,8 +37,8 @@ export class Source implements SourceEntity {
   @Column({ nullable: true })
   public checkedAt?: Date;
 
-  @ManyToOne(() => Asset, (asset) => asset.sources)
-  public asset: Asset;
+  @ManyToOne(() => AssetEntity, (asset) => asset.sources)
+  public asset: AssetEntity;
 
   @OneToMany(() => Reserve, (reserves) => reserves.source)
   public reserves: Reserve[];
@@ -61,7 +61,7 @@ export class Source implements SourceEntity {
     algorithm: string[],
     type: string,
     blockNumber: number,
-    asset: Asset,
+    asset: AssetEntity,
     market?: string,
   ) {
     this.address = address;

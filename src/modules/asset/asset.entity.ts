@@ -1,12 +1,12 @@
 import { Column, Entity, OneToMany, PrimaryGeneratedColumn } from 'typeorm';
 
-import { Source } from 'modules/source/source.entity';
+import { SourceEntity } from 'modules/source/source.entity';
 import { Oracle } from 'modules/oracle/oracle.entity';
 
-import { AssetEntity } from '@/common/types/asset';
+import { Asset } from '@/common/types/asset';
 
 @Entity({ name: 'asset' })
-export class Asset implements AssetEntity {
+export class AssetEntity implements Asset {
   @PrimaryGeneratedColumn()
   public id: number;
 
@@ -28,8 +28,8 @@ export class Asset implements AssetEntity {
   @Column()
   public createdAt: Date;
 
-  @OneToMany(() => Source, (sources) => sources.asset)
-  public sources: Source[];
+  @OneToMany(() => SourceEntity, (sources) => sources.asset)
+  public sources: SourceEntity[];
 
   @OneToMany(() => Oracle, (oracles) => oracles.asset)
   public oracles: Oracle[];

@@ -1,4 +1,4 @@
-export interface AssetEntity {
+export interface Asset {
   id: number;
   address: string;
   decimals: number;

@@ -4,13 +4,13 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { AssetModule } from 'modules/asset/asset.module';
 import { NetworkModule } from 'modules/network/network.module';
 
-import { Source } from './source.entity';
+import { SourceEntity } from './source.entity';
 import { SourceRepository } from './source.repository';
 import { SourceService } from './source.service';
 import { SourceController } from './source.controller';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Source]), AssetModule, NetworkModule],
+  imports: [TypeOrmModule.forFeature([SourceEntity]), AssetModule, NetworkModule],
   providers: [SourceRepository, SourceService],
   exports: [SourceService, SourceRepository],
   controllers: [SourceController],

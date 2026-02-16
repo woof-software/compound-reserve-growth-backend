@@ -7,7 +7,7 @@ import { StartCollectionResponse } from 'modules/admin/response';
 import { IncomesRepository } from 'modules/history/incomes-repository.service';
 import { SpendsRepository } from 'modules/history/spends-repository.service';
 import { ReservesRepository } from 'modules/history/reserves-repository.service';
-import { Source } from 'modules/source/source.entity';
+import { SourceEntity } from 'modules/source/source.entity';
 
 import { Algorithm } from 'common/enum/algorithm.enum';
 
@@ -63,12 +63,15 @@ export class GetHistoryService {
    * @param startDate - Optional date to start from. If not provided, uses contract creation block
    * @returns Array of sources that were successfully updated (excluding those that failed or had no changes)
    */
-  private async updateSourcesBlockNumber(sources: Source[], startDate: Date): Promise<Source[]> {
+  private async updateSourcesBlockNumber(
+    sources: SourceEntity[],
+    startDate: Date,
+  ): Promise<SourceEntity[]> {
     this.logger.log(`Updating blockNumber for ${sources.length} sources...`);
 
     let successCount = 0;
     let failureCount = 0;
-    const successfullyUpdatedSources: Source[] = [];
+    const successfullyUpdatedSources: SourceEntity[] = [];
 
     // Process sources sequentially to avoid RPC batch limit errors
     for (const source of sources) {

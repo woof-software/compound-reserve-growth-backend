@@ -6,7 +6,7 @@ import { Cron, CronExpression } from '@nestjs/schedule';
 import { Oracle } from 'modules/oracle/oracle.entity';
 import { OracleService } from 'modules/oracle/oracle.service';
 import { AlertService } from 'modules/alert/alert.service';
-import { Source } from 'modules/source/source.entity';
+import { SourceEntity } from 'modules/source/source.entity';
 import { OffsetRequest } from 'modules/history/request/offset.request';
 import { ProviderFactory } from 'modules/network/provider.factory';
 
@@ -34,8 +34,8 @@ export class CapoService {
     private aggregationRepository: Repository<DailyAggregation>,
     @InjectRepository(Oracle)
     private oracleRepository: Repository<Oracle>,
-    @InjectRepository(Source)
-    private sourceRepository: Repository<Source>,
+    @InjectRepository(SourceEntity)
+    private sourceRepository: Repository<SourceEntity>,
     private oracleService: OracleService,
     private alertService: AlertService,
     private providerFactory: ProviderFactory,

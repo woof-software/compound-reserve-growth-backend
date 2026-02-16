@@ -8,7 +8,7 @@ import { Incomes, Reserve, Spends } from 'modules/history/entities';
 import { REDIS_CLIENT } from 'modules/redis/redis.module';
 import { ProviderFactory } from 'modules/network/provider.factory';
 import { HistoryService } from 'modules/history/history.service';
-import { Source } from 'modules/source/source.entity';
+import { SourceEntity } from 'modules/source/source.entity';
 import { SourceService } from 'modules/source/source.service';
 import { PriceService } from 'modules/price/price.service';
 import { MailService } from 'modules/mail/mail.service';
@@ -184,7 +184,7 @@ export class ContractService implements OnModuleInit {
    * @param startDate - Optional date to start from
    * @returns Block number to start from
    */
-  async getSourceBlockNumber(source: Source, startDate?: Date): Promise<number> {
+  async getSourceBlockNumber(source: SourceEntity, startDate?: Date): Promise<number> {
     try {
       if (startDate) {
         const provider = this.providerFactory.get(source.network);
@@ -584,7 +584,7 @@ export class ContractService implements OnModuleInit {
     return this.networkConfig[network];
   }
 
-  async getHistory(source: Source) {
+  async getHistory(source: SourceEntity) {
     const { algorithm } = source;
 
     for (const alg of algorithm) {
@@ -607,7 +607,7 @@ export class ContractService implements OnModuleInit {
     }
   }
 
-  public async saveReserves(source: Source, algorithm: string): Promise<void> {
+  public async saveReserves(source: SourceEntity, algorithm: string): Promise<void> {
     const { address: contractAddress, network, asset } = source;
     const { address: assetAddress } = asset;
 
@@ -798,7 +798,7 @@ export class ContractService implements OnModuleInit {
     }
   }
 
-  public async saveStats(source: Source, algorithm: string, data?: Date): Promise<void> {
+  public async saveStats(source: SourceEntity, algorithm: string, data?: Date): Promise<void> {
     const { address: contractAddress, network, asset } = source;
 
     this.logger.log(

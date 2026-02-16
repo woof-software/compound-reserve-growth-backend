@@ -3,8 +3,8 @@ import { ConfigService } from '@nestjs/config';
 import axios from 'axios';
 import { EntityManager, QueryFailedError } from 'typeorm';
 
-import { Asset } from 'modules/asset/asset.entity';
-import { Source } from 'modules/source/source.entity';
+import { AssetEntity } from 'modules/asset/asset.entity';
+import { SourceEntity } from 'modules/source/source.entity';
 import { NetworkService } from 'modules/network/network.service';
 
 import { getAlgorithms } from './helpers/get-algorithms';
@@ -20,8 +20,6 @@ import type { RemoteAsset, RemoteSource } from './types/remote-reserve-sources.t
 import { getAssetKey, getSourceKey } from './helpers/reserve-source-keys';
 
 import { fetchJson } from '@/common/utils/fetch-json';
-import { SourceEntity } from '@/common/types/source';
-import { AssetEntity } from '@/common/types/asset';
 import type { ReserveSourcesConfig } from 'config/reserve-sources.config';
 
 /**
@@ -85,10 +83,10 @@ export class SourcesUpdateService {
     ]);
 
     return {
-      assetByKey: new Map<string, Asset>(
+      assetByKey: new Map<string, AssetEntity>(
         dbAssets.map((a) => [getAssetKey(a.address, a.network), a]),
       ),
-      sourceByKey: new Map<string, Source>(
+      sourceByKey: new Map<string, SourceEntity>(
         dbSources.map((s) => [getSourceKey(s.address, s.network, s.algorithm, s.asset.address), s]),
       ),
     };
@@ -96,11 +94,11 @@ export class SourcesUpdateService {
 
   private prepareAssetSyncPlan(
     remoteAssets: RemoteAsset[],
-    assetByKey: Map<string, Asset>,
+    assetByKey: Map<string, AssetEntity>,
   ): AssetSyncPlan {
-    const remoteIdToAsset = new Map<number, Asset>();
+    const remoteIdToAsset = new Map<number, AssetEntity>();
     const inserts: AssetInsertItem[] = [];
-    const updates: Asset[] = [];
+    const updates: AssetEntity[] = [];
 
     for (const remote of remoteAssets) {
       const network = this.resolveNetwork(remote.chainId);
@@ -119,7 +117,7 @@ export class SourcesUpdateService {
         continue;
       }
 
-      const asset = new Asset(
+      const asset = new AssetEntity(
         remote.address,
         remote.decimals,
         remote.symbol,
@@ -134,7 +132,7 @@ export class SourcesUpdateService {
 
   private async persistAssetChanges(
     assetPlan: AssetSyncPlan,
-    assetByKey: Map<string, Asset>,
+    assetByKey: Map<string, AssetEntity>,
     manager: EntityManager,
   ): Promise<void> {
     if (assetPlan.inserts.length) {
@@ -158,11 +156,11 @@ export class SourcesUpdateService {
 
   private prepareSourceSyncPlan(
     remoteSources: RemoteSource[],
-    remoteIdToAsset: Map<number, Asset>,
-    sourceByKey: Map<string, Source>,
+    remoteIdToAsset: Map<number, AssetEntity>,
+    sourceByKey: Map<string, SourceEntity>,
   ): SourceSyncPlan {
-    const inserts: Source[] = [];
-    const updates: Source[] = [];
+    const inserts: SourceEntity[] = [];
+    const updates: SourceEntity[] = [];
 
     for (const remote of remoteSources) {
       const asset = remoteIdToAsset.get(remote.assetId);
@@ -188,7 +186,7 @@ export class SourcesUpdateService {
       const existingSource = sourceByKey.get(key);
 
       if (existingSource) {
-        const changed = this.applyRemoteToSource(existingSource, remote);
+        const changed = this.applyRemoteToSource(existingSource, remote, asset);
         if (changed) {
           existingSource.checkedAt = new Date();
           updates.push(existingSource);
@@ -196,7 +194,7 @@ export class SourcesUpdateService {
         continue;
       }
 
-      const source = new Source(
+      const source = new SourceEntity(
         remote.address,
         network,
         remote.algorithm,
@@ -293,6 +291,11 @@ export class SourcesUpdateService {
 
   private applyRemoteToAsset(asset: AssetEntity, remote: RemoteAsset): boolean {
     let changed = false;
+    const network = this.resolveNetwork(remote.chainId);
+    if (network && asset.network !== network) {
+      asset.network = network;
+      changed = true;
+    }
     if (asset.decimals !== remote.decimals) {
       asset.decimals = remote.decimals;
       changed = true;
@@ -309,8 +312,21 @@ export class SourcesUpdateService {
     return changed;
   }
 
-  private applyRemoteToSource(source: SourceEntity, remote: RemoteSource): boolean {
+  private applyRemoteToSource(
+    source: SourceEntity,
+    remote: RemoteSource,
+    asset: AssetEntity,
+  ): boolean {
     let changed = false;
+    const network = this.resolveNetwork(remote.chainId);
+    if (network && source.network !== network) {
+      source.network = network;
+      changed = true;
+    }
+    if (source.asset?.id !== asset.id) {
+      source.asset = asset;
+      changed = true;
+    }
     if (source.blockNumber !== remote.startBlock) {
       source.blockNumber = remote.startBlock;
       changed = true;
@@ -321,14 +337,28 @@ export class SourcesUpdateService {
       source.market = remoteMarket;
       changed = true;
     }
+    if (!this.algorithmEqual(source.algorithm, remote.algorithm)) {
+      source.algorithm = [...remote.algorithm];
+      changed = true;
+    }
+    const currentType = source.type ?? undefined;
+    const remoteType = remote.type ?? undefined;
+    if (currentType !== remoteType) {
+      source.type = remoteType;
+      changed = true;
+    }
     return changed;
+  }
+
+  private algorithmEqual(a: string[], b: string[]): boolean {
+    return a.length === b.length && a.every((v, i) => v === b[i]);
   }
 
   private formatAssetBatchLog(assets: AssetEntity[]): string {
     return assets.map((a) => `${a.address} (${a.network}, ${a.symbol})`).join(', ');
   }
 
-  private formatSourceBatchLog(sources: Source[]): string {
+  private formatSourceBatchLog(sources: SourceEntity[]): string {
     return sources.map((s) => `${s.address} (${s.network}, asset: ${s.asset.address})`).join(', ');
   }
 
