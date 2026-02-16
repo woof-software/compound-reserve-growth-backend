@@ -3,13 +3,9 @@ import { ConfigService } from '@nestjs/config';
 import axios from 'axios';
 import { EntityManager, QueryFailedError } from 'typeorm';
 
-import { AssetEntity } from '@/common/types/asset';
-import { SourceEntity } from '@/common/types/source';
 import { Asset } from 'modules/asset/asset.entity';
 import { Source } from 'modules/source/source.entity';
 import { NetworkService } from 'modules/network/network.service';
-
-import { fetchJson } from '@/common/utils/fetch-json';
 
 import { getAlgorithms } from './helpers/get-algorithms';
 import {
@@ -23,6 +19,9 @@ import { SyncRepository } from './repositories/sync.repository';
 import type { RemoteAsset, RemoteSource } from './types/remote-reserve-sources.types';
 import { getAssetKey, getSourceKey } from './helpers/reserve-source-keys';
 
+import { fetchJson } from '@/common/utils/fetch-json';
+import { SourceEntity } from '@/common/types/source';
+import { AssetEntity } from '@/common/types/asset';
 import type { ReserveSourcesConfig } from 'config/reserve-sources.config';
 
 /**

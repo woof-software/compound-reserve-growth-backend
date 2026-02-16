@@ -19,7 +19,13 @@ export class SyncRepository {
       await qr.commitTransaction();
       return result;
     } catch (err) {
-      await qr.rollbackTransaction();
+      try {
+        await qr.rollbackTransaction();
+      } catch (rollbackErr) {
+        if (err instanceof Error && rollbackErr instanceof Error) {
+          (err as Error & { cause?: unknown }).cause = rollbackErr;
+        }
+      }
       throw err;
     } finally {
       await qr.release();
