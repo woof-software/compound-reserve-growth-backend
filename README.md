@@ -158,18 +158,17 @@ yarn migration:revert
 
 ## Managing Sources & Assets
 
-| Task             | Command                | What it does                                                                                   |
-| ---------------- | ---------------------- | ---------------------------------------------------------------------------------------------- |
-| **Initial seed** | `yarn cli:source-fill` | ➜ Crawls Comptrollers & `roots.json`, inserts missing rows into **source** & **asset** tables. |
-| **Sync events**  | `yarn cli:event-fill`  | ➜ Loads hard‑coded protocol events (`modules/event/constants/events.ts`).                      |
+| Task             | Command                   | What it does                                                                                   |
+| ---------------- | ------------------------- | ---------------------------------------------------------------------------------------------- |
+| **Sources sync** | `yarn cli:sources-update` | ➜ Syncs **asset** & **source** tables from remote reserve data (compound-reserve-sources repo). |
+| **Sync events** | `yarn cli:event-fill`     | ➜ Loads hard‑coded protocol events (`modules/event/constants/events.ts`).                      |
 
 Adding a brand‑new market/network:
 
 1. Update `config/networks.config.ts` with RPC endpoint & avgBlockTime.
-2. Append an entry to `modules/source/constants/sources.ts` _or_ deploy a new Comptroller/Comet so the crawler picks it up.
-3. Run `cli:source-fill`.
+2. Add or update assets/sources in the remote reserve data (see `config/reserve-sources.config.ts` for repo URL), then run `yarn cli:sources-update`.
 
-Assets are auto‑created via `AssetService.findOrCreate`. Manual updates can be made with SQL or a dedicated admin script.
+Assets and sources are created or updated from the remote JSON; manual changes can also be made via SQL or a dedicated admin script.
 
 ---
 
@@ -215,7 +214,7 @@ Resilience features:
 | `nestjs build`               | `yarn build`                           | Transpile TS ➜ JS.                              |
 | `typeorm migration:run`      | `yarn migration:run`                   | Apply DB migrations.                            |
 | `typeorm migration:generate` | `yarn migration:generate -- -n <name>` | Create migration diff.                          |
-| **Source seed**              | `yarn cli:source-fill`                 | Insert markets into DB.                         |
+| **Sources sync**             | `yarn cli:sources-update`               | Sync assets and sources from remote reserve data. |
 | **Event seed**               | `yarn cli:event-fill`                  | Insert protocol events.                         |
 | **History backfill**         | `yarn cli:history-get`                 | One‑off history sync (same code as daily cron). |
 

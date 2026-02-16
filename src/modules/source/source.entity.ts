@@ -4,6 +4,7 @@ import { Reserve, Incomes, Spends } from 'modules/history/entities';
 import { Revenue } from 'modules/revenue/revenue.entity';
 import { Treasury } from 'modules/treasury/treasury.entity';
 import { Asset } from 'modules/asset/asset.entity';
+import { DailyAggregation } from 'modules/capo/daily.entity';
 
 import { SourceEntity } from '@/common/types/source';
 
