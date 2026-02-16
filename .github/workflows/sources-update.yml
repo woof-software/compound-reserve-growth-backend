@@ -23,6 +23,7 @@ jobs:
       COINGECKO_API_KEY: ${{ secrets.COINGECKO_API_KEY }}
       MAILJET_USER: ${{ secrets.MAILJET_USER }}
       MAILJET_PASS: ${{ secrets.MAILJET_PASS }}
+      ADMIN_TOKEN: ${{ secrets.ADMIN_TOKEN }}
 
     steps:
       - name: Checkout
