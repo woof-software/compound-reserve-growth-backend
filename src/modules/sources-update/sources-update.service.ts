@@ -1,27 +1,28 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { InjectDataSource } from '@nestjs/typeorm';
 import axios from 'axios';
-import { DataSource, EntityManager, QueryFailedError } from 'typeorm';
+import { EntityManager, QueryFailedError } from 'typeorm';
 
+import { AssetEntity } from '@/common/types/asset';
+import { SourceEntity } from '@/common/types/source';
 import { Asset } from 'modules/asset/asset.entity';
 import { Source } from 'modules/source/source.entity';
 import { NetworkService } from 'modules/network/network.service';
 
-import { getAlgorithms } from 'common/utils/get-algorithms';
-import { fetchJson } from 'common/utils/fetch-json';
+import { fetchJson } from '@/common/utils/fetch-json';
 
+import { getAlgorithms } from './helpers/get-algorithms';
 import {
   AssetInsertItem,
   AssetSyncPlan,
   DbSyncState,
   LoadedRemoteData,
   SourceSyncPlan,
-} from './sources-update.types';
+} from './types/sources-update.types';
 import { SyncRepository } from './repositories/sync.repository';
+import type { RemoteAsset, RemoteSource } from './types/remote-reserve-sources.types';
+import { getAssetKey, getSourceKey } from './helpers/reserve-source-keys';
 
-import { getAssetKey, getSourceKey } from '@/common/utils/reserve-source-keys';
-import type { RemoteAsset, RemoteSource } from '@/common/types/remote-reserve-sources.types';
 import type { ReserveSourcesConfig } from 'config/reserve-sources.config';
 
 /**
@@ -38,17 +39,31 @@ export class SourcesUpdateService {
     private readonly configService: ConfigService,
     private readonly networkService: NetworkService,
     private readonly syncRepo: SyncRepository,
-    @InjectDataSource() private readonly dataSource: DataSource,
   ) {}
 
   async run(): Promise<void> {
     const config = this.getConfig();
     const { remoteAssets, remoteSources } = await this.loadRemoteData(config);
-    const dbState = await this.loadDbSyncState();
-    const assetPlan = this.prepareAssetSyncPlan(remoteAssets, dbState.assetByKey);
 
-    await this.syncInTransaction(dbState, assetPlan, remoteSources);
-    this.logger.log('Sources update completed.');
+    try {
+      await this.syncRepo.inTransaction(async (manager) => {
+        const dbState = await this.loadDbSyncState(manager);
+        const assetPlan = this.prepareAssetSyncPlan(remoteAssets, dbState.assetByKey);
+        await this.persistAssetChanges(assetPlan, dbState.assetByKey, manager);
+        const sourcePlan = this.prepareSourceSyncPlan(
+          remoteSources,
+          assetPlan.remoteIdToAsset,
+          dbState.sourceByKey,
+        );
+        await this.persistSourceChanges(sourcePlan, manager);
+      });
+      this.logger.log('Sources update completed.');
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      this.logger.error(`Sources update failed (transaction rolled back): ${message}`);
+      if (err instanceof QueryFailedError) this.logQueryFailedRow(err);
+      throw err;
+    }
   }
 
   private async loadRemoteData(config: ReserveSourcesConfig): Promise<LoadedRemoteData> {
@@ -64,10 +79,10 @@ export class SourcesUpdateService {
     };
   }
 
-  private async loadDbSyncState(): Promise<DbSyncState> {
+  private async loadDbSyncState(manager: EntityManager): Promise<DbSyncState> {
     const [dbAssets, dbSources] = await Promise.all([
-      this.syncRepo.listAllAssets(),
-      this.syncRepo.listAllSources(),
+      this.syncRepo.listAllAssets(manager),
+      this.syncRepo.listAllSources(manager),
     ]);
 
     return {
@@ -116,37 +131,6 @@ export class SourcesUpdateService {
     }
 
     return { remoteIdToAsset, inserts, updates };
-  }
-
-  private async syncInTransaction(
-    dbState: DbSyncState,
-    assetPlan: AssetSyncPlan,
-    remoteSources: RemoteSource[],
-  ): Promise<void> {
-    const qr = this.dataSource.createQueryRunner();
-    await qr.connect();
-
-    try {
-      await qr.startTransaction('READ COMMITTED');
-
-      await this.persistAssetChanges(assetPlan, dbState.assetByKey, qr.manager);
-      const sourcePlan = this.prepareSourceSyncPlan(
-        remoteSources,
-        assetPlan.remoteIdToAsset,
-        dbState.sourceByKey,
-      );
-      await this.persistSourceChanges(sourcePlan, qr.manager);
-
-      await qr.commitTransaction();
-    } catch (err) {
-      await qr.rollbackTransaction();
-      const message = err instanceof Error ? err.message : String(err);
-      this.logger.error(`Sources update failed (transaction rolled back): ${message}`);
-      if (err instanceof QueryFailedError) this.logQueryFailedRow(err);
-      throw err;
-    } finally {
-      await qr.release();
-    }
   }
 
   private async persistAssetChanges(
@@ -308,7 +292,7 @@ export class SourcesUpdateService {
     return typeof value === 'object' && value !== null;
   }
 
-  private applyRemoteToAsset(asset: Asset, remote: RemoteAsset): boolean {
+  private applyRemoteToAsset(asset: AssetEntity, remote: RemoteAsset): boolean {
     let changed = false;
     if (asset.decimals !== remote.decimals) {
       asset.decimals = remote.decimals;
@@ -326,7 +310,7 @@ export class SourcesUpdateService {
     return changed;
   }
 
-  private applyRemoteToSource(source: Source, remote: RemoteSource): boolean {
+  private applyRemoteToSource(source: SourceEntity, remote: RemoteSource): boolean {
     let changed = false;
     if (source.blockNumber !== remote.startBlock) {
       source.blockNumber = remote.startBlock;
@@ -341,7 +325,7 @@ export class SourcesUpdateService {
     return changed;
   }
 
-  private formatAssetBatchLog(assets: Asset[]): string {
+  private formatAssetBatchLog(assets: AssetEntity[]): string {
     return assets.map((a) => `${a.address} (${a.network}, ${a.symbol})`).join(', ');
   }
 

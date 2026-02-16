@@ -1,39 +1,47 @@
 import { Injectable } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { EntityManager, Repository } from 'typeorm';
+import { InjectDataSource } from '@nestjs/typeorm';
+import { DataSource, EntityManager } from 'typeorm';
 
 import { Asset } from 'modules/asset/asset.entity';
 import { Source } from 'modules/source/source.entity';
 
 @Injectable()
 export class SyncRepository {
-  constructor(
-    @InjectRepository(Asset)
-    private readonly assetRepo: Repository<Asset>,
-    @InjectRepository(Source)
-    private readonly sourceRepo: Repository<Source>,
-  ) {}
+  constructor(@InjectDataSource() private readonly dataSource: DataSource) {}
 
-  async listAllAssets(): Promise<Asset[]> {
-    return this.assetRepo.find({ order: { id: 'ASC' } });
+  async inTransaction<T>(work: (manager: EntityManager) => Promise<T>): Promise<T> {
+    const qr = this.dataSource.createQueryRunner();
+    await qr.connect();
+
+    try {
+      await qr.startTransaction('READ COMMITTED');
+      const result = await work(qr.manager);
+      await qr.commitTransaction();
+      return result;
+    } catch (err) {
+      await qr.rollbackTransaction();
+      throw err;
+    } finally {
+      await qr.release();
+    }
   }
 
-  /** Batch save assets. Pass manager to run inside a transaction. */
-  async saveAssets(assets: Asset[], manager?: EntityManager): Promise<Asset[]> {
-    if (manager) return manager.getRepository(Asset).save(assets);
-    return this.assetRepo.save(assets);
+  async listAllAssets(manager: EntityManager): Promise<Asset[]> {
+    return manager.getRepository(Asset).find({ order: { id: 'ASC' } });
   }
 
-  async listAllSources(): Promise<Source[]> {
-    return this.sourceRepo.find({
+  async saveAssets(assets: Asset[], manager: EntityManager): Promise<Asset[]> {
+    return manager.getRepository(Asset).save(assets);
+  }
+
+  async listAllSources(manager: EntityManager): Promise<Source[]> {
+    return manager.getRepository(Source).find({
       relations: { asset: true },
       order: { id: 'ASC' },
     });
   }
 
-  /** Batch save sources. Pass manager to run inside a transaction. */
-  async saveSources(sources: Source[], manager?: EntityManager): Promise<Source[]> {
-    if (manager) return manager.getRepository(Source).save(sources);
-    return this.sourceRepo.save(sources);
+  async saveSources(sources: Source[], manager: EntityManager): Promise<Source[]> {
+    return manager.getRepository(Source).save(sources);
   }
 }

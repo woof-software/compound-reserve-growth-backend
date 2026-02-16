@@ -1,5 +1,5 @@
 import { Algorithm } from '../../src/common/enum/algorithm.enum';
-import { getAlgorithms } from '../../src/common/utils/get-algorithms';
+import { getAlgorithms } from '../../src/modules/sources-update/helpers/get-algorithms';
 
 describe('getAlgorithms', () => {
   describe('valid input: array with at least one non-empty value', () => {

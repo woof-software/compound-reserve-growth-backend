@@ -1,7 +1,7 @@
 import { Asset } from 'modules/asset/asset.entity';
 import { Source } from 'modules/source/source.entity';
 
-import { RemoteAsset, RemoteSource } from '@/common/types/remote-reserve-sources.types';
+import { RemoteAsset, RemoteSource } from './remote-reserve-sources.types';
 
 /** One asset to insert, with remote id for mapping sources later */
 export interface AssetInsertItem {

@@ -3,8 +3,10 @@ import { Column, Entity, OneToMany, PrimaryGeneratedColumn } from 'typeorm';
 import { Source } from 'modules/source/source.entity';
 import { Oracle } from 'modules/oracle/oracle.entity';
 
+import { AssetEntity } from '@/common/types/asset';
+
 @Entity({ name: 'asset' })
-export class Asset {
+export class Asset implements AssetEntity {
   @PrimaryGeneratedColumn()
   public id: number;
 
