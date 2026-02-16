@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectDataSource } from '@nestjs/typeorm';
 import axios from 'axios';
-import { DataSource, QueryFailedError } from 'typeorm';
+import { DataSource, EntityManager, QueryFailedError } from 'typeorm';
 
 import { Asset } from 'modules/asset/asset.entity';
 import { Source } from 'modules/source/source.entity';
@@ -11,17 +11,18 @@ import { NetworkService } from 'modules/network/network.service';
 import { getAlgorithms } from 'common/utils/get-algorithms';
 import { fetchJson } from 'common/utils/fetch-json';
 
+import {
+  AssetInsertItem,
+  AssetSyncPlan,
+  DbSyncState,
+  LoadedRemoteData,
+  SourceSyncPlan,
+} from './sources-update.types';
 import { SyncRepository } from './repositories/sync.repository';
 
 import { getAssetKey, getSourceKey } from '@/common/utils/reserve-source-keys';
 import type { RemoteAsset, RemoteSource } from '@/common/types/remote-reserve-sources.types';
 import type { ReserveSourcesConfig } from 'config/reserve-sources.config';
-
-/** One asset to insert, with remote id for mapping sources later */
-interface AssetInsertItem {
-  remoteId: number;
-  asset: Asset;
-}
 
 /**
  * Syncs assets and sources from remote reserve data in a single transaction.
@@ -42,33 +43,50 @@ export class SourcesUpdateService {
 
   async run(): Promise<void> {
     const config = this.getConfig();
-    this.logger.log(`Loading reserve data from ${config.repoUrl}`);
+    const { remoteAssets, remoteSources } = await this.loadRemoteData(config);
+    const dbState = await this.loadDbSyncState();
+    const assetPlan = this.prepareAssetSyncPlan(remoteAssets, dbState.assetByKey);
 
+    await this.syncInTransaction(dbState, assetPlan, remoteSources);
+    this.logger.log('Sources update completed.');
+  }
+
+  private async loadRemoteData(config: ReserveSourcesConfig): Promise<LoadedRemoteData> {
+    this.logger.log(`Loading reserve data from ${config.repoUrl}`);
     const http = axios.create({ timeout: config.requestTimeoutMs });
     const [rawAssets, rawSources] = await Promise.all([
       fetchJson<unknown>(http, config.rawAssetsUrl),
       fetchJson<unknown>(http, config.rawSourcesUrl),
     ]);
+    return {
+      remoteAssets: this.parseAssets(rawAssets),
+      remoteSources: this.parseSources(rawSources),
+    };
+  }
 
-    const remoteAssets = this.parseAssets(rawAssets);
-    const remoteSources = this.parseSources(rawSources);
-
+  private async loadDbSyncState(): Promise<DbSyncState> {
     const [dbAssets, dbSources] = await Promise.all([
       this.syncRepo.listAllAssets(),
       this.syncRepo.listAllSources(),
     ]);
 
-    const assetByKey = new Map<string, Asset>(
-      dbAssets.map((a) => [getAssetKey(a.address, a.network), a]),
-    );
-    const sourceByKey = new Map<string, Source>(
-      dbSources.map((s) => [getSourceKey(s.address, s.network, s.algorithm, s.asset.address), s]),
-    );
+    return {
+      assetByKey: new Map<string, Asset>(
+        dbAssets.map((a) => [getAssetKey(a.address, a.network), a]),
+      ),
+      sourceByKey: new Map<string, Source>(
+        dbSources.map((s) => [getSourceKey(s.address, s.network, s.algorithm, s.asset.address), s]),
+      ),
+    };
+  }
 
-    /** remote asset id (from JSON) -> Asset. Filled for existing now, for new after insert. */
+  private prepareAssetSyncPlan(
+    remoteAssets: RemoteAsset[],
+    assetByKey: Map<string, Asset>,
+  ): AssetSyncPlan {
     const remoteIdToAsset = new Map<number, Asset>();
-    const assetInserts: AssetInsertItem[] = [];
-    const assetUpdates: Asset[] = [];
+    const inserts: AssetInsertItem[] = [];
+    const updates: Asset[] = [];
 
     for (const remote of remoteAssets) {
       const network = this.resolveNetwork(remote.chainId);
@@ -76,113 +94,50 @@ export class SourcesUpdateService {
         this.logger.warn(`Unknown chainId for asset ${remote.id}: ${remote.chainId}`);
         continue;
       }
+
       const key = getAssetKey(remote.address, network);
       const existing = assetByKey.get(key);
 
       if (existing) {
         const changed = this.applyRemoteToAsset(existing, remote);
-        if (changed) assetUpdates.push(existing);
+        if (changed) updates.push(existing);
         remoteIdToAsset.set(remote.id, existing);
-      } else {
-        const asset = new Asset(
-          remote.address,
-          remote.decimals,
-          remote.symbol,
-          network,
-          remote.type ?? undefined,
-        );
-        assetInserts.push({ remoteId: remote.id, asset });
+        continue;
       }
+
+      const asset = new Asset(
+        remote.address,
+        remote.decimals,
+        remote.symbol,
+        network,
+        remote.type ?? undefined,
+      );
+      inserts.push({ remoteId: remote.id, asset });
     }
 
+    return { remoteIdToAsset, inserts, updates };
+  }
+
+  private async syncInTransaction(
+    dbState: DbSyncState,
+    assetPlan: AssetSyncPlan,
+    remoteSources: RemoteSource[],
+  ): Promise<void> {
     const qr = this.dataSource.createQueryRunner();
     await qr.connect();
 
     try {
       await qr.startTransaction('READ COMMITTED');
 
-      if (assetInserts.length) {
-        const toInsert = assetInserts.map((x) => x.asset);
-        this.logger.log(
-          `Inserting ${toInsert.length} asset(s): ${this.formatAssetBatchLog(toInsert)}`,
-        );
-        const saved = await this.syncRepo.saveAssets(toInsert, qr.manager);
-        for (let i = 0; i < saved.length; i++) {
-          remoteIdToAsset.set(assetInserts[i].remoteId, saved[i]);
-          assetByKey.set(getAssetKey(saved[i].address, saved[i].network), saved[i]);
-        }
-        this.logger.log(`Inserted ${saved.length} asset(s)`);
-      }
-
-      if (assetUpdates.length) {
-        await this.syncRepo.saveAssets(assetUpdates, qr.manager);
-        this.logger.warn(`Updated ${assetUpdates.length} asset(s)`);
-      }
-
-      const sourceInserts: Source[] = [];
-      const sourceUpdates: Source[] = [];
-
-      for (const remote of remoteSources) {
-        const asset = remoteIdToAsset.get(remote.assetId);
-        if (!asset) {
-          this.logger.warn(
-            `Skipping source id=${remote.id}: asset not found for assetId=${remote.assetId}`,
-          );
-          continue;
-        }
-
-        const network = this.resolveNetwork(remote.chainId);
-        if (!network) {
-          this.logger.warn(`Unknown chainId for source ${remote.id}: ${remote.chainId}`);
-          continue;
-        }
-
-        const algorithms = remote.algorithm;
-
-        if (!remote.type) {
-          this.logger.warn(`Missing type for source ${remote.id}`);
-          continue;
-        }
-
-        const key = getSourceKey(remote.address, network, algorithms, asset.address);
-        const existingSource = sourceByKey.get(key);
-
-        if (existingSource) {
-          const changed = this.applyRemoteToSource(existingSource, remote);
-          if (changed) {
-            existingSource.checkedAt = new Date();
-            sourceUpdates.push(existingSource);
-          }
-        } else {
-          const source = new Source(
-            remote.address,
-            network,
-            algorithms,
-            remote.type,
-            remote.startBlock,
-            asset,
-            remote.market ?? undefined,
-          );
-          sourceInserts.push(source);
-          sourceByKey.set(key, source);
-        }
-      }
-
-      if (sourceInserts.length) {
-        this.logger.log(
-          `Inserting ${sourceInserts.length} source(s): ${this.formatSourceBatchLog(sourceInserts)}`,
-        );
-        await this.syncRepo.saveSources(sourceInserts, qr.manager);
-        this.logger.log(`Inserted ${sourceInserts.length} source(s)`);
-      }
-
-      if (sourceUpdates.length) {
-        await this.syncRepo.saveSources(sourceUpdates, qr.manager);
-        this.logger.warn(`Updated ${sourceUpdates.length} source(s)`);
-      }
+      await this.persistAssetChanges(assetPlan, dbState.assetByKey, qr.manager);
+      const sourcePlan = this.prepareSourceSyncPlan(
+        remoteSources,
+        assetPlan.remoteIdToAsset,
+        dbState.sourceByKey,
+      );
+      await this.persistSourceChanges(sourcePlan, qr.manager);
 
       await qr.commitTransaction();
-      this.logger.log('Sources update completed.');
     } catch (err) {
       await qr.rollbackTransaction();
       const message = err instanceof Error ? err.message : String(err);
@@ -191,6 +146,104 @@ export class SourcesUpdateService {
       throw err;
     } finally {
       await qr.release();
+    }
+  }
+
+  private async persistAssetChanges(
+    assetPlan: AssetSyncPlan,
+    assetByKey: Map<string, Asset>,
+    manager: EntityManager,
+  ): Promise<void> {
+    if (assetPlan.inserts.length) {
+      const toInsert = assetPlan.inserts.map((x) => x.asset);
+      this.logger.log(
+        `Inserting ${toInsert.length} asset(s): ${this.formatAssetBatchLog(toInsert)}`,
+      );
+      const saved = await this.syncRepo.saveAssets(toInsert, manager);
+      for (let i = 0; i < saved.length; i++) {
+        assetPlan.remoteIdToAsset.set(assetPlan.inserts[i].remoteId, saved[i]);
+        assetByKey.set(getAssetKey(saved[i].address, saved[i].network), saved[i]);
+      }
+      this.logger.log(`Inserted ${saved.length} asset(s)`);
+    }
+
+    if (assetPlan.updates.length) {
+      await this.syncRepo.saveAssets(assetPlan.updates, manager);
+      this.logger.warn(`Updated ${assetPlan.updates.length} asset(s)`);
+    }
+  }
+
+  private prepareSourceSyncPlan(
+    remoteSources: RemoteSource[],
+    remoteIdToAsset: Map<number, Asset>,
+    sourceByKey: Map<string, Source>,
+  ): SourceSyncPlan {
+    const inserts: Source[] = [];
+    const updates: Source[] = [];
+
+    for (const remote of remoteSources) {
+      const asset = remoteIdToAsset.get(remote.assetId);
+      if (!asset) {
+        this.logger.warn(
+          `Skipping source id=${remote.id}: asset not found for assetId=${remote.assetId}`,
+        );
+        continue;
+      }
+
+      const network = this.resolveNetwork(remote.chainId);
+      if (!network) {
+        this.logger.warn(`Unknown chainId for source ${remote.id}: ${remote.chainId}`);
+        continue;
+      }
+
+      if (!remote.type) {
+        this.logger.warn(`Missing type for source ${remote.id}`);
+        continue;
+      }
+
+      const key = getSourceKey(remote.address, network, remote.algorithm, asset.address);
+      const existingSource = sourceByKey.get(key);
+
+      if (existingSource) {
+        const changed = this.applyRemoteToSource(existingSource, remote);
+        if (changed) {
+          existingSource.checkedAt = new Date();
+          updates.push(existingSource);
+        }
+        continue;
+      }
+
+      const source = new Source(
+        remote.address,
+        network,
+        remote.algorithm,
+        remote.type,
+        remote.startBlock,
+        asset,
+        remote.market ?? undefined,
+      );
+      inserts.push(source);
+      sourceByKey.set(key, source);
+    }
+
+    return { inserts, updates };
+  }
+
+  private async persistSourceChanges(
+    sourcePlan: SourceSyncPlan,
+    manager: EntityManager,
+  ): Promise<void> {
+    if (sourcePlan.inserts.length) {
+      this.logger.log(
+        `Inserting ${sourcePlan.inserts.length} source(s): ${this.formatSourceBatchLog(sourcePlan.inserts)}`,
+      );
+      await this.syncRepo.saveSources(sourcePlan.inserts, manager);
+      this.logger.log(`Inserted ${sourcePlan.inserts.length} source(s)`);
+    }
+
+    if (sourcePlan.updates.length) {
+      await this.syncRepo.saveSources(sourcePlan.updates, manager);
+      this.logger.warn(`Updated ${sourcePlan.updates.length} source(s)`);
     }
   }
 
