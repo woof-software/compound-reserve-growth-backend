@@ -19,7 +19,6 @@ import { SyncRepository } from './repositories/sync.repository';
 import type { RemoteAsset, RemoteSource } from './types/remote-reserve-sources.types';
 import { getAssetKey, getSourceKey } from './helpers/reserve-source-keys';
 
-import { fetchJson } from '@/common/utils/fetch-json';
 import type { ReserveSourcesConfig } from 'config/reserve-sources.config';
 
 /**
@@ -67,8 +66,8 @@ export class SourcesUpdateService {
     this.logger.log(`Loading reserve data from ${config.repoUrl}`);
     const http = axios.create({ timeout: config.requestTimeoutMs });
     const [rawAssets, rawSources] = await Promise.all([
-      fetchJson<unknown>(http, config.rawAssetsUrl),
-      fetchJson<unknown>(http, config.rawSourcesUrl),
+      http.get<unknown>(config.rawAssetsUrl, { responseType: 'json' }).then((r) => r.data),
+      http.get<unknown>(config.rawSourcesUrl, { responseType: 'json' }).then((r) => r.data),
     ]);
     return {
       remoteAssets: this.parseAssets(rawAssets),

@@ -1,11 +1,11 @@
 import { LogLevel, Logger } from '@nestjs/common';
 import { CommandFactory } from 'nest-commander';
 
-import { HistoryCliModule } from './cli-modules';
+import { PriceCliModule } from './price-cli.module';
 
 async function bootstrap() {
   const logLevel = ['log', 'error', 'warn', 'debug', 'verbose'] as LogLevel[];
-  await CommandFactory.run(HistoryCliModule, { logger: logLevel });
+  await CommandFactory.run(PriceCliModule, { logger: logLevel });
   process.exit(0);
 }
 
