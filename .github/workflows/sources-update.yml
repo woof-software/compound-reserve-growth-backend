@@ -1,0 +1,44 @@
+name: CLI (sources-update)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  cli:
+    runs-on: ubuntu-22.04
+
+    env:
+      NODE_ENV: production
+      DB_HOST: ${{ secrets.DB_HOST }}
+      DB_PORT: ${{ secrets.DB_PORT }}
+      DB_NAME: ${{ secrets.DB_NAME }}
+      DB_USER: ${{ secrets.DB_USER }}
+      DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+      REDIS_HOST: ${{ secrets.REDIS_HOST }}
+      REDIS_PORT: ${{ secrets.REDIS_PORT }}
+      ANKR_KEY: ${{ secrets.ANKR_KEY }}
+      REDIS_PASSWORD: ${{ secrets.REDIS_PASSWORD }}
+      REDIS_TLS: ${{ secrets.REDIS_TLS }}
+      REDIS_CONNECTION_TIMEOUT: ${{ secrets.REDIS_CONNECTION_TIMEOUT }}
+      COINGECKO_API_KEY: ${{ secrets.COINGECKO_API_KEY }}
+      MAILJET_USER: ${{ secrets.MAILJET_USER }}
+      MAILJET_PASS: ${{ secrets.MAILJET_PASS }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "yarn"
+
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
+
+      - name: Run migrations
+        run: yarn migration:run
+
+      - name: CLI sources:update
+        run: yarn cli:sources-update
