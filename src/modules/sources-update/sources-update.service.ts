@@ -282,6 +282,10 @@ export class SourcesUpdateService {
 
   private applyRemoteToAsset(asset: AssetEntity, remote: RemoteAsset): boolean {
     let changed = false;
+    if (asset.address !== remote.address) {
+      asset.address = remote.address;
+      changed = true;
+    }
     const network = this.resolveNetwork(remote.chainId);
     if (network && asset.network !== network) {
       asset.network = network;
@@ -309,6 +313,10 @@ export class SourcesUpdateService {
     asset: AssetEntity,
   ): boolean {
     let changed = false;
+    if (source.address !== remote.address) {
+      source.address = remote.address;
+      changed = true;
+    }
     const network = this.resolveNetwork(remote.chainId);
     if (network && source.network !== network) {
       source.network = network;
