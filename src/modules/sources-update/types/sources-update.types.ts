@@ -15,8 +15,8 @@ export interface LoadedRemoteData {
 }
 
 export interface DbSyncState {
-  assetByKey: Map<string, AssetEntity>;
-  sourceByKey: Map<string, SourceEntity>;
+  assetById: Map<number, AssetEntity>;
+  sourceById: Map<number, SourceEntity>;
 }
 
 export interface AssetSyncPlan {

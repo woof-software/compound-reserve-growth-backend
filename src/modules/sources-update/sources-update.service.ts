@@ -20,23 +20,6 @@ import { SourcesUpdateValidationService } from './sources-validator';
 
 import type { ReserveSourcesConfig } from 'config/reserve-sources.config';
 
-const getAssetKey = (address: string, network: string): string => {
-  return `${network.toLowerCase()}:${address.toLowerCase()}`;
-};
-
-const getSourceKey = (
-  address: string,
-  network: string,
-  algorithms: string[],
-  assetAddress: string,
-): string => {
-  const algoKey = [...algorithms]
-    .map((algorithm) => algorithm.toLowerCase())
-    .sort()
-    .join('|');
-  return `${network.toLowerCase()}:${address.toLowerCase()}:${algoKey}:${assetAddress.toLowerCase()}`;
-};
-
 /**
  * Syncs assets and sources from remote reserve data in a single transaction.
  * 1. Prepares batches (assets then sources) from remote data and current DB state.
@@ -61,12 +44,12 @@ export class SourcesUpdateService {
     try {
       await this.syncRepo.inTransaction(async (manager) => {
         const dbState = await this.loadDbSyncState(manager);
-        const assetPlan = this.prepareAssetSyncPlan(remoteAssets, dbState.assetByKey);
-        await this.persistAssetUpserts(assetPlan, dbState.assetByKey, manager);
+        const assetPlan = this.prepareAssetSyncPlan(remoteAssets, dbState.assetById);
+        await this.persistAssetUpserts(assetPlan, dbState.assetById, manager);
         const sourcePlan = this.prepareSourceSyncPlan(
           remoteSources,
           assetPlan.remoteIdToAsset,
-          dbState.sourceByKey,
+          dbState.sourceById,
         );
         await this.persistSourceChanges(sourcePlan, manager);
         await this.persistAssetDeletes(assetPlan, manager);
@@ -101,24 +84,20 @@ export class SourcesUpdateService {
     ]);
 
     return {
-      assetByKey: new Map<string, AssetEntity>(
-        dbAssets.map((a) => [getAssetKey(a.address, a.network), a]),
-      ),
-      sourceByKey: new Map<string, SourceEntity>(
-        dbSources.map((s) => [getSourceKey(s.address, s.network, s.algorithm, s.asset.address), s]),
-      ),
+      assetById: new Map<number, AssetEntity>(dbAssets.map((a) => [a.id, a])),
+      sourceById: new Map<number, SourceEntity>(dbSources.map((s) => [s.id, s])),
     };
   }
 
   private prepareAssetSyncPlan(
     remoteAssets: RemoteAsset[],
-    assetByKey: Map<string, AssetEntity>,
+    assetById: Map<number, AssetEntity>,
   ): AssetSyncPlan {
     const remoteIdToAsset = new Map<number, AssetEntity>();
     const inserts: AssetInsertItem[] = [];
     const updates: AssetEntity[] = [];
-    const seenRemoteKeys = new Set<string>();
-    const existingAssetByKey = new Map<string, AssetEntity>(assetByKey);
+    const seenRemoteIds = new Set<number>();
+    const existingAssetById = new Map<number, AssetEntity>(assetById);
 
     for (const remote of remoteAssets) {
       const network = this.resolveNetwork(remote.chainId);
@@ -127,9 +106,8 @@ export class SourcesUpdateService {
         continue;
       }
 
-      const key = getAssetKey(remote.address, network);
-      seenRemoteKeys.add(key);
-      const existing = assetByKey.get(key);
+      seenRemoteIds.add(remote.id);
+      const existing = assetById.get(remote.id);
 
       if (existing) {
         const changed = this.applyRemoteToAsset(existing, remote);
@@ -145,11 +123,12 @@ export class SourcesUpdateService {
         network,
         remote.type ?? undefined,
       );
+      asset.id = remote.id;
       inserts.push({ remoteId: remote.id, asset });
     }
 
-    const deletes = Array.from(existingAssetByKey.entries())
-      .filter(([key]) => !seenRemoteKeys.has(key))
+    const deletes = Array.from(existingAssetById.entries())
+      .filter(([id]) => !seenRemoteIds.has(id))
       .map(([, asset]) => asset);
 
     return { remoteIdToAsset, inserts, updates, deletes };
@@ -157,7 +136,7 @@ export class SourcesUpdateService {
 
   private async persistAssetUpserts(
     assetPlan: AssetSyncPlan,
-    assetByKey: Map<string, AssetEntity>,
+    assetById: Map<number, AssetEntity>,
     manager: EntityManager,
   ): Promise<void> {
     if (assetPlan.inserts.length) {
@@ -168,7 +147,7 @@ export class SourcesUpdateService {
       const saved = await this.syncRepo.saveAssets(toInsert, manager);
       for (let i = 0; i < saved.length; i++) {
         assetPlan.remoteIdToAsset.set(assetPlan.inserts[i].remoteId, saved[i]);
-        assetByKey.set(getAssetKey(saved[i].address, saved[i].network), saved[i]);
+        assetById.set(saved[i].id, saved[i]);
       }
       this.logger.log(`Inserted ${saved.length} asset(s)`);
     }
@@ -199,12 +178,12 @@ export class SourcesUpdateService {
   private prepareSourceSyncPlan(
     remoteSources: RemoteSource[],
     remoteIdToAsset: Map<number, AssetEntity>,
-    sourceByKey: Map<string, SourceEntity>,
+    sourceById: Map<number, SourceEntity>,
   ): SourceSyncPlan {
     const inserts: SourceEntity[] = [];
     const updates: SourceEntity[] = [];
-    const seenRemoteKeys = new Set<string>();
-    const existingSourceByKey = new Map<string, SourceEntity>(sourceByKey);
+    const seenRemoteIds = new Set<number>();
+    const existingSourceById = new Map<number, SourceEntity>(sourceById);
 
     for (const remote of remoteSources) {
       const asset = remoteIdToAsset.get(remote.assetId);
@@ -226,9 +205,8 @@ export class SourcesUpdateService {
         continue;
       }
 
-      const key = getSourceKey(remote.address, network, remote.algorithm, asset.address);
-      seenRemoteKeys.add(key);
-      const existingSource = sourceByKey.get(key);
+      seenRemoteIds.add(remote.id);
+      const existingSource = sourceById.get(remote.id);
 
       if (existingSource) {
         const changed = this.applyRemoteToSource(existingSource, remote, asset);
@@ -248,12 +226,13 @@ export class SourcesUpdateService {
         asset,
         remote.market ?? undefined,
       );
+      source.id = remote.id;
       inserts.push(source);
-      sourceByKey.set(key, source);
+      sourceById.set(source.id, source);
     }
 
-    const deletes = Array.from(existingSourceByKey.entries())
-      .filter(([key]) => !seenRemoteKeys.has(key))
+    const deletes = Array.from(existingSourceById.entries())
+      .filter(([id]) => !seenRemoteIds.has(id))
       .map(([, source]) => source);
 
     return { inserts, updates, deletes };

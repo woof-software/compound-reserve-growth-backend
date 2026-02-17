@@ -116,7 +116,7 @@ describe('SourcesUpdateService', () => {
     mockedAxios.create.mockReturnValue({ get: httpGet } as never);
 
     const dbAssetKeep = makeAsset({
-      id: 101,
+      id: 1,
       address: '0x0000000000000000000000000000000000000001',
       symbol: 'OLD',
     });
@@ -127,7 +127,7 @@ describe('SourcesUpdateService', () => {
     });
 
     const dbSourceKeep = makeSource({
-      id: 201,
+      id: 10,
       address: '0x0000000000000000000000000000000000000010',
       asset: dbAssetKeep,
       algorithm: [Algorithm.COMET, Algorithm.COMET_STATS],
@@ -194,7 +194,7 @@ describe('SourcesUpdateService', () => {
     syncRepo.listAllSources.mockResolvedValue([dbSourceKeep, dbSourceStale]);
 
     const insertedAsset = makeAsset({
-      id: 103,
+      id: 3,
       address: '0x0000000000000000000000000000000000000003',
       symbol: 'NEW',
       decimals: 8,
@@ -218,7 +218,7 @@ describe('SourcesUpdateService', () => {
     expect(syncRepo.deleteAssetsByIds).toHaveBeenCalledWith([102], expect.anything());
 
     const updatedSources = syncRepo.saveSources.mock.calls[1][0] as SourceEntity[];
-    expect(updatedSources[0].id).toBe(201);
+    expect(updatedSources[0].id).toBe(10);
     expect(updatedSources[0].blockNumber).toBe(12);
     expect(updatedSources[0].algorithm).toEqual([Algorithm.COMET_STATS, Algorithm.COMET]);
 
@@ -259,7 +259,7 @@ describe('SourcesUpdateService', () => {
     } as never);
 
     const dbAsset = makeAsset({
-      id: 101,
+      id: 1,
       address: '0x0000000000000000000000000000000000000001',
       symbol: 'USDC',
     });
