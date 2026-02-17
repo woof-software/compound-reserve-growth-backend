@@ -40,6 +40,11 @@ export class SyncRepository {
     return manager.getRepository(AssetEntity).save(assets);
   }
 
+  public async deleteAssetsByIds(ids: number[], manager: EntityManager): Promise<void> {
+    if (!ids.length) return;
+    await manager.getRepository(AssetEntity).delete(ids);
+  }
+
   public async listAllSources(manager: EntityManager): Promise<SourceEntity[]> {
     return manager.getRepository(SourceEntity).find({
       relations: { asset: true },
@@ -52,5 +57,10 @@ export class SyncRepository {
     manager: EntityManager,
   ): Promise<SourceEntity[]> {
     return manager.getRepository(SourceEntity).save(sources);
+  }
+
+  public async deleteSourcesByIds(ids: number[], manager: EntityManager): Promise<void> {
+    if (!ids.length) return;
+    await manager.getRepository(SourceEntity).delete(ids);
   }
 }

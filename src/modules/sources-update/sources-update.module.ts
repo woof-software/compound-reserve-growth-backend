@@ -8,10 +8,16 @@ import { NetworkModule } from 'modules/network/network.module';
 import { SyncRepository } from './repositories/sync.repository';
 import { SourcesUpdateService } from './sources-update.service';
 import { SourcesUpdateCommand } from './cli/sources-update.command';
+import { SourcesUpdateValidationService } from './sources-validator';
 
 @Module({
   imports: [TypeOrmModule.forFeature([AssetEntity, SourceEntity]), NetworkModule],
-  providers: [SyncRepository, SourcesUpdateService, SourcesUpdateCommand],
+  providers: [
+    SyncRepository,
+    SourcesUpdateService,
+    SourcesUpdateValidationService,
+    SourcesUpdateCommand,
+  ],
   exports: [SourcesUpdateService],
 })
 export class SourcesUpdateModule {}

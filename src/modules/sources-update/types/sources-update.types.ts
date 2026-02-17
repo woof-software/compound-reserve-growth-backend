@@ -23,9 +23,11 @@ export interface AssetSyncPlan {
   remoteIdToAsset: Map<number, AssetEntity>;
   inserts: AssetInsertItem[];
   updates: AssetEntity[];
+  deletes: AssetEntity[];
 }
 
 export interface SourceSyncPlan {
   inserts: SourceEntity[];
   updates: SourceEntity[];
+  deletes: SourceEntity[];
 }

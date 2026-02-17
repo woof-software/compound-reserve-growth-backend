@@ -7,7 +7,6 @@ import { AssetEntity } from 'modules/asset/asset.entity';
 import { SourceEntity } from 'modules/source/source.entity';
 import { NetworkService } from 'modules/network/network.service';
 
-import { getAlgorithms } from './helpers/get-algorithms';
 import {
   AssetInsertItem,
   AssetSyncPlan,
@@ -17,14 +16,31 @@ import {
 } from './types/sources-update.types';
 import { SyncRepository } from './repositories/sync.repository';
 import type { RemoteAsset, RemoteSource } from './types/remote-reserve-sources.types';
-import { getAssetKey, getSourceKey } from './helpers/reserve-source-keys';
+import { SourcesUpdateValidationService } from './sources-validator';
 
 import type { ReserveSourcesConfig } from 'config/reserve-sources.config';
+
+const getAssetKey = (address: string, network: string): string => {
+  return `${network.toLowerCase()}:${address.toLowerCase()}`;
+};
+
+const getSourceKey = (
+  address: string,
+  network: string,
+  algorithms: string[],
+  assetAddress: string,
+): string => {
+  const algoKey = [...algorithms]
+    .map((algorithm) => algorithm.toLowerCase())
+    .sort()
+    .join('|');
+  return `${network.toLowerCase()}:${address.toLowerCase()}:${algoKey}:${assetAddress.toLowerCase()}`;
+};
 
 /**
  * Syncs assets and sources from remote reserve data in a single transaction.
  * 1. Prepares batches (assets then sources) from remote data and current DB state.
- * 2. In one transaction: inserts/updates all assets, then inserts/updates all sources.
+ * 2. In one transaction: upserts assets, inserts/updates/deletes sources, then deletes stale assets.
  * 3. On any error rolls back and throws; no partial apply.
  */
 @Injectable()
@@ -35,23 +51,25 @@ export class SourcesUpdateService {
     private readonly configService: ConfigService,
     private readonly networkService: NetworkService,
     private readonly syncRepo: SyncRepository,
+    private readonly validationService: SourcesUpdateValidationService,
   ) {}
 
   async run(): Promise<void> {
     const config = this.getConfig();
-    const { remoteAssets, remoteSources } = await this.loadRemoteData(config);
+    const { remoteAssets, remoteSources } = await this.fetchRemoteData(config);
 
     try {
       await this.syncRepo.inTransaction(async (manager) => {
         const dbState = await this.loadDbSyncState(manager);
         const assetPlan = this.prepareAssetSyncPlan(remoteAssets, dbState.assetByKey);
-        await this.persistAssetChanges(assetPlan, dbState.assetByKey, manager);
+        await this.persistAssetUpserts(assetPlan, dbState.assetByKey, manager);
         const sourcePlan = this.prepareSourceSyncPlan(
           remoteSources,
           assetPlan.remoteIdToAsset,
           dbState.sourceByKey,
         );
         await this.persistSourceChanges(sourcePlan, manager);
+        await this.persistAssetDeletes(assetPlan, manager);
       });
       this.logger.log('Sources update completed.');
     } catch (err) {
@@ -62,17 +80,18 @@ export class SourcesUpdateService {
     }
   }
 
-  private async loadRemoteData(config: ReserveSourcesConfig): Promise<LoadedRemoteData> {
+  private async fetchRemoteData(config: ReserveSourcesConfig): Promise<LoadedRemoteData> {
     this.logger.log(`Loading reserve data from ${config.repoUrl}`);
     const http = axios.create({ timeout: config.requestTimeoutMs });
     const [rawAssets, rawSources] = await Promise.all([
       http.get<unknown>(config.rawAssetsUrl, { responseType: 'json' }).then((r) => r.data),
       http.get<unknown>(config.rawSourcesUrl, { responseType: 'json' }).then((r) => r.data),
     ]);
-    return {
-      remoteAssets: this.parseAssets(rawAssets),
-      remoteSources: this.parseSources(rawSources),
-    };
+    const validated = await this.validationService.validateAll({
+      assetsRaw: rawAssets,
+      sourcesRaw: rawSources,
+    });
+    return { remoteAssets: validated.assets, remoteSources: validated.sources };
   }
 
   private async loadDbSyncState(manager: EntityManager): Promise<DbSyncState> {
@@ -98,6 +117,8 @@ export class SourcesUpdateService {
     const remoteIdToAsset = new Map<number, AssetEntity>();
     const inserts: AssetInsertItem[] = [];
     const updates: AssetEntity[] = [];
+    const seenRemoteKeys = new Set<string>();
+    const existingAssetByKey = new Map<string, AssetEntity>(assetByKey);
 
     for (const remote of remoteAssets) {
       const network = this.resolveNetwork(remote.chainId);
@@ -107,6 +128,7 @@ export class SourcesUpdateService {
       }
 
       const key = getAssetKey(remote.address, network);
+      seenRemoteKeys.add(key);
       const existing = assetByKey.get(key);
 
       if (existing) {
@@ -126,10 +148,14 @@ export class SourcesUpdateService {
       inserts.push({ remoteId: remote.id, asset });
     }
 
-    return { remoteIdToAsset, inserts, updates };
+    const deletes = Array.from(existingAssetByKey.entries())
+      .filter(([key]) => !seenRemoteKeys.has(key))
+      .map(([, asset]) => asset);
+
+    return { remoteIdToAsset, inserts, updates, deletes };
   }
 
-  private async persistAssetChanges(
+  private async persistAssetUpserts(
     assetPlan: AssetSyncPlan,
     assetByKey: Map<string, AssetEntity>,
     manager: EntityManager,
@@ -153,6 +179,23 @@ export class SourcesUpdateService {
     }
   }
 
+  private async persistAssetDeletes(
+    assetPlan: AssetSyncPlan,
+    manager: EntityManager,
+  ): Promise<void> {
+    if (!assetPlan.deletes.length) return;
+
+    const idsToDelete = assetPlan.deletes
+      .map((asset) => asset.id)
+      .filter((id): id is number => typeof id === 'number');
+
+    this.logger.warn(
+      `Deleting ${idsToDelete.length} stale asset(s): ${this.formatAssetBatchLog(assetPlan.deletes)}`,
+    );
+    await this.syncRepo.deleteAssetsByIds(idsToDelete, manager);
+    this.logger.warn(`Deleted ${idsToDelete.length} stale asset(s)`);
+  }
+
   private prepareSourceSyncPlan(
     remoteSources: RemoteSource[],
     remoteIdToAsset: Map<number, AssetEntity>,
@@ -160,6 +203,8 @@ export class SourcesUpdateService {
   ): SourceSyncPlan {
     const inserts: SourceEntity[] = [];
     const updates: SourceEntity[] = [];
+    const seenRemoteKeys = new Set<string>();
+    const existingSourceByKey = new Map<string, SourceEntity>(sourceByKey);
 
     for (const remote of remoteSources) {
       const asset = remoteIdToAsset.get(remote.assetId);
@@ -182,6 +227,7 @@ export class SourcesUpdateService {
       }
 
       const key = getSourceKey(remote.address, network, remote.algorithm, asset.address);
+      seenRemoteKeys.add(key);
       const existingSource = sourceByKey.get(key);
 
       if (existingSource) {
@@ -206,7 +252,11 @@ export class SourcesUpdateService {
       sourceByKey.set(key, source);
     }
 
-    return { inserts, updates };
+    const deletes = Array.from(existingSourceByKey.entries())
+      .filter(([key]) => !seenRemoteKeys.has(key))
+      .map(([, source]) => source);
+
+    return { inserts, updates, deletes };
   }
 
   private async persistSourceChanges(
@@ -225,6 +275,18 @@ export class SourcesUpdateService {
       await this.syncRepo.saveSources(sourcePlan.updates, manager);
       this.logger.warn(`Updated ${sourcePlan.updates.length} source(s)`);
     }
+
+    if (sourcePlan.deletes.length) {
+      const idsToDelete = sourcePlan.deletes
+        .map((source) => source.id)
+        .filter((id): id is number => typeof id === 'number');
+
+      this.logger.warn(
+        `Deleting ${idsToDelete.length} stale source(s): ${this.formatSourceBatchLog(sourcePlan.deletes)}`,
+      );
+      await this.syncRepo.deleteSourcesByIds(idsToDelete, manager);
+      this.logger.warn(`Deleted ${idsToDelete.length} stale source(s)`);
+    }
   }
 
   private getConfig(): ReserveSourcesConfig {
@@ -237,55 +299,6 @@ export class SourcesUpdateService {
 
   private resolveNetwork(chainId: number): string | null {
     return this.networkService.byChainId(chainId)?.network ?? null;
-  }
-
-  private parseAssets(data: unknown): RemoteAsset[] {
-    if (!Array.isArray(data)) throw new Error('assets.json must contain an array');
-    const result: RemoteAsset[] = [];
-    data.forEach((entry, index) => {
-      if (!this.isRecord(entry)) {
-        this.logger.warn(`Skipping asset at index ${index}: invalid shape`);
-        return;
-      }
-      const item = entry as RemoteAsset;
-      result.push({
-        id: item.id,
-        address: item.address,
-        decimals: item.decimals,
-        symbol: item.symbol,
-        chainId: item.chainId,
-        type: item.type ?? null,
-      });
-    });
-    return result;
-  }
-
-  private parseSources(data: unknown): RemoteSource[] {
-    if (!Array.isArray(data)) throw new Error('sources.json must contain an array');
-    const result: RemoteSource[] = [];
-    data.forEach((entry, index) => {
-      if (!this.isRecord(entry)) {
-        this.logger.warn(`Skipping source at index ${index}: invalid shape`);
-        return;
-      }
-      const item = entry as Omit<RemoteSource, 'algorithm'> & { algorithm: unknown };
-      result.push({
-        id: item.id,
-        address: item.address,
-        market: item.market ?? null,
-        algorithm: getAlgorithms(item.algorithm),
-        startBlock: item.startBlock,
-        endBlock: item.endBlock ?? null,
-        chainId: item.chainId,
-        assetId: item.assetId,
-        type: item.type ?? null,
-      });
-    });
-    return result;
-  }
-
-  private isRecord(value: unknown): value is Record<string, unknown> {
-    return typeof value === 'object' && value !== null;
   }
 
   private applyRemoteToAsset(asset: AssetEntity, remote: RemoteAsset): boolean {
