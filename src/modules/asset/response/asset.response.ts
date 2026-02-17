@@ -1,6 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 
-import { Asset } from 'modules/asset/asset.entity';
+import { AssetEntity } from 'modules/asset/asset.entity';
 
 export class AssetResponse {
   @ApiProperty({ example: 2 })
@@ -21,7 +21,7 @@ export class AssetResponse {
   @ApiProperty({ example: 'ERC20' })
   public type: string;
 
-  constructor(asset: Asset) {
+  constructor(asset: AssetEntity) {
     this.id = asset.id;
     this.address = asset.address;
     this.decimals = asset.decimals;

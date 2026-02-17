@@ -1,7 +1,7 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 
 import { SourceRepository } from 'modules/source/source.repository';
-import { Source } from 'modules/source/source.entity';
+import { SourceEntity } from 'modules/source/source.entity';
 
 import { ReservesRepository } from './reserves-repository.service';
 import { IncomesRepository } from './incomes-repository.service';
@@ -67,11 +67,11 @@ export class HistoryService {
     return this.spendsRepo.findById(id);
   }
 
-  async findIncomesBySource(source: Source): Promise<Incomes> {
+  async findIncomesBySource(source: SourceEntity): Promise<Incomes> {
     return this.incomesRepo.findBySourceId(source.id);
   }
 
-  async findSpendsBySource(source: Source): Promise<Spends> {
+  async findSpendsBySource(source: SourceEntity): Promise<Spends> {
     return this.spendsRepo.findBySourceId(source.id);
   }
 

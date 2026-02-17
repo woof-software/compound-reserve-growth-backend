@@ -1,4 +1,4 @@
-import { Asset } from 'modules/asset/asset.entity';
+import { AssetEntity } from 'modules/asset/asset.entity';
 
 export class CreateSourceWithAssetDto {
   public address: string;
@@ -6,6 +6,6 @@ export class CreateSourceWithAssetDto {
   public algorithm: string[];
   public type: string;
   public blockNumber: number;
-  public asset: Asset;
+  public asset: AssetEntity;
   public market?: string;
 }

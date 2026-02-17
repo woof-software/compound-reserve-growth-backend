@@ -1,6 +1,6 @@
 import { Column, Entity, ManyToOne, PrimaryGeneratedColumn } from 'typeorm';
 
-import { Source } from 'modules/source/source.entity';
+import { SourceEntity } from 'modules/source/source.entity';
 
 @Entity({ name: 'revenue' })
 export class Revenue {
@@ -25,11 +25,11 @@ export class Revenue {
   @Column()
   public createdAt: Date;
 
-  @ManyToOne(() => Source, (source) => source.reserves)
-  public source: Source;
+  @ManyToOne(() => SourceEntity, (source) => source.reserves)
+  public source: SourceEntity;
 
   constructor(
-    source: Source,
+    source: SourceEntity,
     blockNumber: number,
     quantity: string,
     price: number,

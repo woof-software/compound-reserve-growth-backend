@@ -24,6 +24,7 @@ import { EventModule } from 'modules/event/event.module';
 import { CoinGeckoModule } from 'modules/price/providers/coingecko/coingecko.module';
 import { CapoModule } from 'modules/capo/capo.module';
 import { getAdminModule } from 'modules/admin';
+import { HistoryCronModule } from 'modules/history/history-cron.module';
 
 import { AppController } from './app.controller';
 
@@ -33,6 +34,7 @@ import networksConfig from 'config/networks.config';
 import redis from 'config/redis';
 import google from 'config/google';
 import admin from 'config/admin';
+import reserveSourcesConfig from 'config/reserve-sources.config';
 import { DatabaseModule } from 'database/database.module';
 import { Logger } from 'infrastructure/logger';
 import { ExceptionInterceptor } from 'infrastructure/http/interceptors/exception.interceptor';
@@ -41,7 +43,7 @@ import { ExceptionInterceptor } from 'infrastructure/http/interceptors/exception
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      load: [appConfig, databaseConfig, networksConfig, redis, google, admin],
+      load: [appConfig, databaseConfig, networksConfig, redis, google, admin, reserveSourcesConfig],
     }),
     ScheduleModule.forRoot(),
     ThrottlerModule.forRoot({
@@ -80,6 +82,7 @@ import { ExceptionInterceptor } from 'infrastructure/http/interceptors/exception
     SourceModule,
     AssetModule,
     HistoryModule,
+    HistoryCronModule,
     TreasuryModule,
     RevenueModule,
     CoinGeckoModule,

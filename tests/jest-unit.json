@@ -1,0 +1,21 @@
+{
+  "moduleFileExtensions": ["js", "json", "ts"],
+  "rootDir": "../",
+  "testEnvironment": "node",
+  "testMatch": [
+    "**/?(*.)spec.ts"
+  ],
+  "transform": {
+    "^.+\\.(t|j)s$": "ts-jest"
+  },
+  "transformIgnorePatterns": [
+    "node_modules/(?!@woof-software/subgraph-sdk)"
+  ],
+  "setupFiles": ["<rootDir>/tests/setup.ts"],
+  "moduleNameMapper": {
+    "^@/(.*)$": "<rootDir>/src/$1",
+    "^modules/(.*)$": "<rootDir>/src/modules/$1",
+    "^config/(.*)$": "<rootDir>/src/config/$1",
+    "^infrastructure/(.*)$": "<rootDir>/src/infrastructure/$1"
+  }
+}

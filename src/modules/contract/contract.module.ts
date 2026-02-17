@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { forwardRef, Module } from '@nestjs/common';
 
 import { NetworkModule } from 'modules/network/network.module';
 import { HistoryModule } from 'modules/history/history.module';
@@ -11,7 +11,17 @@ import { AlgorithmService } from './algorithm.service';
 import { ContractService } from './contract.service';
 
 @Module({
-  imports: [NetworkModule, HistoryModule, SourceModule, PriceModule, RedisModule, MailModule],
+  imports: [
+    NetworkModule,
+    // Circular dependency: ContractService -> HistoryService (this module needs HistoryModule),
+    // and HistoryModule's GetHistoryService -> ContractService (history/cron/history-get.service.ts).
+    // forwardRef is required; HistoryModule also uses forwardRef(() => ContractModule).
+    forwardRef(() => HistoryModule),
+    SourceModule,
+    PriceModule,
+    RedisModule,
+    MailModule,
+  ],
   providers: [ContractService, AlgorithmService],
   exports: [ContractService, AlgorithmService],
 })

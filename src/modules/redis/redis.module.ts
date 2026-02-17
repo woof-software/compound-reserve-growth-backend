@@ -13,13 +13,15 @@ export const REDIS_CLIENT = 'REDIS_CLIENT';
     {
       provide: REDIS_CLIENT,
       inject: [ConfigService],
-      useFactory: (config: ConfigService) => {
+      useFactory: (config: ConfigService): Redis => {
         const logger = new Logger('RedisClient');
 
         const redisHost = config.get<string>('redis.host');
-        logger.log(`Connecting to Redis at ${redisHost}`);
-        if (!redisHost) throw new Error('REDIS_HOST is not set');
+        if (!redisHost) {
+          throw new Error('REDIS_HOST is required');
+        }
 
+        logger.log(`Connecting to Redis at ${redisHost}`);
         const client = new Redis({
           lazyConnect: true,
           host: redisHost,
