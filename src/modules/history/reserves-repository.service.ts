@@ -5,7 +5,7 @@ import { ethers } from 'ethers';
 
 import { Price } from 'modules/price/price.entity';
 
-import { IncentivesHistory, Reserve, Spends } from './entities';
+import { IncentivesHistory, ReserveEntity, SpendsEntity } from './entities';
 import { PaginationDto } from './dto/pagination.dto';
 import { OffsetDto } from './dto/offset.dto';
 
@@ -17,24 +17,24 @@ import { Order } from '@/common/enum/order.enum';
 @Injectable()
 export class ReservesRepository {
   constructor(
-    @InjectRepository(Reserve) private readonly reservesRepository: Repository<Reserve>,
-    @InjectRepository(Spends) private readonly spendsRepository: Repository<Spends>,
+    @InjectRepository(ReserveEntity) private readonly reservesRepository: Repository<ReserveEntity>,
+    @InjectRepository(SpendsEntity) private readonly spendsRepository: Repository<SpendsEntity>,
     @InjectRepository(Price) private readonly priceRepository: Repository<Price>,
     @InjectDataSource() private readonly dataSource: DataSource,
   ) {}
 
-  async save(reserve: Reserve): Promise<Reserve> {
+  async save(reserve: ReserveEntity): Promise<ReserveEntity> {
     return this.reservesRepository.save(reserve);
   }
 
-  async findById(id: number): Promise<Reserve> {
+  async findById(id: number): Promise<ReserveEntity> {
     return this.reservesRepository.findOne({
       where: { id },
       relations: { source: true },
     });
   }
 
-  async findLatestBySourceId(sourceId: number): Promise<Reserve | null> {
+  async findLatestBySourceId(sourceId: number): Promise<ReserveEntity | null> {
     return this.reservesRepository.findOne({
       where: { source: { id: sourceId } },
       relations: { source: true },
@@ -42,14 +42,14 @@ export class ReservesRepository {
     });
   }
 
-  async getTreasuryReserves(): Promise<Reserve[]> {
+  async getTreasuryReserves(): Promise<ReserveEntity[]> {
     return this.reservesRepository.find({
       relations: { source: { asset: true } },
       order: { date: 'DESC' },
     });
   }
 
-  async getTreasuryHoldings(): Promise<Reserve[]> {
+  async getTreasuryHoldings(): Promise<ReserveEntity[]> {
     return this.reservesRepository
       .createQueryBuilder('reserves')
       .innerJoinAndSelect('reserves.source', 'source')
@@ -61,7 +61,7 @@ export class ReservesRepository {
       .getMany();
   }
 
-  async getPaginatedTreasuryReserves(dto: PaginationDto): Promise<PaginatedDataDto<Reserve>> {
+  async getPaginatedTreasuryReserves(dto: PaginationDto): Promise<PaginatedDataDto<ReserveEntity>> {
     const query = this.reservesRepository
       .createQueryBuilder('reserves')
       .leftJoinAndSelect('reserves.source', 'source')
@@ -76,10 +76,15 @@ export class ReservesRepository {
 
     const [reserves, total] = await query.getManyAndCount();
 
-    return new PaginatedDataDto<Reserve>(reserves, dto.page ?? 1, dto.perPage ?? total, total);
+    return new PaginatedDataDto<ReserveEntity>(
+      reserves,
+      dto.page ?? 1,
+      dto.perPage ?? total,
+      total,
+    );
   }
 
-  async getOffsetTreasuryReserves(dto: OffsetDto): Promise<OffsetDataDto<Reserve>> {
+  async getOffsetTreasuryReserves(dto: OffsetDto): Promise<OffsetDataDto<ReserveEntity>> {
     const query = this.reservesRepository
       .createQueryBuilder('reserves')
       .leftJoinAndSelect('reserves.source', 'source')
@@ -91,10 +96,10 @@ export class ReservesRepository {
 
     const [reserves, total] = await query.getManyAndCount();
 
-    return new OffsetDataDto<Reserve>(reserves, dto.limit ?? null, dto.offset ?? 0, total);
+    return new OffsetDataDto<ReserveEntity>(reserves, dto.limit ?? null, dto.offset ?? 0, total);
   }
 
-  async getRevenueReserves(): Promise<Reserve[]> {
+  async getRevenueReserves(): Promise<ReserveEntity[]> {
     const algorithmsArrayLiteral = `{${[Algorithm.COMET, Algorithm.MARKET_V2].join(',')}}`;
 
     return this.reservesRepository
@@ -106,7 +111,7 @@ export class ReservesRepository {
       .getMany();
   }
 
-  async getPaginatedRevenueReserves(dto: PaginationDto): Promise<PaginatedDataDto<Reserve>> {
+  async getPaginatedRevenueReserves(dto: PaginationDto): Promise<PaginatedDataDto<ReserveEntity>> {
     const algorithmsArrayLiteral = `{${[
       Algorithm.COMET,
       Algorithm.MARKET_V2,
@@ -139,7 +144,7 @@ export class ReservesRepository {
         acc[sourceId].push(item);
         return acc;
       },
-      {} as Record<number, Reserve[]>,
+      {} as Record<number, ReserveEntity[]>,
     );
 
     Object.values(sourceGroups).forEach((sourceReserve) => {
@@ -163,13 +168,18 @@ export class ReservesRepository {
       return new Date(b.date).getTime() - new Date(a.date).getTime();
     });
 
-    return new PaginatedDataDto<Reserve>(reserves, dto.page ?? 1, dto.perPage ?? total, total);
+    return new PaginatedDataDto<ReserveEntity>(
+      reserves,
+      dto.page ?? 1,
+      dto.perPage ?? total,
+      total,
+    );
   }
 
   async getOffsetRevenueReserves(
     dto: OffsetDto,
     algorithms = [Algorithm.COMET, Algorithm.MARKET_V2, Algorithm.AERA_COMPOUND_RESERVES],
-  ): Promise<OffsetDataDto<Reserve>> {
+  ): Promise<OffsetDataDto<ReserveEntity>> {
     const query = this.reservesRepository
       .createQueryBuilder('reserves')
       .leftJoinAndSelect('reserves.source', 'source')
@@ -193,7 +203,7 @@ export class ReservesRepository {
         acc[sourceId].push(item);
         return acc;
       },
-      {} as Record<number, Reserve[]>,
+      {} as Record<number, ReserveEntity[]>,
     );
 
     Object.values(sourceGroups).forEach((sourceReserve) => {
@@ -217,7 +227,7 @@ export class ReservesRepository {
       return new Date(b.date).getTime() - new Date(a.date).getTime();
     });
 
-    return new OffsetDataDto<Reserve>(reserves, dto.limit ?? null, dto.offset ?? 0, total);
+    return new OffsetDataDto<ReserveEntity>(reserves, dto.limit ?? null, dto.offset ?? 0, total);
   }
 
   async deleteAll(): Promise<void> {

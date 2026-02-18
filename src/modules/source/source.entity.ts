@@ -1,8 +1,8 @@
 import { Column, Entity, ManyToOne, OneToMany, PrimaryGeneratedColumn } from 'typeorm';
 
-import { Reserve, Incomes, Spends } from 'modules/history/entities';
-import { Revenue } from 'modules/revenue/revenue.entity';
-import { Treasury } from 'modules/treasury/treasury.entity';
+import { ReserveEntity, IncomesEntity, SpendsEntity } from 'modules/history/entities';
+import { RevenueEntity } from 'modules/revenue/revenue.entity';
+import { TreasuryEntity } from 'modules/treasury/treasury.entity';
 import { AssetEntity } from 'modules/asset/asset.entity';
 
 import { Source } from '@/common/types/source';
@@ -42,20 +42,20 @@ export class SourceEntity implements Source {
   @ManyToOne(() => AssetEntity, (asset) => asset.sources)
   public asset: AssetEntity;
 
-  @OneToMany(() => Reserve, (reserves) => reserves.source)
-  public reserves: Reserve[];
+  @OneToMany(() => ReserveEntity, (reserves) => reserves.source)
+  public reserves: ReserveEntity[];
 
-  @OneToMany(() => Treasury, (treasuries) => treasuries.source)
-  public treasuries: Treasury[];
+  @OneToMany(() => TreasuryEntity, (treasuries) => treasuries.source)
+  public treasuries: TreasuryEntity[];
 
-  @OneToMany(() => Revenue, (revenues) => revenues.source)
-  public revenues: Revenue[];
+  @OneToMany(() => RevenueEntity, (revenues) => revenues.source)
+  public revenues: RevenueEntity[];
 
-  @OneToMany(() => Incomes, (incomes) => incomes.source)
-  public incomes: Incomes[];
+  @OneToMany(() => IncomesEntity, (incomes) => incomes.source)
+  public incomes: IncomesEntity[];
 
-  @OneToMany(() => Spends, (spends) => spends.source)
-  public spends: Spends[];
+  @OneToMany(() => SpendsEntity, (spends) => spends.source)
+  public spends: SpendsEntity[];
 
   constructor(
     address: string,

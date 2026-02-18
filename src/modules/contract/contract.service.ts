@@ -4,7 +4,7 @@ import { ethers, JsonRpcProvider } from 'ethers';
 import type { Cache } from 'cache-manager';
 import type { Redis } from 'ioredis';
 
-import { Incomes, Reserve, Spends } from 'modules/history/entities';
+import { IncomesEntity, ReserveEntity, SpendsEntity } from 'modules/history/entities';
 import { REDIS_CLIENT } from 'modules/redis/redis.module';
 import { ProviderFactory } from 'modules/network/provider.factory';
 import { HistoryService } from 'modules/history/history.service';
@@ -767,7 +767,14 @@ export class ContractService implements OnModuleInit {
               `Reserves have a negative value: ${value}, contractAddress: ${contractAddress}, network: ${network}`,
             );
 
-          const newHistory = new Reserve(source, blockTag, reserves.toString(), price, value, date);
+          const newHistory = new ReserveEntity(
+            source,
+            blockTag,
+            reserves.toString(),
+            price,
+            value,
+            date,
+          );
 
           await this.historyService.createReservesWithSource(newHistory);
 
@@ -1001,7 +1008,7 @@ export class ContractService implements OnModuleInit {
           const spendSupplyQuantity = marketAccounting.spends?.supplyUsd;
           const spendBorrowQuantity = marketAccounting.spends?.borrowUsd;
 
-          const newIncomes = new Incomes(
+          const newIncomes = new IncomesEntity(
             source,
             blockTag,
             marketAccounting.incomes.supply.toString(),
@@ -1018,7 +1025,7 @@ export class ContractService implements OnModuleInit {
             typeof spendSupplyQuantity === 'number' &&
             typeof spendBorrowQuantity === 'number'
           ) {
-            const newSpends = new Spends(
+            const newSpends = new SpendsEntity(
               source,
               blockTag,
               marketAccounting.spends.supplyUsd.toString(),

@@ -4,9 +4,9 @@ import { DataSource, EntityManager } from 'typeorm';
 
 import { AssetEntity } from 'modules/asset/asset.entity';
 import { SourceEntity } from 'modules/source/source.entity';
-import { Reserve, Incomes, Spends } from 'modules/history/entities';
-import { Treasury } from 'modules/treasury/treasury.entity';
-import { Revenue } from 'modules/revenue/revenue.entity';
+import { ReserveEntity, IncomesEntity, SpendsEntity } from 'modules/history/entities';
+import { TreasuryEntity } from 'modules/treasury/treasury.entity';
+import { RevenueEntity } from 'modules/revenue/revenue.entity';
 
 @Injectable()
 export class SyncRepository {
@@ -68,35 +68,35 @@ export class SyncRepository {
     // Delete all dependent records before deleting sources to avoid FK constraint violations
     // Order matters: delete child records first, then parent
     await manager
-      .getRepository(Reserve)
+      .getRepository(ReserveEntity)
       .createQueryBuilder()
       .delete()
       .where('sourceId IN (:...ids)', { ids })
       .execute();
 
     await manager
-      .getRepository(Incomes)
+      .getRepository(IncomesEntity)
       .createQueryBuilder()
       .delete()
       .where('sourceId IN (:...ids)', { ids })
       .execute();
 
     await manager
-      .getRepository(Spends)
+      .getRepository(SpendsEntity)
       .createQueryBuilder()
       .delete()
       .where('sourceId IN (:...ids)', { ids })
       .execute();
 
     await manager
-      .getRepository(Treasury)
+      .getRepository(TreasuryEntity)
       .createQueryBuilder()
       .delete()
       .where('sourceId IN (:...ids)', { ids })
       .execute();
 
     await manager
-      .getRepository(Revenue)
+      .getRepository(RevenueEntity)
       .createQueryBuilder()
       .delete()
       .where('sourceId IN (:...ids)', { ids })

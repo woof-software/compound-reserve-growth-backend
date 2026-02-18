@@ -4,9 +4,9 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { AssetEntity } from 'modules/asset/asset.entity';
 import { SourceEntity } from 'modules/source/source.entity';
 import { NetworkModule } from 'modules/network/network.module';
-import { Reserve, Incomes, Spends } from 'modules/history/entities';
-import { Treasury } from 'modules/treasury/treasury.entity';
-import { Revenue } from 'modules/revenue/revenue.entity';
+import { ReserveEntity, IncomesEntity, SpendsEntity } from 'modules/history/entities';
+import { TreasuryEntity } from 'modules/treasury/treasury.entity';
+import { RevenueEntity } from 'modules/revenue/revenue.entity';
 
 import { SyncRepository } from './repositories/sync.repository';
 import { SourcesUpdateService } from './sources-update.service';
@@ -18,11 +18,11 @@ import { SourcesUpdateValidationService } from './sources-validator';
     TypeOrmModule.forFeature([
       AssetEntity,
       SourceEntity,
-      Reserve,
-      Incomes,
-      Spends,
-      Treasury,
-      Revenue,
+      ReserveEntity,
+      IncomesEntity,
+      SpendsEntity,
+      TreasuryEntity,
+      RevenueEntity,
     ]),
     NetworkModule,
   ],

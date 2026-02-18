@@ -4,27 +4,29 @@ import { Repository } from 'typeorm';
 
 import { OffsetDto } from 'modules/history/dto/offset.dto';
 
-import { Spends } from './entities';
+import { SpendsEntity } from './entities';
 
 import { OffsetDataDto } from '@app/common/dto/offset-data.dto';
 import { Algorithm } from '@app/common/enum/algorithm.enum';
 
 @Injectable()
 export class SpendsRepository {
-  constructor(@InjectRepository(Spends) private readonly spendsRepository: Repository<Spends>) {}
+  constructor(
+    @InjectRepository(SpendsEntity) private readonly spendsRepository: Repository<SpendsEntity>,
+  ) {}
 
-  async save(reserve: Spends): Promise<Spends> {
+  async save(reserve: SpendsEntity): Promise<SpendsEntity> {
     return this.spendsRepository.save(reserve);
   }
 
-  async findById(id: number): Promise<Spends> {
+  async findById(id: number): Promise<SpendsEntity> {
     return this.spendsRepository.findOne({
       where: { id },
       relations: { source: true },
     });
   }
 
-  async findBySourceId(sourceId: number): Promise<Spends> {
+  async findBySourceId(sourceId: number): Promise<SpendsEntity> {
     return this.spendsRepository.findOne({
       where: { source: { id: sourceId } },
       relations: { source: true },
@@ -35,7 +37,7 @@ export class SpendsRepository {
   async getOffsetStats(
     dto: OffsetDto,
     algorithms = [Algorithm.COMET_STATS],
-  ): Promise<OffsetDataDto<Spends>> {
+  ): Promise<OffsetDataDto<SpendsEntity>> {
     const algorithmsArrayLiteral = `{${algorithms.join(',')}}`;
 
     const query = this.spendsRepository
@@ -52,14 +54,14 @@ export class SpendsRepository {
 
     const [spends, total] = await query.getManyAndCount();
 
-    return new OffsetDataDto<Spends>(spends, dto.limit ?? null, dto.offset ?? 0, total);
+    return new OffsetDataDto<SpendsEntity>(spends, dto.limit ?? null, dto.offset ?? 0, total);
   }
 
   async deleteAll(): Promise<void> {
     await this.spendsRepository.clear();
   }
 
-  async findAllWithMissingPriceComp(): Promise<Spends[]> {
+  async findAllWithMissingPriceComp(): Promise<SpendsEntity[]> {
     return this.spendsRepository
       .createQueryBuilder('spends')
       .leftJoinAndSelect('spends.source', 'source')
