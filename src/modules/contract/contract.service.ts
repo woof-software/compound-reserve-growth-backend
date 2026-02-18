@@ -853,12 +853,6 @@ export class ContractService implements OnModuleInit {
             lastBlock = source.startBlock;
           } else {
             lastBlock = await this.findBlockByTimestamp(network, provider, targetTimestamp);
-            if (source.endBlock != null && lastBlock > source.endBlock) {
-              lastBlock = source.endBlock;
-              this.logger.log(
-                `Capped to source.endBlock=${lastBlock} for ${source.address} on ${source.network}`,
-              );
-            }
             this.logger.log(
               `Using provided date ${startDate.toISOString()} to start from block ${lastBlock} for ${source.address} on ${source.network}`,
             );
