@@ -2,7 +2,22 @@ import { DataSource } from 'typeorm';
 
 import { AssetEntity } from '@/modules/asset/asset.entity';
 import { SourceEntity } from '@/modules/source/source.entity';
+import { Reserve, Incomes, Spends } from '@/modules/history/entities';
+import { Treasury } from '@/modules/treasury/treasury.entity';
+import { Revenue } from '@/modules/revenue/revenue.entity';
 import { SyncRepository } from '@/modules/sources-update/repositories/sync.repository';
+
+/** Mock repository for delete by sourceId (createQueryBuilder().delete().where().execute()). */
+const makeDeleteBySourceIdsRepo = () => {
+  const execute = jest.fn().mockResolvedValue({ affected: 0 });
+  return {
+    createQueryBuilder: jest.fn().mockReturnValue({
+      delete: jest.fn().mockReturnValue({
+        where: jest.fn().mockReturnValue({ execute }),
+      }),
+    }),
+  };
+};
 
 describe('SyncRepository', () => {
   const makeQueryRunner = () => ({
@@ -83,11 +98,21 @@ describe('SyncRepository', () => {
       save: jest.fn().mockResolvedValue(['s2']),
       delete: jest.fn().mockResolvedValue(undefined),
     };
+    const dependentRepo = makeDeleteBySourceIdsRepo();
 
     const manager = {
       getRepository: jest.fn((entity: unknown) => {
         if (entity === AssetEntity) return assetRepo;
         if (entity === SourceEntity) return sourceRepo;
+        if (
+          entity === Reserve ||
+          entity === Incomes ||
+          entity === Spends ||
+          entity === Treasury ||
+          entity === Revenue
+        ) {
+          return dependentRepo;
+        }
         throw new Error('unknown entity');
       }),
     };
@@ -117,11 +142,21 @@ describe('SyncRepository', () => {
   it('skips delete calls when ids list is empty', async () => {
     const assetRepo = { delete: jest.fn() };
     const sourceRepo = { delete: jest.fn() };
+    const dependentRepo = makeDeleteBySourceIdsRepo();
 
     const manager = {
       getRepository: jest.fn((entity: unknown) => {
         if (entity === AssetEntity) return assetRepo;
         if (entity === SourceEntity) return sourceRepo;
+        if (
+          entity === Reserve ||
+          entity === Incomes ||
+          entity === Spends ||
+          entity === Treasury ||
+          entity === Revenue
+        ) {
+          return dependentRepo;
+        }
         throw new Error('unknown entity');
       }),
     };
