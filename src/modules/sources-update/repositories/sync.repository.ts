@@ -4,6 +4,9 @@ import { DataSource, EntityManager } from 'typeorm';
 
 import { AssetEntity } from 'modules/asset/asset.entity';
 import { SourceEntity } from 'modules/source/source.entity';
+import { Reserve, Incomes, Spends } from 'modules/history/entities';
+import { Treasury } from 'modules/treasury/treasury.entity';
+import { Revenue } from 'modules/revenue/revenue.entity';
 
 @Injectable()
 export class SyncRepository {
@@ -61,6 +64,44 @@ export class SyncRepository {
 
   public async deleteSourcesByIds(ids: number[], manager: EntityManager): Promise<void> {
     if (!ids.length) return;
+
+    // Delete all dependent records before deleting sources to avoid FK constraint violations
+    // Order matters: delete child records first, then parent
+    await manager
+      .getRepository(Reserve)
+      .createQueryBuilder()
+      .delete()
+      .where('sourceId IN (:...ids)', { ids })
+      .execute();
+
+    await manager
+      .getRepository(Incomes)
+      .createQueryBuilder()
+      .delete()
+      .where('sourceId IN (:...ids)', { ids })
+      .execute();
+
+    await manager
+      .getRepository(Spends)
+      .createQueryBuilder()
+      .delete()
+      .where('sourceId IN (:...ids)', { ids })
+      .execute();
+
+    await manager
+      .getRepository(Treasury)
+      .createQueryBuilder()
+      .delete()
+      .where('sourceId IN (:...ids)', { ids })
+      .execute();
+
+    await manager
+      .getRepository(Revenue)
+      .createQueryBuilder()
+      .delete()
+      .where('sourceId IN (:...ids)', { ids })
+      .execute();
+
     await manager.getRepository(SourceEntity).delete(ids);
   }
 }
