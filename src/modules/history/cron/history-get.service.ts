@@ -95,11 +95,13 @@ export class GetHistoryService {
 
       this.logger.log(`Found ${dbSources.length} sources for reserves processing`);
 
+      let startDate: Date | undefined;
       if (collectionSwitch?.clearData) {
         const sourceIds = dbSources.map((s) => s.id);
         this.logger.log(`Clearing reserves for ${sourceIds.length} sources...`);
         await this.reservesRepository.deleteBySourceIds(sourceIds);
         this.logger.log('Reserves cleared successfully.');
+        startDate = collectionSwitch.data;
       }
 
       for (const source of dbSources) {
@@ -108,7 +110,7 @@ export class GetHistoryService {
         );
 
         if (matchingAlgorithm) {
-          await this.contractService.saveReserves(source, matchingAlgorithm);
+          await this.contractService.saveReserves(source, matchingAlgorithm, startDate);
         }
       }
 
@@ -119,12 +121,12 @@ export class GetHistoryService {
   async startStatsProcessing(collectionSwitch?: StartCollectionResponse) {
     return this.executeWithLock('Stats Processing', async () => {
       this.logger.log('Starting to process stats...');
-      let data: Date;
+      let startDate: Date | undefined;
       if (collectionSwitch?.clearData) {
         this.logger.log('Clearing spends and incomes tables...');
         await Promise.all([this.spendsRepository.deleteAll(), this.incomesRepository.deleteAll()]);
         this.logger.log('Spends and incomes tables cleared successfully.');
-        data = collectionSwitch.data;
+        startDate = collectionSwitch.data;
       }
 
       const statsAlgorithms = [Algorithm.COMET_STATS];
@@ -138,7 +140,7 @@ export class GetHistoryService {
         );
 
         if (matchingAlgorithm) {
-          await this.contractService.saveStats(source, matchingAlgorithm, data);
+          await this.contractService.saveStats(source, matchingAlgorithm, startDate);
         }
       }
 

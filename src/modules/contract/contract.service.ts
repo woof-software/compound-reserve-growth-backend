@@ -566,7 +566,11 @@ export class ContractService implements OnModuleInit {
     }
   }
 
-  public async saveReserves(source: SourceEntity, algorithm: string): Promise<void> {
+  public async saveReserves(
+    source: SourceEntity,
+    algorithm: string,
+    startDate?: Date,
+  ): Promise<void> {
     const { address: contractAddress, network, asset } = source;
     const { address: assetAddress } = asset;
 
@@ -577,8 +581,45 @@ export class ContractService implements OnModuleInit {
     try {
       const provider = this.providerFactory.get(network);
 
-      const latestReserve = await this.historyService.findLatestReserveBySource(source);
-      let lastBlock = latestReserve?.blockNumber ?? source.startBlock;
+      let lastBlock: number;
+
+      if (startDate) {
+        try {
+          const startBlockData = await this.getCachedBlock(network, provider, source.startBlock);
+          const startBlockTimestamp = startBlockData.timestamp;
+          const providedTimestamp = Math.floor(startDate.getTime() / 1000);
+
+          const targetTimestamp = Math.max(startBlockTimestamp, providedTimestamp);
+
+          if (providedTimestamp < startBlockTimestamp) {
+            this.logger.log(
+              `Provided date ${startDate.toISOString()} is older than source.startBlock. Using startBlock ${source.startBlock} for ${source.address} on ${source.network}`,
+            );
+            lastBlock = source.startBlock;
+          } else {
+            lastBlock = await this.findBlockByTimestamp(network, provider, targetTimestamp);
+            if (source.endBlock != null && lastBlock > source.endBlock) {
+              lastBlock = source.endBlock;
+              this.logger.log(
+                `Capped to source.endBlock=${lastBlock} for ${source.address} on ${source.network}`,
+              );
+            }
+            this.logger.log(
+              `Using provided date ${startDate.toISOString()} to start from block ${lastBlock} for ${source.address} on ${source.network}`,
+            );
+          }
+        } catch (e: unknown) {
+          const message = e instanceof Error ? e.message : String(e);
+          this.logger.error(
+            `Failed to find block for date ${startDate.toISOString()} for ${source.address} on ${source.network}: ${message}`,
+          );
+          return;
+        }
+      } else {
+        const latestReserve = await this.historyService.findLatestReserveBySource(source);
+        lastBlock = latestReserve?.blockNumber ?? source.startBlock;
+      }
+
       const startBlockData = await this.getCachedBlock(network, provider, lastBlock);
       const startTs = startBlockData.timestamp;
 
@@ -747,7 +788,7 @@ export class ContractService implements OnModuleInit {
     }
   }
 
-  public async saveStats(source: SourceEntity, algorithm: string, data?: Date): Promise<void> {
+  public async saveStats(source: SourceEntity, algorithm: string, startDate?: Date): Promise<void> {
     const { address: contractAddress, network, asset } = source;
 
     this.logger.log(
@@ -759,17 +800,17 @@ export class ContractService implements OnModuleInit {
 
       let lastBlock: number | undefined;
 
-      if (data) {
+      if (startDate) {
         try {
           const startBlockData = await this.getCachedBlock(network, provider, source.startBlock);
           const startBlockTimestamp = startBlockData.timestamp;
-          const providedTimestamp = Math.floor(data.getTime() / 1000);
+          const providedTimestamp = Math.floor(startDate.getTime() / 1000);
 
           const targetTimestamp = Math.max(startBlockTimestamp, providedTimestamp);
 
           if (providedTimestamp < startBlockTimestamp) {
             this.logger.log(
-              `Provided date ${data.toISOString()} is older than source.startBlock. Using startBlock ${source.startBlock} for ${source.address} on ${source.network}`,
+              `Provided date ${startDate.toISOString()} is older than source.startBlock. Using startBlock ${source.startBlock} for ${source.address} on ${source.network}`,
             );
             lastBlock = source.startBlock;
           } else {
@@ -781,12 +822,13 @@ export class ContractService implements OnModuleInit {
               );
             }
             this.logger.log(
-              `Using provided date ${data.toISOString()} to start from block ${lastBlock} for ${source.address} on ${source.network}`,
+              `Using provided date ${startDate.toISOString()} to start from block ${lastBlock} for ${source.address} on ${source.network}`,
             );
           }
-        } catch (e: any) {
+        } catch (e: unknown) {
+          const message = e instanceof Error ? e.message : String(e);
           this.logger.error(
-            `Failed to find block for date ${data.toISOString()} for ${source.address} on ${source.network}: ${e?.message}`,
+            `Failed to find block for date ${startDate.toISOString()} for ${source.address} on ${source.network}: ${message}`,
           );
           return;
         }
