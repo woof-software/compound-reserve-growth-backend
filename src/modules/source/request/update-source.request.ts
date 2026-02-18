@@ -6,7 +6,7 @@ export class UpdateSourceRequest {
   @IsInt()
   public id: number;
 
-  @ApiPropertyOptional({ example: 20000000, description: 'Start block (last synced)' })
+  @ApiPropertyOptional({ example: 20000000, description: 'Start block number (optional)' })
   @IsOptional()
   @IsNumber()
   public startBlock?: number;

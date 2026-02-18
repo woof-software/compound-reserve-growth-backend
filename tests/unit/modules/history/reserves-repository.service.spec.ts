@@ -1,4 +1,4 @@
-import { Reserve } from '@/modules/history/entities';
+import { ReserveEntity } from '@/modules/history/entities';
 import { ReservesRepository } from '@/modules/history/reserves-repository.service';
 
 describe('ReservesRepository', () => {
@@ -37,7 +37,11 @@ describe('ReservesRepository', () => {
     it('queries reserve by source id ordered by blockNumber descending', async () => {
       const { repo, findOne } = makeReservesRepository();
       const sourceId = 42;
-      const mockReserve = { id: 1, blockNumber: 100_000, sourceId } as unknown as Reserve;
+      const mockReserve = {
+        id: 1,
+        blockNumber: 100_000,
+        source: { id: sourceId },
+      } as unknown as ReserveEntity;
       findOne.mockResolvedValue(mockReserve);
 
       const result = await repo.findLatestBySourceId(sourceId);

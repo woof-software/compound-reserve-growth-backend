@@ -2,9 +2,9 @@ import { DataSource } from 'typeorm';
 
 import { AssetEntity } from '@/modules/asset/asset.entity';
 import { SourceEntity } from '@/modules/source/source.entity';
-import { Reserve, Incomes, Spends } from '@/modules/history/entities';
-import { Treasury } from '@/modules/treasury/treasury.entity';
-import { Revenue } from '@/modules/revenue/revenue.entity';
+import { ReserveEntity, IncomesEntity, SpendsEntity } from '@/modules/history/entities';
+import { TreasuryEntity } from '@/modules/treasury/treasury.entity';
+import { RevenueEntity } from '@/modules/revenue/revenue.entity';
 import { SyncRepository } from '@/modules/sources-update/repositories/sync.repository';
 
 /** Mock repository for delete by sourceId (createQueryBuilder().delete().where().execute()). */
@@ -105,11 +105,11 @@ describe('SyncRepository', () => {
         if (entity === AssetEntity) return assetRepo;
         if (entity === SourceEntity) return sourceRepo;
         if (
-          entity === Reserve ||
-          entity === Incomes ||
-          entity === Spends ||
-          entity === Treasury ||
-          entity === Revenue
+          entity === ReserveEntity ||
+          entity === IncomesEntity ||
+          entity === SpendsEntity ||
+          entity === TreasuryEntity ||
+          entity === RevenueEntity
         ) {
           return dependentRepo;
         }
@@ -149,11 +149,11 @@ describe('SyncRepository', () => {
         if (entity === AssetEntity) return assetRepo;
         if (entity === SourceEntity) return sourceRepo;
         if (
-          entity === Reserve ||
-          entity === Incomes ||
-          entity === Spends ||
-          entity === Treasury ||
-          entity === Revenue
+          entity === ReserveEntity ||
+          entity === IncomesEntity ||
+          entity === SpendsEntity ||
+          entity === TreasuryEntity ||
+          entity === RevenueEntity
         ) {
           return dependentRepo;
         }

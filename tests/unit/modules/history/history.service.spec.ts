@@ -1,4 +1,4 @@
-import { Reserve } from '@/modules/history/entities';
+import { ReserveEntity } from '@/modules/history/entities';
 import { SourceEntity } from '@/modules/source/source.entity';
 import { HistoryService } from '@/modules/history/history.service';
 
@@ -52,12 +52,8 @@ describe('HistoryService', () => {
     it('returns latest reserve when one exists for the source', async () => {
       const { service, findLatestBySourceId } = makeDeps();
       const source = makeSource(10);
-      const mockReserve = {
-        id: 1,
-        blockNumber: 50_000,
-        sourceId: 10,
-        source,
-      } as unknown as Reserve;
+      const mockReserve = new ReserveEntity(source, 50_000, '0', 0, 0, new Date());
+      mockReserve.id = 1;
       findLatestBySourceId.mockResolvedValue(mockReserve);
 
       const result = await service.findLatestReserveBySource(source);
