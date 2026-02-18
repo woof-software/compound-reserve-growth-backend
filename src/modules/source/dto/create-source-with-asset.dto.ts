@@ -5,7 +5,8 @@ export class CreateSourceWithAssetDto {
   public network: string;
   public algorithm: string[];
   public type: string;
-  public blockNumber: number;
+  public startBlock: number;
+  public endBlock?: number | null;
   public asset: AssetEntity;
   public market?: string;
 }

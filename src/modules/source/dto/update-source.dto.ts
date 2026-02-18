@@ -1,5 +1,6 @@
 export class UpdateSourceDto {
   public id: number;
-  public blockNumber?: number;
+  public startBlock?: number;
+  public endBlock?: number | null;
   public checkedAt?: Date;
 }

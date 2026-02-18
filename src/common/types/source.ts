@@ -5,7 +5,8 @@ export interface Source {
   market?: string;
   type?: string;
   algorithm: string[];
-  blockNumber: number;
+  startBlock: number;
+  endBlock?: number | null;
   createdAt: Date;
   checkedAt?: Date;
 }

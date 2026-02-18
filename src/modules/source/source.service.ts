@@ -29,9 +29,10 @@ export class SourceService {
       dto.network,
       dto.algorithm,
       dto.type,
-      dto.blockNumber,
+      dto.startBlock,
       asset,
       dto.market,
+      dto.endBlock,
     );
     return this.sourceRepository.save(source);
   }
@@ -42,9 +43,10 @@ export class SourceService {
       dto.network,
       dto.algorithm,
       dto.type,
-      dto.blockNumber,
+      dto.startBlock,
       dto.asset,
       dto.market,
+      dto.endBlock,
     );
     return this.sourceRepository.save(source);
   }
@@ -52,14 +54,16 @@ export class SourceService {
   async update(dto: UpdateSourceDto): Promise<SourceEntity> {
     const source = await this.sourceRepository.findById(dto.id);
     if (!source) throw new NotFoundException(`Source with id ${dto.id} not found`);
-    if (dto.blockNumber) source.blockNumber = dto.blockNumber;
+    if (dto.startBlock !== undefined) source.startBlock = dto.startBlock;
+    if (dto.endBlock !== undefined) source.endBlock = dto.endBlock;
     source.checkedAt = dto.checkedAt ? dto.checkedAt : new Date();
     return this.sourceRepository.update(source);
   }
 
   async updateWithSource(dto: UpdateWithSourceDto): Promise<SourceEntity> {
     const source = dto.source;
-    if (dto.blockNumber) source.blockNumber = dto.blockNumber;
+    if (dto.startBlock !== undefined) source.startBlock = dto.startBlock;
+    if (dto.endBlock !== undefined) source.endBlock = dto.endBlock;
     source.checkedAt = dto.checkedAt ? dto.checkedAt : new Date();
     return this.sourceRepository.update(source);
   }

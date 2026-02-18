@@ -58,7 +58,7 @@ export class GetHistoryService {
   }
 
   /**
-   * Updates blockNumber for sources with reserves algorithms
+   * Updates startBlock for sources with reserves algorithms
    * @param sources - Array of sources to update
    * @param startDate - Optional date to start from. If not provided, uses contract creation block
    * @returns Array of sources that were successfully updated (excluding those that failed or had no changes)
@@ -67,7 +67,7 @@ export class GetHistoryService {
     sources: SourceEntity[],
     startDate: Date,
   ): Promise<SourceEntity[]> {
-    this.logger.log(`Updating blockNumber for ${sources.length} sources...`);
+    this.logger.log(`Updating startBlock for ${sources.length} sources...`);
 
     let successCount = 0;
     let failureCount = 0;
@@ -79,9 +79,9 @@ export class GetHistoryService {
         this.logger.log(`Processing source ${source.id} (${source.address})...`);
         const newBlockNumber = await this.contractService.getSourceBlockNumber(source, startDate);
 
-        if (newBlockNumber === source.blockNumber) {
+        if (newBlockNumber === source.startBlock) {
           this.logger.log(
-            `Source ${source.id} already has correct block number ${newBlockNumber}, skipping update`,
+            `Source ${source.id} already has correct start block ${newBlockNumber}, skipping update`,
           );
           successCount++;
           continue;
@@ -89,24 +89,26 @@ export class GetHistoryService {
 
         await this.sourceService.updateWithSource({
           source,
-          blockNumber: newBlockNumber,
+          startBlock: newBlockNumber,
           checkedAt: new Date(),
         });
 
         successfullyUpdatedSources.push(source);
         successCount++;
-        this.logger.log(`Successfully updated source ${source.id} to block ${newBlockNumber}`);
+        this.logger.log(
+          `Successfully updated source ${source.id} to start block ${newBlockNumber}`,
+        );
       } catch (error) {
         failureCount++;
         this.logger.error(
-          `Failed to update blockNumber for source ${source.id} (${source.address}): ${error.message}`,
+          `Failed to update startBlock for source ${source.id} (${source.address}): ${error.message}`,
         );
         // Continue processing other sources instead of stopping the entire process
       }
     }
 
     this.logger.log(
-      `BlockNumber update completed: ${successCount} successful, ${failureCount} failed out of ${sources.length} sources`,
+      `StartBlock update completed: ${successCount} successful, ${failureCount} failed out of ${sources.length} sources`,
     );
     this.logger.log(
       `Successfully updated ${successfullyUpdatedSources.length} sources that will have their reserves cleared`,

@@ -3,7 +3,8 @@ export class CreateSourceDto {
   public network: string;
   public algorithm: string[];
   public type: string;
-  public blockNumber: number;
+  public startBlock: number;
+  public endBlock?: number | null;
   public assetId: number;
   public market?: string;
 }

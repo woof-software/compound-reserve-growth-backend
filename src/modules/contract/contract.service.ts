@@ -211,9 +211,9 @@ export class ContractService implements OnModuleInit {
       }
     } catch (error) {
       this.logger.warn(
-        `Failed to get block number for source ${source.id} (${source.address}): ${error.message}. Using current block number ${source.blockNumber} as fallback.`,
+        `Failed to get block number for source ${source.id} (${source.address}): ${error.message}. Using current start block ${source.startBlock} as fallback.`,
       );
-      return source.blockNumber;
+      return source.startBlock;
     }
   }
 
@@ -618,7 +618,7 @@ export class ContractService implements OnModuleInit {
     try {
       const provider = this.providerFactory.get(network);
 
-      let lastBlock = source.blockNumber;
+      let lastBlock = source.startBlock;
       const startBlockData = await this.getCachedBlock(network, provider, lastBlock);
       const startTs = startBlockData.timestamp;
 
@@ -631,7 +631,7 @@ export class ContractService implements OnModuleInit {
         // Update the source with current timestamp
         await this.sourceService.updateWithSource({
           source,
-          blockNumber: lastBlock,
+          startBlock: lastBlock,
           checkedAt: new Date(),
         });
 
@@ -674,7 +674,10 @@ export class ContractService implements OnModuleInit {
 
       for (const targetTs of dailyTs) {
         try {
-          const blockTag = await this.findBlockByTimestamp(network, provider, targetTs, lastBlock);
+          let blockTag = await this.findBlockByTimestamp(network, provider, targetTs, lastBlock);
+          if (source.endBlock != null && blockTag > source.endBlock) {
+            blockTag = source.endBlock;
+          }
 
           let reserves: bigint;
           try {
@@ -752,7 +755,7 @@ export class ContractService implements OnModuleInit {
 
           await this.sourceService.updateWithSource({
             source,
-            blockNumber: blockTag,
+            startBlock: blockTag,
             checkedAt: new Date(),
           });
 
@@ -861,7 +864,7 @@ export class ContractService implements OnModuleInit {
             );
           } catch (e: any) {
             this.logger.warn(
-              `Failed to determine creation block for ${source.address} on ${source.network}: ${e?.message}. Fallback to source.blockNumber=${lastBlock}`,
+              `Failed to determine creation block for ${source.address} on ${source.network}: ${e?.message}. Fallback to source.startBlock=${lastBlock}`,
             );
             return;
           }

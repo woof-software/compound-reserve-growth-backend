@@ -40,7 +40,8 @@ describe('SourcesUpdateService', () => {
     address: string;
     asset: AssetEntity;
     algorithm: string[];
-    blockNumber?: number;
+    startBlock?: number;
+    endBlock?: number | null;
     network?: string;
     type?: string;
     market?: string;
@@ -50,9 +51,10 @@ describe('SourcesUpdateService', () => {
       params.network ?? 'eth',
       params.algorithm,
       params.type ?? 'treasury',
-      params.blockNumber ?? 1,
+      params.startBlock ?? 1,
       params.asset,
       params.market,
+      params.endBlock ?? null,
     );
     source.id = params.id;
     return source;
@@ -131,7 +133,7 @@ describe('SourcesUpdateService', () => {
       address: '0x0000000000000000000000000000000000000010',
       asset: dbAssetKeep,
       algorithm: [Algorithm.COMET, Algorithm.COMET_STATS],
-      blockNumber: 5,
+      startBlock: 5,
       market: 'old-market',
     });
     const dbSourceStale = makeSource({
@@ -139,7 +141,7 @@ describe('SourcesUpdateService', () => {
       address: '0x0000000000000000000000000000000000000020',
       asset: dbAssetStale,
       algorithm: [Algorithm.REWARDS],
-      blockNumber: 10,
+      startBlock: 10,
     });
 
     validationService.validateAll.mockResolvedValue({
@@ -219,7 +221,7 @@ describe('SourcesUpdateService', () => {
 
     const updatedSources = syncRepo.saveSources.mock.calls[1][0] as SourceEntity[];
     expect(updatedSources[0].id).toBe(10);
-    expect(updatedSources[0].blockNumber).toBe(12);
+    expect(updatedSources[0].startBlock).toBe(12);
     expect(updatedSources[0].algorithm).toEqual([Algorithm.COMET_STATS, Algorithm.COMET]);
 
     const deleteSourcesOrder = syncRepo.deleteSourcesByIds.mock.invocationCallOrder[0];
@@ -334,7 +336,7 @@ describe('SourcesUpdateService', () => {
       address: '0x0000000000000000000000000000000000000020',
       asset: dbAssetStale,
       algorithm: [Algorithm.REWARDS],
-      blockNumber: 10,
+      startBlock: 10,
     });
 
     validationService.validateAll.mockResolvedValue({
@@ -456,7 +458,7 @@ describe('SourcesUpdateService', () => {
       address: '0x00000000000000000000000000000000000000aa',
       asset: oldAsset,
       algorithm: [Algorithm.COMET],
-      blockNumber: 1,
+      startBlock: 1,
       network: 'polygon',
       type: 'legacy',
       market: 'legacy-market',
@@ -471,6 +473,7 @@ describe('SourcesUpdateService', () => {
       {
         chainId: 1,
         startBlock: 99,
+        endBlock: null,
         market: null,
         algorithm: [Algorithm.REWARDS],
         type: 'treasury',
@@ -481,7 +484,7 @@ describe('SourcesUpdateService', () => {
     expect(changed).toBe(true);
     expect(source.network).toBe('eth');
     expect(source.asset.id).toBe(newAsset.id);
-    expect(source.blockNumber).toBe(99);
+    expect(source.startBlock).toBe(99);
     expect(source.market).toBeUndefined();
     expect(source.algorithm).toEqual([Algorithm.REWARDS]);
     expect(source.type).toBe('treasury');

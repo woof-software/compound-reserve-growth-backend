@@ -34,7 +34,12 @@ export class CreateSourceRequest {
   @ApiProperty({ example: 19876543, description: 'Start block number' })
   @IsNotEmpty()
   @IsNumber()
-  public blockNumber: number;
+  public startBlock: number;
+
+  @ApiPropertyOptional({ example: 21246747, description: 'End block number (optional)' })
+  @IsOptional()
+  @IsNumber()
+  public endBlock?: number;
 
   @ApiPropertyOptional({ example: 'cUSDCv3', description: 'Market name' })
   @IsOptional()

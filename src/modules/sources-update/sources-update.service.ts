@@ -225,6 +225,7 @@ export class SourcesUpdateService {
         remote.startBlock,
         asset,
         remote.market ?? undefined,
+        remote.endBlock ?? null,
       );
       source.id = remote.id;
       inserts.push(source);
@@ -326,8 +327,13 @@ export class SourcesUpdateService {
       source.asset = asset;
       changed = true;
     }
-    if (source.blockNumber !== remote.startBlock) {
-      source.blockNumber = remote.startBlock;
+    if (source.startBlock !== remote.startBlock) {
+      source.startBlock = remote.startBlock;
+      changed = true;
+    }
+    const remoteEndBlock = remote.endBlock ?? null;
+    if (source.endBlock !== remoteEndBlock) {
+      source.endBlock = remoteEndBlock;
       changed = true;
     }
     const currentMarket = source.market ?? undefined;

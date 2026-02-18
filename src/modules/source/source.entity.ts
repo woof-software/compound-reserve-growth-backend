@@ -28,7 +28,10 @@ export class SourceEntity implements Source {
   public algorithm: string[];
 
   @Column()
-  public blockNumber: number;
+  public startBlock: number;
+
+  @Column({ nullable: true })
+  public endBlock: number | null;
 
   @Column()
   public createdAt: Date;
@@ -59,15 +62,17 @@ export class SourceEntity implements Source {
     network: string,
     algorithm: string[],
     type: string,
-    blockNumber: number,
+    startBlock: number,
     asset: AssetEntity,
     market?: string,
+    endBlock?: number | null,
   ) {
     this.address = address;
     this.network = network;
     this.algorithm = algorithm;
     this.type = type;
-    this.blockNumber = blockNumber;
+    this.startBlock = startBlock;
+    this.endBlock = endBlock ?? null;
     this.asset = asset;
     this.market = market;
     this.createdAt = new Date();
