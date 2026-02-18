@@ -49,7 +49,11 @@ describe('ContractService', () => {
     const algorithmService = { comet: jest.fn(), marketV2: jest.fn() };
     const mailService = { notifyGetHistoryError: jest.fn() };
     const cacheManager = { get: jest.fn().mockResolvedValue(null), set: jest.fn() };
-    const redisClient = { get: jest.fn().mockResolvedValue(null), setex: jest.fn() };
+    const redisClient = {
+      get: jest.fn().mockResolvedValue(null),
+      setex: jest.fn(),
+      ping: jest.fn().mockResolvedValue('PONG'),
+    };
 
     const service = new ContractService(
       cacheManager as never,
@@ -66,6 +70,9 @@ describe('ContractService', () => {
       findLatestReserveBySource,
       providerFactory,
       historyService,
+      priceService,
+      mailService,
+      redisClient,
     };
   };
 
@@ -115,6 +122,105 @@ describe('ContractService', () => {
 
       expect(findLatestReserveBySource).toHaveBeenCalledWith(source);
       expect(getCachedBlockSpy).toHaveBeenCalledWith('eth', expect.anything(), 50_000);
+    });
+
+    it('uses source.startBlock when provided startDate is older than start block timestamp', async () => {
+      const { service, findLatestReserveBySource } = makeDeps();
+      const source = makeSource({ id: 30, startBlock: 9_000 });
+      const olderThanStartBlock = new Date('2020-01-01T00:00:00.000Z');
+
+      const getCachedBlockSpy = jest
+        .spyOn(service as unknown as { getCachedBlock: jest.Mock }, 'getCachedBlock')
+        .mockResolvedValue({
+          blockNumber: source.startBlock,
+          timestamp: Math.floor(Date.now() / 1000) + 2 * 86_400,
+          hash: '0x',
+        });
+
+      const findBlockByTimestampSpy = jest.spyOn(
+        service as unknown as { findBlockByTimestamp: jest.Mock },
+        'findBlockByTimestamp',
+      );
+
+      await service.saveReserves(source, Algorithm.COMET, olderThanStartBlock);
+
+      expect(findLatestReserveBySource).not.toHaveBeenCalled();
+      expect(findBlockByTimestampSpy).not.toHaveBeenCalled();
+      expect(getCachedBlockSpy).toHaveBeenCalledWith('eth', expect.anything(), source.startBlock);
+    });
+
+    it('caps start block to source.endBlock when startDate resolves to a higher block', async () => {
+      const { service, findLatestReserveBySource } = makeDeps();
+      const source = makeSource({ id: 31, startBlock: 1_000, endBlock: 5_555 });
+      const startDate = new Date('2030-01-01T00:00:00.000Z');
+
+      const getCachedBlockSpy = jest
+        .spyOn(service as unknown as { getCachedBlock: jest.Mock }, 'getCachedBlock')
+        .mockResolvedValue({
+          blockNumber: source.endBlock as number,
+          timestamp: Math.floor(Date.now() / 1000) + 2 * 86_400,
+          hash: '0x',
+        });
+
+      const findBlockByTimestampSpy = jest
+        .spyOn(service as unknown as { findBlockByTimestamp: jest.Mock }, 'findBlockByTimestamp')
+        .mockResolvedValue(9_999);
+
+      await service.saveReserves(source, Algorithm.COMET, startDate);
+
+      expect(findLatestReserveBySource).not.toHaveBeenCalled();
+      expect(findBlockByTimestampSpy).toHaveBeenCalledTimes(1);
+      expect(getCachedBlockSpy).toHaveBeenCalledWith('eth', expect.anything(), source.endBlock);
+    });
+
+    it('returns early when firstMidnightUTC is greater than todayMidnightUTC', async () => {
+      const { service, findLatestReserveBySource, historyService, priceService, mailService } =
+        makeDeps();
+      const source = makeSource({ id: 32, startBlock: 7_000 });
+      findLatestReserveBySource.mockResolvedValue({ blockNumber: 7_000 });
+
+      jest
+        .spyOn(service as unknown as { getCachedBlock: jest.Mock }, 'getCachedBlock')
+        .mockResolvedValue({
+          blockNumber: 7_000,
+          timestamp: Math.floor(Date.now() / 1000) + 2 * 86_400,
+          hash: '0x',
+        });
+
+      await service.saveReserves(source, Algorithm.COMET);
+
+      expect(findLatestReserveBySource).toHaveBeenCalledWith(source);
+      expect(historyService.createReservesWithSource).not.toHaveBeenCalled();
+      expect(priceService.getHistoricalPrice).not.toHaveBeenCalled();
+      expect(mailService.notifyGetHistoryError).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('getHistory', () => {
+    it('dispatches COMET_STATS to saveStats and unknown algorithm to saveReserves', async () => {
+      const { service } = makeDeps();
+      const source = makeSource({ id: 40, startBlock: 1_000 });
+      source.algorithm = [Algorithm.COMET_STATS, 'custom-algorithm'];
+
+      const saveStatsSpy = jest.spyOn(service, 'saveStats').mockResolvedValue(undefined);
+      const saveReservesSpy = jest.spyOn(service, 'saveReserves').mockResolvedValue(undefined);
+
+      await service.getHistory(source);
+
+      expect(saveStatsSpy).toHaveBeenCalledTimes(1);
+      expect(saveStatsSpy).toHaveBeenCalledWith(source, Algorithm.COMET_STATS);
+      expect(saveReservesSpy).toHaveBeenCalledTimes(1);
+      expect(saveReservesSpy).toHaveBeenCalledWith(source, 'custom-algorithm');
+    });
+  });
+
+  describe('onModuleInit', () => {
+    it('initializes redis by pinging on startup', async () => {
+      const { service, redisClient } = makeDeps();
+
+      await service.onModuleInit();
+
+      expect(redisClient.ping).toHaveBeenCalledTimes(1);
     });
   });
 });
