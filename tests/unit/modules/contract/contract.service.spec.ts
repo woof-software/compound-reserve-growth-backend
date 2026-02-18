@@ -73,6 +73,7 @@ describe('ContractService', () => {
       priceService,
       mailService,
       redisClient,
+      provider,
     };
   };
 
@@ -193,6 +194,71 @@ describe('ContractService', () => {
       expect(historyService.createReservesWithSource).not.toHaveBeenCalled();
       expect(priceService.getHistoricalPrice).not.toHaveBeenCalled();
       expect(mailService.notifyGetHistoryError).not.toHaveBeenCalled();
+    });
+
+    it('stops daily processing after reaching endBlock and does not write duplicate future-day rows', async () => {
+      const { service, findLatestReserveBySource, historyService, priceService, provider } =
+        makeDeps();
+      const source = makeSource({ id: 33, startBlock: 1_000, endBlock: 100 });
+      source.asset.symbol = 'ETH';
+
+      findLatestReserveBySource.mockResolvedValue({ blockNumber: 90 });
+      (provider as { getBalance?: jest.Mock }).getBalance = jest
+        .fn()
+        .mockResolvedValue(1_000_000_000_000_000_000n);
+      priceService.getHistoricalPrice.mockResolvedValue(1);
+
+      jest
+        .spyOn(service as unknown as { getCachedBlock: jest.Mock }, 'getCachedBlock')
+        .mockResolvedValue({
+          blockNumber: 90,
+          timestamp: Math.floor(Date.now() / 1000) - 3 * 86_400,
+          hash: '0x',
+        });
+
+      const findBlockByTimestampSpy = jest
+        .spyOn(service as unknown as { findBlockByTimestamp: jest.Mock }, 'findBlockByTimestamp')
+        .mockResolvedValueOnce(95)
+        .mockResolvedValueOnce(120)
+        .mockResolvedValue(130);
+
+      await service.saveReserves(source, Algorithm.ETH_WALLET);
+
+      expect(findBlockByTimestampSpy).toHaveBeenCalledTimes(2);
+      expect(historyService.createReservesWithSource).toHaveBeenCalledTimes(2);
+
+      const firstReserve = historyService.createReservesWithSource.mock.calls[0][0] as {
+        blockNumber: number;
+      };
+      const secondReserve = historyService.createReservesWithSource.mock.calls[1][0] as {
+        blockNumber: number;
+      };
+
+      expect(firstReserve.blockNumber).toBe(95);
+      expect(secondReserve.blockNumber).toBe(100);
+    });
+
+    it('returns early when latest stored block already reached source.endBlock', async () => {
+      const { service, findLatestReserveBySource, historyService, priceService } = makeDeps();
+      const source = makeSource({ id: 34, startBlock: 1_000, endBlock: 10_000 });
+
+      findLatestReserveBySource.mockResolvedValue({ blockNumber: 10_000 });
+
+      const getCachedBlockSpy = jest.spyOn(
+        service as unknown as { getCachedBlock: jest.Mock },
+        'getCachedBlock',
+      );
+      const findBlockByTimestampSpy = jest.spyOn(
+        service as unknown as { findBlockByTimestamp: jest.Mock },
+        'findBlockByTimestamp',
+      );
+
+      await service.saveReserves(source, Algorithm.COMET);
+
+      expect(getCachedBlockSpy).not.toHaveBeenCalled();
+      expect(findBlockByTimestampSpy).not.toHaveBeenCalled();
+      expect(historyService.createReservesWithSource).not.toHaveBeenCalled();
+      expect(priceService.getHistoricalPrice).not.toHaveBeenCalled();
     });
   });
 
