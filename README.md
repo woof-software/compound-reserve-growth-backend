@@ -194,9 +194,8 @@ Assets and sources are created or updated from the remote JSON; manual changes c
              |                     - **Fallback:** ERC-20 balance / native ETH
              v
 +----------------------------+   4. Fetch USD price (PriceService -> CoinGecko)
-| HistoryService.create      |-+-> Persist reserves row (blockNumber, qty, price, value)
-+----------------------------+ |
-                               +-> Update source.checkedAt
+| HistoryService.create      |---> Persist reserve row (block, qty, price, value)
++----------------------------+
 
 Resilience features:
 - **Redis block cache** (30 days) to avoid duplicate RPC calls.
