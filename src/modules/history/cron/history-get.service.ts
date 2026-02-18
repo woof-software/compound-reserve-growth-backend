@@ -39,12 +39,12 @@ export class GetHistoryService {
     processFunction: () => Promise<T>,
   ): Promise<T | void> {
     if (this.isProcessRunning()) {
-      this.logger.warn(`❌ ${processName} cannot start: another process is already running`);
+      this.logger.warn(`${processName} cannot start: another process is already running`);
       return;
     }
 
     this.isProcessing = true;
-    this.logger.log(`🔒 Starting ${processName}...`);
+    this.logger.log(`Starting ${processName}...`);
 
     try {
       return await processFunction();
@@ -52,7 +52,7 @@ export class GetHistoryService {
       this.logger.error(`An error occurred in ${processName}:`, error);
     } finally {
       this.isProcessing = false;
-      this.logger.log(`🔓 Completed ${processName}`);
+      this.logger.log(`Completed ${processName}`);
     }
   }
 

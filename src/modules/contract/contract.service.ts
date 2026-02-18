@@ -694,7 +694,7 @@ export class ContractService implements OnModuleInit {
             }
           } catch (e: any) {
             if (e.code === 'CALL_EXCEPTION') {
-              const message = `Skip ${new Date(targetTs * SEC_IN_MS).toISOString().slice(0, 10)} block number ${blockTag} — reserves unavailable for contract ${contractAddress} at network ${network}, algorithm ${algorithm}, asset ${asset.symbol}`;
+              const message = `Skip ${new Date(targetTs * SEC_IN_MS).toISOString().slice(0, 10)} block number ${blockTag} - reserves unavailable for contract ${contractAddress} at network ${network}, algorithm ${algorithm}, asset ${asset.symbol}`;
               this.logger.warn(message);
               lastBlock = blockTag;
               skippedCount++;
@@ -932,7 +932,7 @@ export class ContractService implements OnModuleInit {
             }
           } catch (e: any) {
             if (e.code === 'CALL_EXCEPTION') {
-              const message = `Skip ${new Date(targetTs * SEC_IN_MS).toISOString().slice(0, 10)} block number ${blockTag} — reserves unavailable for contract ${contractAddress} at network ${network}, algorithm ${algorithm}, asset ${asset.symbol}`;
+              const message = `Skip ${new Date(targetTs * SEC_IN_MS).toISOString().slice(0, 10)} block number ${blockTag} - reserves unavailable for contract ${contractAddress} at network ${network}, algorithm ${algorithm}, asset ${asset.symbol}`;
               this.logger.warn(message);
               lastBlock = blockTag;
               skippedCount++;
