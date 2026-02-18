@@ -125,6 +125,7 @@ export class SourcesUpdateService {
         remote.type ?? undefined,
       );
       asset.id = remote.id;
+      remoteIdToAsset.set(remote.id, asset);
       inserts.push({ remoteId: remote.id, asset });
     }
 

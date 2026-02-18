@@ -183,7 +183,7 @@ describe('SourcesUpdateService', () => {
           startBlock: 15,
           endBlock: null,
           chainId: 1,
-          assetId: 1,
+          assetId: 3,
           type: 'treasury',
         },
       ],
@@ -218,6 +218,11 @@ describe('SourcesUpdateService', () => {
     expect(syncRepo.saveSources).toHaveBeenCalledTimes(2);
     expect(syncRepo.deleteSourcesByIds).toHaveBeenCalledWith([202], expect.anything());
     expect(syncRepo.deleteAssetsByIds).toHaveBeenCalledWith([102], expect.anything());
+
+    const insertedSources = syncRepo.saveSources.mock.calls[0][0] as SourceEntity[];
+    expect(insertedSources).toHaveLength(1);
+    expect(insertedSources[0].id).toBe(11);
+    expect(insertedSources[0].asset.id).toBe(3);
 
     const updatedSources = syncRepo.saveSources.mock.calls[1][0] as SourceEntity[];
     expect(updatedSources[0].id).toBe(10);
