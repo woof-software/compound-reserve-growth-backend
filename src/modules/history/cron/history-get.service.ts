@@ -7,7 +7,6 @@ import { StartCollectionResponse } from 'modules/admin/response';
 import { IncomesRepository } from 'modules/history/incomes-repository.service';
 import { SpendsRepository } from 'modules/history/spends-repository.service';
 import { ReservesRepository } from 'modules/history/reserves-repository.service';
-import { SourceEntity } from 'modules/source/source.entity';
 
 import { Algorithm } from 'common/enum/algorithm.enum';
 
@@ -57,66 +56,6 @@ export class GetHistoryService {
     }
   }
 
-  /**
-   * Updates startBlock for sources with reserves algorithms
-   * @param sources - Array of sources to update
-   * @param startDate - Optional date to start from. If not provided, uses contract creation block
-   * @returns Array of sources that were successfully updated (excluding those that failed or had no changes)
-   */
-  private async updateSourcesBlockNumber(
-    sources: SourceEntity[],
-    startDate: Date,
-  ): Promise<SourceEntity[]> {
-    this.logger.log(`Updating startBlock for ${sources.length} sources...`);
-
-    let successCount = 0;
-    let failureCount = 0;
-    const successfullyUpdatedSources: SourceEntity[] = [];
-
-    // Process sources sequentially to avoid RPC batch limit errors
-    for (const source of sources) {
-      try {
-        this.logger.log(`Processing source ${source.id} (${source.address})...`);
-        const newBlockNumber = await this.contractService.getSourceBlockNumber(source, startDate);
-
-        if (newBlockNumber === source.startBlock) {
-          this.logger.log(
-            `Source ${source.id} already has correct start block ${newBlockNumber}, skipping update`,
-          );
-          successCount++;
-          continue;
-        }
-
-        await this.sourceService.updateWithSource({
-          source,
-          startBlock: newBlockNumber,
-          checkedAt: new Date(),
-        });
-
-        successfullyUpdatedSources.push(source);
-        successCount++;
-        this.logger.log(
-          `Successfully updated source ${source.id} to start block ${newBlockNumber}`,
-        );
-      } catch (error) {
-        failureCount++;
-        this.logger.error(
-          `Failed to update startBlock for source ${source.id} (${source.address}): ${error.message}`,
-        );
-        // Continue processing other sources instead of stopping the entire process
-      }
-    }
-
-    this.logger.log(
-      `StartBlock update completed: ${successCount} successful, ${failureCount} failed out of ${sources.length} sources`,
-    );
-    this.logger.log(
-      `Successfully updated ${successfullyUpdatedSources.length} sources that will have their reserves cleared`,
-    );
-
-    return successfullyUpdatedSources;
-  }
-
   async getHistory() {
     return this.executeWithLock('Daily History Sync', async () => {
       this.logger.log('Starting to get history data...');
@@ -157,23 +96,10 @@ export class GetHistoryService {
       this.logger.log(`Found ${dbSources.length} sources for reserves processing`);
 
       if (collectionSwitch?.clearData) {
-        const successfullyUpdatedSources = await this.updateSourcesBlockNumber(
-          dbSources,
-          collectionSwitch.data,
-        );
-
-        if (successfullyUpdatedSources.length > 0) {
-          this.logger.log(
-            `Clearing reserves for ${successfullyUpdatedSources.length} successfully updated sources...`,
-          );
-          const sourceIds = successfullyUpdatedSources.map((source) => source.id);
-          await this.reservesRepository.deleteBySourceIds(sourceIds);
-          this.logger.log(
-            `Reserves cleared successfully for ${successfullyUpdatedSources.length} sources.`,
-          );
-        } else {
-          this.logger.log('No sources were successfully updated, skipping reserves cleanup.');
-        }
+        const sourceIds = dbSources.map((s) => s.id);
+        this.logger.log(`Clearing reserves for ${sourceIds.length} sources...`);
+        await this.reservesRepository.deleteBySourceIds(sourceIds);
+        this.logger.log('Reserves cleared successfully.');
       }
 
       for (const source of dbSources) {

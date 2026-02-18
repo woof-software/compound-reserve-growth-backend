@@ -9,7 +9,6 @@ import { REDIS_CLIENT } from 'modules/redis/redis.module';
 import { ProviderFactory } from 'modules/network/provider.factory';
 import { HistoryService } from 'modules/history/history.service';
 import { SourceEntity } from 'modules/source/source.entity';
-import { SourceService } from 'modules/source/source.service';
 import { PriceService } from 'modules/price/price.service';
 import { MailService } from 'modules/mail/mail.service';
 import { STABLECOIN_PRICES } from 'modules/price/constants';
@@ -93,7 +92,6 @@ export class ContractService implements OnModuleInit {
     @Inject(REDIS_CLIENT) private readonly redisClient: Redis,
     private readonly providerFactory: ProviderFactory,
     private readonly historyService: HistoryService,
-    private readonly sourceService: SourceService,
     private readonly priceService: PriceService,
     private readonly algorithmService: AlgorithmService,
     private readonly mailService: MailService,
@@ -175,45 +173,6 @@ export class ContractService implements OnModuleInit {
     } catch (error) {
       this.logger.error(`Error finding creation block for ${contractAddress}:`, error);
       throw error;
-    }
-  }
-
-  /**
-   * Gets the appropriate block number for a source based on date or creation block
-   * @param source - Source entity
-   * @param startDate - Optional date to start from
-   * @returns Block number to start from
-   */
-  async getSourceBlockNumber(source: SourceEntity, startDate?: Date): Promise<number> {
-    try {
-      if (startDate) {
-        const provider = this.providerFactory.get(source.network);
-
-        // Get contract creation block to compare with provided date
-        const creationBlock = await this.getContractCreationBlock(source.address, source.network);
-        const creationBlockData = await this.getCachedBlock(
-          source.network,
-          provider,
-          creationBlock,
-        );
-        const creationTimestamp = creationBlockData.timestamp;
-        const providedTimestamp = Math.floor(startDate.getTime() / 1000);
-
-        const targetTimestamp = Math.max(creationTimestamp, providedTimestamp);
-
-        if (providedTimestamp < creationTimestamp) {
-          return creationBlock;
-        } else {
-          return this.findBlockByTimestamp(source.network, provider, targetTimestamp);
-        }
-      } else {
-        return this.getContractCreationBlock(source.address, source.network);
-      }
-    } catch (error) {
-      this.logger.warn(
-        `Failed to get block number for source ${source.id} (${source.address}): ${error.message}. Using current start block ${source.startBlock} as fallback.`,
-      );
-      return source.startBlock;
     }
   }
 
@@ -618,7 +577,8 @@ export class ContractService implements OnModuleInit {
     try {
       const provider = this.providerFactory.get(network);
 
-      let lastBlock = source.startBlock;
+      const latestReserve = await this.historyService.findLatestReserveBySource(source);
+      let lastBlock = latestReserve?.blockNumber ?? source.startBlock;
       const startBlockData = await this.getCachedBlock(network, provider, lastBlock);
       const startTs = startBlockData.timestamp;
 
@@ -627,14 +587,6 @@ export class ContractService implements OnModuleInit {
       // Check if we have any days to process
       if (firstMidnightUTC > todayMidnightUTC) {
         this.logger.log(`No historical data needed - source is already up to date`);
-
-        // Update the source with current timestamp
-        await this.sourceService.updateWithSource({
-          source,
-          startBlock: lastBlock,
-          checkedAt: new Date(),
-        });
-
         return;
       }
 
@@ -753,12 +705,6 @@ export class ContractService implements OnModuleInit {
 
           await this.historyService.createReservesWithSource(newHistory);
 
-          await this.sourceService.updateWithSource({
-            source,
-            startBlock: blockTag,
-            checkedAt: new Date(),
-          });
-
           lastBlock = blockTag;
           processedCount++;
 
@@ -860,13 +806,13 @@ export class ContractService implements OnModuleInit {
             );
             lastBlock = Math.max(creationBlock, 0);
             this.logger.log(
-              `No previous liquidation events. Starting scan from creation block ${lastBlock} for ${source.address} on ${source.network}`,
+              `No previous stats events. Starting scan from creation block ${lastBlock} for ${source.address} on ${source.network}`,
             );
           } catch (e: any) {
             this.logger.warn(
-              `Failed to determine creation block for ${source.address} on ${source.network}: ${e?.message}. Fallback to source.startBlock=${lastBlock}`,
+              `Failed to determine creation block for ${source.address} on ${source.network}: ${e?.message}. Using source.startBlock as fallback.`,
             );
-            return;
+            lastBlock = source.startBlock;
           }
         }
       }

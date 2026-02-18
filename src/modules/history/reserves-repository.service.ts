@@ -34,6 +34,14 @@ export class ReservesRepository {
     });
   }
 
+  async findLatestBySourceId(sourceId: number): Promise<Reserve | null> {
+    return this.reservesRepository.findOne({
+      where: { source: { id: sourceId } },
+      relations: { source: true },
+      order: { blockNumber: 'DESC' },
+    });
+  }
+
   async getTreasuryReserves(): Promise<Reserve[]> {
     return this.reservesRepository.find({
       relations: { source: { asset: true } },

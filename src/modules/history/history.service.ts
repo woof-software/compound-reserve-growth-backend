@@ -75,6 +75,10 @@ export class HistoryService {
     return this.spendsRepo.findBySourceId(source.id);
   }
 
+  async findLatestReserveBySource(source: SourceEntity): Promise<Reserve | null> {
+    return this.reservesRepo.findLatestBySourceId(source.id);
+  }
+
   async getTreasuryHistory(): Promise<Reserve[]> {
     const reserves = await this.reservesRepo.getTreasuryReserves();
     if (!reserves || reserves.length === 0) {
