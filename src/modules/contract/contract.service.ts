@@ -761,22 +761,25 @@ export class ContractService implements OnModuleInit {
 
       if (data) {
         try {
-          // Get contract creation block to compare with provided date
-          const creationBlock = await this.getContractCreationBlock(source.address, source.network);
-          const creationBlockData = await this.getCachedBlock(network, provider, creationBlock);
-          const creationTimestamp = creationBlockData.timestamp;
+          const startBlockData = await this.getCachedBlock(network, provider, source.startBlock);
+          const startBlockTimestamp = startBlockData.timestamp;
           const providedTimestamp = Math.floor(data.getTime() / 1000);
 
-          // Use the later of creation block or provided date
-          const targetTimestamp = Math.max(creationTimestamp, providedTimestamp);
+          const targetTimestamp = Math.max(startBlockTimestamp, providedTimestamp);
 
-          if (providedTimestamp < creationTimestamp) {
+          if (providedTimestamp < startBlockTimestamp) {
             this.logger.log(
-              `Provided date ${data.toISOString()} is older than contract creation. Using creation block ${creationBlock} instead for ${source.address} on ${source.network}`,
+              `Provided date ${data.toISOString()} is older than source.startBlock. Using startBlock ${source.startBlock} for ${source.address} on ${source.network}`,
             );
-            lastBlock = creationBlock;
+            lastBlock = source.startBlock;
           } else {
             lastBlock = await this.findBlockByTimestamp(network, provider, targetTimestamp);
+            if (source.endBlock != null && lastBlock > source.endBlock) {
+              lastBlock = source.endBlock;
+              this.logger.log(
+                `Capped to source.endBlock=${lastBlock} for ${source.address} on ${source.network}`,
+              );
+            }
             this.logger.log(
               `Using provided date ${data.toISOString()} to start from block ${lastBlock} for ${source.address} on ${source.network}`,
             );
@@ -798,22 +801,10 @@ export class ContractService implements OnModuleInit {
           lastBlock = spends.blockNumber;
         }
         if (!lastBlock) {
-          try {
-            // Start from the contract creation block if we have no prior events
-            const creationBlock = await this.getContractCreationBlock(
-              source.address,
-              source.network,
-            );
-            lastBlock = Math.max(creationBlock, 0);
-            this.logger.log(
-              `No previous stats events. Starting scan from creation block ${lastBlock} for ${source.address} on ${source.network}`,
-            );
-          } catch (e: any) {
-            this.logger.warn(
-              `Failed to determine creation block for ${source.address} on ${source.network}: ${e?.message}. Using source.startBlock as fallback.`,
-            );
-            lastBlock = source.startBlock;
-          }
+          lastBlock = source.startBlock;
+          this.logger.log(
+            `No previous stats events. Starting scan from source.startBlock=${lastBlock} for ${source.address} on ${source.network}`,
+          );
         }
       }
 
