@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import axios from 'axios';
 import { EntityManager, QueryFailedError } from 'typeorm';
@@ -45,12 +45,12 @@ export class SourcesUpdateService {
       await this.syncRepo.inTransaction(async (manager) => {
         const dbState = await this.loadDbSyncState(manager);
         const assetPlan = this.prepareAssetSyncPlan(remoteAssets, dbState.assetById);
-        await this.persistAssetUpserts(assetPlan, dbState.assetById, manager);
         const sourcePlan = this.prepareSourceSyncPlan(
           remoteSources,
           assetPlan.remoteIdToAsset,
           dbState.sourceById,
         );
+        await this.persistAssetUpserts(assetPlan, dbState.assetById, manager);
         await this.persistSourceChanges(sourcePlan, manager);
         await this.persistAssetDeletes(assetPlan, manager);
       });
@@ -98,11 +98,12 @@ export class SourcesUpdateService {
     const updates: AssetEntity[] = [];
     const seenRemoteIds = new Set<number>();
     const existingAssetById = new Map<number, AssetEntity>(assetById);
+    const validationErrors: string[] = [];
 
     for (const remote of remoteAssets) {
       const network = this.resolveNetwork(remote.chainId);
       if (!network) {
-        this.logger.warn(`Unknown chainId for asset ${remote.id}: ${remote.chainId}`);
+        validationErrors.push(`Asset id=${remote.id}: unknown chainId ${remote.chainId}`);
         continue;
       }
 
@@ -130,6 +131,12 @@ export class SourcesUpdateService {
     const deletes = Array.from(existingAssetById.entries())
       .filter(([id]) => !seenRemoteIds.has(id))
       .map(([, asset]) => asset);
+
+    if (validationErrors.length > 0) {
+      throw new BadRequestException(
+        `Sources update aborted: ${validationErrors.length} asset validation error(s). No changes applied. ${validationErrors.join('; ')}`,
+      );
+    }
 
     return { remoteIdToAsset, inserts, updates, deletes };
   }
@@ -184,24 +191,25 @@ export class SourcesUpdateService {
     const updates: SourceEntity[] = [];
     const seenRemoteIds = new Set<number>();
     const existingSourceById = new Map<number, SourceEntity>(sourceById);
+    const validationErrors: string[] = [];
 
     for (const remote of remoteSources) {
       const asset = remoteIdToAsset.get(remote.assetId);
       if (!asset) {
-        this.logger.warn(
-          `Skipping source id=${remote.id}: asset not found for assetId=${remote.assetId}`,
+        validationErrors.push(
+          `Source id=${remote.id}: asset not found for assetId=${remote.assetId}`,
         );
         continue;
       }
 
       const network = this.resolveNetwork(remote.chainId);
       if (!network) {
-        this.logger.warn(`Unknown chainId for source ${remote.id}: ${remote.chainId}`);
+        validationErrors.push(`Source id=${remote.id}: unknown chainId ${remote.chainId}`);
         continue;
       }
 
       if (!remote.type) {
-        this.logger.warn(`Missing type for source ${remote.id}`);
+        validationErrors.push(`Source id=${remote.id}: missing type`);
         continue;
       }
 
@@ -235,6 +243,12 @@ export class SourcesUpdateService {
     const deletes = Array.from(existingSourceById.entries())
       .filter(([id]) => !seenRemoteIds.has(id))
       .map(([, source]) => source);
+
+    if (validationErrors.length > 0) {
+      throw new BadRequestException(
+        `Sources update aborted: ${validationErrors.length} source validation error(s). No changes applied. ${validationErrors.join('; ')}`,
+      );
+    }
 
     return { inserts, updates, deletes };
   }
