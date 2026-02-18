@@ -183,7 +183,7 @@ describe('SourcesUpdateService', () => {
           startBlock: 15,
           endBlock: null,
           chainId: 1,
-          assetId: 3,
+          assetId: 1,
           type: 'treasury',
         },
       ],
@@ -315,7 +315,7 @@ describe('SourcesUpdateService', () => {
     await expect(service.run()).rejects.toThrow('reserveSources config is missing');
   });
 
-  it('skips invalid remote records and deletes stale db rows', async () => {
+  it('fails fast on invalid remote records and does not delete stale db rows', async () => {
     const { service, syncRepo, validationService, config } = makeDeps();
 
     mockedAxios.create.mockReturnValue({
@@ -405,12 +405,14 @@ describe('SourcesUpdateService', () => {
     syncRepo.deleteSourcesByIds.mockResolvedValue(undefined);
     syncRepo.deleteAssetsByIds.mockResolvedValue(undefined);
 
-    await service.run();
+    await expect(service.run()).rejects.toThrow(
+      'Sources update aborted: 1 asset validation error(s). No changes applied. Asset id=1: unknown chainId 999',
+    );
 
-    expect(syncRepo.saveAssets).toHaveBeenCalledTimes(1);
+    expect(syncRepo.saveAssets).not.toHaveBeenCalled();
     expect(syncRepo.saveSources).not.toHaveBeenCalled();
-    expect(syncRepo.deleteSourcesByIds).toHaveBeenCalledWith([202], expect.anything());
-    expect(syncRepo.deleteAssetsByIds).toHaveBeenCalledWith([102], expect.anything());
+    expect(syncRepo.deleteSourcesByIds).not.toHaveBeenCalled();
+    expect(syncRepo.deleteAssetsByIds).not.toHaveBeenCalled();
   });
 
   it('applyRemoteToAsset updates all mutable asset fields and reports change', () => {
