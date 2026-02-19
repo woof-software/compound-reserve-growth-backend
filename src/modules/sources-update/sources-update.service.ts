@@ -79,8 +79,8 @@ export class SourcesUpdateService {
 
   private async loadDbSyncState(manager: EntityManager): Promise<DbSyncState> {
     const [dbAssets, dbSources] = await Promise.all([
-      this.syncRepo.listAllAssets(manager),
-      this.syncRepo.listAllSources(manager),
+      this.syncRepo.listAllAssetsIncludingDeleted(manager),
+      this.syncRepo.listAllSourcesIncludingDeleted(manager),
     ]);
 
     return {
@@ -111,8 +111,14 @@ export class SourcesUpdateService {
       const existing = assetById.get(remote.id);
 
       if (existing) {
+        const wasSoftDeleted = existing.deletedAt != null;
+        if (wasSoftDeleted) {
+          existing.deletedAt = null;
+        }
         const changed = this.applyRemoteToAsset(existing, remote);
-        if (changed) updates.push(existing);
+        if (changed || wasSoftDeleted) {
+          updates.push(existing);
+        }
         remoteIdToAsset.set(remote.id, existing);
         continue;
       }
@@ -131,7 +137,8 @@ export class SourcesUpdateService {
 
     const deletes = Array.from(existingAssetById.entries())
       .filter(([id]) => !seenRemoteIds.has(id))
-      .map(([, asset]) => asset);
+      .map(([, asset]) => asset)
+      .filter((a) => a.deletedAt == null);
 
     if (validationErrors.length > 0) {
       throw new BadRequestException(
@@ -177,10 +184,10 @@ export class SourcesUpdateService {
       .filter((id): id is number => typeof id === 'number');
 
     this.logger.warn(
-      `Deleting ${idsToDelete.length} stale asset(s): ${this.formatAssetBatchLog(assetPlan.deletes)}`,
+      `Soft-deleting ${idsToDelete.length} stale asset(s): ${this.formatAssetBatchLog(assetPlan.deletes)}`,
     );
     await this.syncRepo.deleteAssetsByIds(idsToDelete, manager);
-    this.logger.warn(`Deleted ${idsToDelete.length} stale asset(s)`);
+    this.logger.warn(`Soft-deleted ${idsToDelete.length} stale asset(s)`);
   }
 
   private prepareSourceSyncPlan(
@@ -218,8 +225,12 @@ export class SourcesUpdateService {
       const existingSource = sourceById.get(remote.id);
 
       if (existingSource) {
+        const wasSoftDeleted = existingSource.deletedAt != null;
+        if (wasSoftDeleted) {
+          existingSource.deletedAt = null;
+        }
         const changed = this.applyRemoteToSource(existingSource, remote, asset);
-        if (changed) {
+        if (changed || wasSoftDeleted) {
           existingSource.checkedAt = new Date();
           updates.push(existingSource);
         }
@@ -243,7 +254,8 @@ export class SourcesUpdateService {
 
     const deletes = Array.from(existingSourceById.entries())
       .filter(([id]) => !seenRemoteIds.has(id))
-      .map(([, source]) => source);
+      .map(([, source]) => source)
+      .filter((s) => s.deletedAt == null);
 
     if (validationErrors.length > 0) {
       throw new BadRequestException(
