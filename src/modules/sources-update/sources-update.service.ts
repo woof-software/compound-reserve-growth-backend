@@ -289,10 +289,10 @@ export class SourcesUpdateService {
         .filter((id): id is number => typeof id === 'number');
 
       this.logger.warn(
-        `Deleting ${idsToDelete.length} stale source(s): ${this.formatSourceBatchLog(sourcePlan.deletes)}`,
+        `Soft-deleting ${idsToDelete.length} stale source(s): ${this.formatSourceBatchLog(sourcePlan.deletes)}`,
       );
       await this.syncRepo.deleteSourcesByIds(idsToDelete, manager);
-      this.logger.warn(`Deleted ${idsToDelete.length} stale source(s)`);
+      this.logger.warn(`Soft-deleted ${idsToDelete.length} stale source(s)`);
     }
   }
 
