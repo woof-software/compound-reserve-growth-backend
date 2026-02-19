@@ -31,8 +31,8 @@ export class ReservesRepository {
     return this.reservesRepository
       .createQueryBuilder('reserves')
       .leftJoinAndSelect('reserves.source', 'source')
-      .where('reserves.id = :id', { id })
-      .andWhere('source.deletedAt IS NULL')
+      .where('source.deletedAt IS NULL')
+      .andWhere('reserves.id = :id', { id })
       .getOne();
   }
 
@@ -40,8 +40,8 @@ export class ReservesRepository {
     return this.reservesRepository
       .createQueryBuilder('reserves')
       .leftJoinAndSelect('reserves.source', 'source')
-      .where('source.id = :sourceId', { sourceId })
-      .andWhere('source.deletedAt IS NULL')
+      .where('source.deletedAt IS NULL')
+      .andWhere('source.id = :sourceId', { sourceId })
       .orderBy('reserves.blockNumber', 'DESC')
       .getOne();
   }

@@ -23,8 +23,8 @@ export class IncomesRepository {
     return this.incomesRepository
       .createQueryBuilder('incomes')
       .leftJoinAndSelect('incomes.source', 'source')
-      .where('incomes.id = :id', { id })
-      .andWhere('source.deletedAt IS NULL')
+      .where('source.deletedAt IS NULL')
+      .andWhere('incomes.id = :id', { id })
       .getOne();
   }
 
@@ -32,8 +32,8 @@ export class IncomesRepository {
     return this.incomesRepository
       .createQueryBuilder('incomes')
       .leftJoinAndSelect('incomes.source', 'source')
-      .where('source.id = :sourceId', { sourceId })
-      .andWhere('source.deletedAt IS NULL')
+      .where('source.deletedAt IS NULL')
+      .andWhere('source.id = :sourceId', { sourceId })
       .orderBy('incomes.blockNumber', 'DESC')
       .getOne();
   }
