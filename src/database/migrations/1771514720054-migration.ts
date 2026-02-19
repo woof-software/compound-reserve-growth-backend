@@ -1,7 +1,7 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
-export class SourceStartBlockEndBlock1760000000000 implements MigrationInterface {
-  name = 'SourceStartBlockEndBlock1760000000000';
+export class SourceStartBlockEndBlockDeletedAt1771514720054 implements MigrationInterface {
+  name = 'SourceStartBlockEndBlockDeletedAt1771514720054';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(`ALTER TABLE "source" RENAME COLUMN "blockNumber" TO "startBlock"`);
