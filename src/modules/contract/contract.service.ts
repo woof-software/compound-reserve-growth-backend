@@ -665,19 +665,6 @@ export class ContractService implements OnModuleInit {
 
       let processedCount = 0;
       let skippedCount = 0;
-      let isEndBlockStopLogged = false;
-      const shouldStopAtEndBlock = (blockNumber: number): boolean => {
-        if (source.endBlock == null || blockNumber < source.endBlock) {
-          return false;
-        }
-        if (!isEndBlockStopLogged) {
-          this.logger.log(
-            `Reached endBlock ${source.endBlock} for source ${source.id}. Stopping processing.`,
-          );
-          isEndBlockStopLogged = true;
-        }
-        return true;
-      };
 
       const ABI = algorithm === Algorithm.COMET ? CometABI : MarketV2ABI;
 
@@ -718,7 +705,10 @@ export class ContractService implements OnModuleInit {
               lastBlock = blockTag;
               skippedCount++;
               await this.mailService.notifyGetHistoryError(message);
-              if (shouldStopAtEndBlock(blockTag)) {
+              if (source.endBlock != null && blockTag >= source.endBlock) {
+                this.logger.log(
+                  `Reached endBlock ${source.endBlock} for source ${source.id}. Stopping processing.`,
+                );
                 break;
               }
               continue;
@@ -757,7 +747,10 @@ export class ContractService implements OnModuleInit {
             this.logger.warn(`Invalid value: ${value}, skipping`);
             lastBlock = blockTag;
             skippedCount++;
-            if (shouldStopAtEndBlock(blockTag)) {
+            if (source.endBlock != null && blockTag >= source.endBlock) {
+              this.logger.log(
+                `Reached endBlock ${source.endBlock} for source ${source.id}. Stopping processing.`,
+              );
               break;
             }
             continue;
@@ -780,7 +773,10 @@ export class ContractService implements OnModuleInit {
 
           lastBlock = blockTag;
           processedCount++;
-          if (shouldStopAtEndBlock(blockTag)) {
+          if (source.endBlock != null && blockTag >= source.endBlock) {
+            this.logger.log(
+              `Reached endBlock ${source.endBlock} for source ${source.id}. Stopping processing.`,
+            );
             break;
           }
 
@@ -804,7 +800,10 @@ export class ContractService implements OnModuleInit {
             lastBlock = lastBlock + (networkConf?.blocksPerDay || 43200);
           }
           skippedCount++;
-          if (shouldStopAtEndBlock(lastBlock)) {
+          if (source.endBlock != null && lastBlock >= source.endBlock) {
+            this.logger.log(
+              `Reached endBlock ${source.endBlock} for source ${source.id}. Stopping processing.`,
+            );
             break;
           }
           continue;
