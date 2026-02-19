@@ -28,25 +28,32 @@ export class ReservesRepository {
   }
 
   async findById(id: number): Promise<ReserveEntity> {
-    return this.reservesRepository.findOne({
-      where: { id },
-      relations: { source: true },
-    });
+    return this.reservesRepository
+      .createQueryBuilder('reserves')
+      .leftJoinAndSelect('reserves.source', 'source')
+      .where('reserves.id = :id', { id })
+      .andWhere('source.deletedAt IS NULL')
+      .getOne();
   }
 
   async findLatestBySourceId(sourceId: number): Promise<ReserveEntity | null> {
-    return this.reservesRepository.findOne({
-      where: { source: { id: sourceId } },
-      relations: { source: true },
-      order: { blockNumber: 'DESC' },
-    });
+    return this.reservesRepository
+      .createQueryBuilder('reserves')
+      .leftJoinAndSelect('reserves.source', 'source')
+      .where('source.id = :sourceId', { sourceId })
+      .andWhere('source.deletedAt IS NULL')
+      .orderBy('reserves.blockNumber', 'DESC')
+      .getOne();
   }
 
   async getTreasuryReserves(): Promise<ReserveEntity[]> {
-    return this.reservesRepository.find({
-      relations: { source: { asset: true } },
-      order: { date: 'DESC' },
-    });
+    return this.reservesRepository
+      .createQueryBuilder('reserves')
+      .leftJoinAndSelect('reserves.source', 'source')
+      .leftJoinAndSelect('source.asset', 'asset')
+      .where('source.deletedAt IS NULL')
+      .orderBy('reserves.date', 'DESC')
+      .getMany();
   }
 
   async getTreasuryHoldings(): Promise<ReserveEntity[]> {
@@ -54,6 +61,7 @@ export class ReservesRepository {
       .createQueryBuilder('reserves')
       .innerJoinAndSelect('reserves.source', 'source')
       .innerJoinAndSelect('source.asset', 'asset')
+      .where('source.deletedAt IS NULL')
       .distinctOn(['source.id', 'asset.id'])
       .orderBy('source.id', 'ASC')
       .addOrderBy('asset.id', 'ASC')
@@ -65,7 +73,8 @@ export class ReservesRepository {
     const query = this.reservesRepository
       .createQueryBuilder('reserves')
       .leftJoinAndSelect('reserves.source', 'source')
-      .leftJoinAndSelect('source.asset', 'asset');
+      .leftJoinAndSelect('source.asset', 'asset')
+      .where('source.deletedAt IS NULL');
 
     query.orderBy('reserves.date', dto.order);
 
@@ -88,7 +97,8 @@ export class ReservesRepository {
     const query = this.reservesRepository
       .createQueryBuilder('reserves')
       .leftJoinAndSelect('reserves.source', 'source')
-      .leftJoinAndSelect('source.asset', 'asset');
+      .leftJoinAndSelect('source.asset', 'asset')
+      .where('source.deletedAt IS NULL');
 
     query.orderBy('reserves.date', dto.order).offset(dto.offset ?? 0);
 
@@ -106,7 +116,8 @@ export class ReservesRepository {
       .createQueryBuilder('reserves')
       .leftJoinAndSelect('reserves.source', 'source')
       .leftJoinAndSelect('source.asset', 'asset')
-      .where('source.algorithm && :algorithms::text[]', { algorithms: algorithmsArrayLiteral })
+      .where('source.deletedAt IS NULL')
+      .andWhere('source.algorithm && :algorithms::text[]', { algorithms: algorithmsArrayLiteral })
       .orderBy('reserves.date', 'DESC')
       .getMany();
   }
@@ -122,7 +133,8 @@ export class ReservesRepository {
       .createQueryBuilder('reserves')
       .leftJoinAndSelect('reserves.source', 'source')
       .leftJoinAndSelect('source.asset', 'asset')
-      .where('source.algorithm && :algorithms::text[]', {
+      .where('source.deletedAt IS NULL')
+      .andWhere('source.algorithm && :algorithms::text[]', {
         algorithms: algorithmsArrayLiteral,
       });
 
@@ -184,7 +196,8 @@ export class ReservesRepository {
       .createQueryBuilder('reserves')
       .leftJoinAndSelect('reserves.source', 'source')
       .leftJoinAndSelect('source.asset', 'asset')
-      .where('source.algorithm && :algorithms::text[]', {
+      .where('source.deletedAt IS NULL')
+      .andWhere('source.algorithm && :algorithms::text[]', {
         algorithms: `{${algorithms.join(',')}}`,
       });
 
@@ -270,7 +283,8 @@ export class ReservesRepository {
       .createQueryBuilder('r0')
       .innerJoin('r0.source', 'src0')
       .innerJoin('src0.asset', 'a0')
-      .where('src0.algorithm && :algorithms::text[]', { algorithms })
+      .where('src0.deletedAt IS NULL')
+      .andWhere('src0.algorithm && :algorithms::text[]', { algorithms })
       .select([
         `r0."sourceId" AS "sourceId"`,
         `r0."date"     AS "date"`,
@@ -339,7 +353,8 @@ export class ReservesRepository {
     const countQb = this.reservesRepository
       .createQueryBuilder('r')
       .innerJoin('r.source', 'src')
-      .where('src.algorithm && :algorithms::text[]', { algorithms });
+      .where('src.deletedAt IS NULL')
+      .andWhere('src.algorithm && :algorithms::text[]', { algorithms });
 
     const [rows, totalReserves] = await Promise.all([
       dataQb.getRawMany<IncentivesHistory>(),

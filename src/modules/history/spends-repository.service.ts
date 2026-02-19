@@ -20,18 +20,22 @@ export class SpendsRepository {
   }
 
   async findById(id: number): Promise<SpendsEntity> {
-    return this.spendsRepository.findOne({
-      where: { id },
-      relations: { source: true },
-    });
+    return this.spendsRepository
+      .createQueryBuilder('spends')
+      .leftJoinAndSelect('spends.source', 'source')
+      .where('spends.id = :id', { id })
+      .andWhere('source.deletedAt IS NULL')
+      .getOne();
   }
 
   async findBySourceId(sourceId: number): Promise<SpendsEntity> {
-    return this.spendsRepository.findOne({
-      where: { source: { id: sourceId } },
-      relations: { source: true },
-      order: { blockNumber: 'DESC' },
-    });
+    return this.spendsRepository
+      .createQueryBuilder('spends')
+      .leftJoinAndSelect('spends.source', 'source')
+      .where('source.id = :sourceId', { sourceId })
+      .andWhere('source.deletedAt IS NULL')
+      .orderBy('spends.blockNumber', 'DESC')
+      .getOne();
   }
 
   async getOffsetStats(
@@ -44,7 +48,8 @@ export class SpendsRepository {
       .createQueryBuilder('spends')
       .leftJoinAndSelect('spends.source', 'source')
       .leftJoinAndSelect('source.asset', 'asset')
-      .where('source.algorithm && :algorithms::text[]', {
+      .where('source.deletedAt IS NULL')
+      .andWhere('source.algorithm && :algorithms::text[]', {
         algorithms: algorithmsArrayLiteral,
       });
 
@@ -65,7 +70,8 @@ export class SpendsRepository {
     return this.spendsRepository
       .createQueryBuilder('spends')
       .leftJoinAndSelect('spends.source', 'source')
-      .where('spends.priceComp IS NULL OR spends.priceComp = 0')
+      .where('source.deletedAt IS NULL')
+      .andWhere('spends.priceComp IS NULL OR spends.priceComp = 0')
       .orderBy('spends.date', 'ASC')
       .getMany();
   }

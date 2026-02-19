@@ -20,18 +20,22 @@ export class IncomesRepository {
   }
 
   async findById(id: number): Promise<IncomesEntity> {
-    return this.incomesRepository.findOne({
-      where: { id },
-      relations: { source: true },
-    });
+    return this.incomesRepository
+      .createQueryBuilder('incomes')
+      .leftJoinAndSelect('incomes.source', 'source')
+      .where('incomes.id = :id', { id })
+      .andWhere('source.deletedAt IS NULL')
+      .getOne();
   }
 
   async findBySourceId(sourceId: number): Promise<IncomesEntity> {
-    return this.incomesRepository.findOne({
-      where: { source: { id: sourceId } },
-      relations: { source: true },
-      order: { blockNumber: 'DESC' },
-    });
+    return this.incomesRepository
+      .createQueryBuilder('incomes')
+      .leftJoinAndSelect('incomes.source', 'source')
+      .where('source.id = :sourceId', { sourceId })
+      .andWhere('source.deletedAt IS NULL')
+      .orderBy('incomes.blockNumber', 'DESC')
+      .getOne();
   }
 
   async getOffsetStats(dto: OffsetDto): Promise<OffsetDataDto<IncomesEntity>> {
@@ -41,7 +45,8 @@ export class IncomesRepository {
       .createQueryBuilder('incomes')
       .leftJoinAndSelect('incomes.source', 'source')
       .leftJoinAndSelect('source.asset', 'asset')
-      .where('source.algorithm && :algorithms::text[]', {
+      .where('source.deletedAt IS NULL')
+      .andWhere('source.algorithm && :algorithms::text[]', {
         algorithms: algorithmsArrayLiteral,
       });
 
@@ -62,7 +67,8 @@ export class IncomesRepository {
     return this.incomesRepository
       .createQueryBuilder('incomes')
       .leftJoinAndSelect('incomes.source', 'source')
-      .where('incomes.priceComp IS NULL OR incomes.priceComp = 0')
+      .where('source.deletedAt IS NULL')
+      .andWhere('incomes.priceComp IS NULL OR incomes.priceComp = 0')
       .orderBy('incomes.date', 'ASC')
       .getMany();
   }
