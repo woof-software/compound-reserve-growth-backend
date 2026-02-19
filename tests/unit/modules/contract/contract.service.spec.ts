@@ -19,7 +19,7 @@ describe('ContractService', () => {
   const makeSource = (params: {
     id: number;
     startBlock: number;
-    endBlock?: number | null;
+    endBlock?: number;
   }): SourceEntity => {
     const asset = makeAsset(1);
     const source = new SourceEntity(
@@ -30,7 +30,7 @@ describe('ContractService', () => {
       params.startBlock,
       asset,
       undefined,
-      params.endBlock ?? null,
+      params.endBlock,
     );
     source.id = params.id;
     source.asset = asset;

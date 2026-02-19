@@ -234,7 +234,7 @@ export class SourcesUpdateService {
         remote.startBlock,
         asset,
         remote.market ?? undefined,
-        remote.endBlock ?? null,
+        remote.endBlock ?? undefined,
       );
       source.id = remote.id;
       inserts.push(source);

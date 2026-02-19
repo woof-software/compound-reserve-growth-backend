@@ -65,7 +65,7 @@ export class SourceEntity implements Source {
     startBlock: number,
     asset: AssetEntity,
     market?: string,
-    endBlock?: number | null,
+    endBlock?: number,
   ) {
     this.address = address;
     this.network = network;

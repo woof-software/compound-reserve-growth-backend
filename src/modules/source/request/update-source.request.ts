@@ -14,9 +14,8 @@ export class UpdateSourceRequest {
   @ApiPropertyOptional({
     example: 21246747,
     description: 'End block (optional)',
-    nullable: true,
   })
   @IsOptional()
   @IsNumber()
-  public endBlock?: number | null;
+  public endBlock?: number;
 }

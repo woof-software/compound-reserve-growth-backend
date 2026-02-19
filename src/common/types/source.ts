@@ -6,7 +6,7 @@ export interface Source {
   type?: string;
   algorithm: string[];
   startBlock: number;
-  endBlock?: number | null;
+  endBlock: number | null;
   createdAt: Date;
   checkedAt?: Date;
 }

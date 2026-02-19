@@ -41,7 +41,7 @@ describe('SourcesUpdateService', () => {
     asset: AssetEntity;
     algorithm: string[];
     startBlock?: number;
-    endBlock?: number | null;
+    endBlock?: number;
     network?: string;
     type?: string;
     market?: string;
@@ -54,7 +54,7 @@ describe('SourcesUpdateService', () => {
       params.startBlock ?? 1,
       params.asset,
       params.market,
-      params.endBlock ?? null,
+      params.endBlock,
     );
     source.id = params.id;
     return source;
