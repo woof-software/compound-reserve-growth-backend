@@ -9,4 +9,5 @@ export interface Source {
   endBlock: number | null;
   createdAt: Date;
   checkedAt?: Date;
+  deletedAt?: Date;
 }

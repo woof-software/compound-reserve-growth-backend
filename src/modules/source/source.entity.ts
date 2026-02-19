@@ -39,6 +39,9 @@ export class SourceEntity implements Source {
   @Column({ nullable: true })
   public checkedAt?: Date;
 
+  @Column({ nullable: true })
+  public deletedAt?: Date;
+
   @ManyToOne(() => AssetEntity, (asset) => asset.sources)
   public asset: AssetEntity;
 
@@ -76,5 +79,6 @@ export class SourceEntity implements Source {
     this.asset = asset;
     this.market = market;
     this.createdAt = new Date();
+    this.deletedAt = null;
   }
 }

@@ -14,11 +14,15 @@ export class SourceRepository {
   ) {}
 
   async findById(id: number): Promise<SourceEntity> {
-    return this.sourceRepository.findOne({ where: { id }, relations: { asset: true } });
+    return this.sourceRepository.findOne({
+      where: { id, deletedAt: null },
+      relations: { asset: true },
+    });
   }
 
   async list(): Promise<SourceEntity[]> {
     return this.sourceRepository.find({
+      where: { deletedAt: null },
       relations: { asset: true },
       order: { id: 'ASC' },
     });
@@ -30,7 +34,8 @@ export class SourceRepository {
     return this.sourceRepository
       .createQueryBuilder('source')
       .leftJoinAndSelect('source.asset', 'asset')
-      .where('source.algorithm && :algorithms::text[]', {
+      .where('source.deletedAt IS NULL')
+      .andWhere('source.algorithm && :algorithms::text[]', {
         algorithms: algorithmsArrayLiteral,
       })
       .orderBy('source.id', 'ASC')

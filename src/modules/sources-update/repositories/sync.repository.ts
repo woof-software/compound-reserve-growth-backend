@@ -50,6 +50,7 @@ export class SyncRepository {
 
   public async listAllSources(manager: EntityManager): Promise<SourceEntity[]> {
     return manager.getRepository(SourceEntity).find({
+      where: { deletedAt: null },
       relations: { asset: true },
       order: { id: 'ASC' },
     });
@@ -65,43 +66,13 @@ export class SyncRepository {
   public async deleteSourcesByIds(ids: number[], manager: EntityManager): Promise<void> {
     if (!ids.length) return;
 
-    // Delete all dependent records before deleting sources to avoid FK constraint violations
-    // Order matters: delete child records first, then parent
     await manager
-      .getRepository(ReserveEntity)
+      .getRepository(SourceEntity)
       .createQueryBuilder()
-      .delete()
-      .where('sourceId IN (:...ids)', { ids })
+      .update()
+      .set({ deletedAt: () => 'NOW()' })
+      .where('id IN (:...ids)', { ids })
+      .andWhere('deletedAt IS NULL')
       .execute();
-
-    await manager
-      .getRepository(IncomesEntity)
-      .createQueryBuilder()
-      .delete()
-      .where('sourceId IN (:...ids)', { ids })
-      .execute();
-
-    await manager
-      .getRepository(SpendsEntity)
-      .createQueryBuilder()
-      .delete()
-      .where('sourceId IN (:...ids)', { ids })
-      .execute();
-
-    await manager
-      .getRepository(TreasuryEntity)
-      .createQueryBuilder()
-      .delete()
-      .where('sourceId IN (:...ids)', { ids })
-      .execute();
-
-    await manager
-      .getRepository(RevenueEntity)
-      .createQueryBuilder()
-      .delete()
-      .where('sourceId IN (:...ids)', { ids })
-      .execute();
-
-    await manager.getRepository(SourceEntity).delete(ids);
   }
 }
