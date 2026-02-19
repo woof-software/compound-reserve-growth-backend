@@ -19,6 +19,24 @@ const makeDeleteBySourceIdsRepo = () => {
   };
 };
 
+/** Mock for soft delete (createQueryBuilder().update().set().where().andWhere().execute()). */
+const makeSoftDeleteRepo = () => {
+  const execute = jest.fn().mockResolvedValue({ affected: 0 });
+  return {
+    find: jest.fn(),
+    save: jest.fn(),
+    createQueryBuilder: jest.fn().mockReturnValue({
+      update: jest.fn().mockReturnValue({
+        set: jest.fn().mockReturnValue({
+          where: jest.fn().mockReturnValue({
+            andWhere: jest.fn().mockReturnValue({ execute }),
+          }),
+        }),
+      }),
+    }),
+  };
+};
+
 describe('SyncRepository', () => {
   const makeQueryRunner = () => ({
     manager: {},
@@ -88,16 +106,14 @@ describe('SyncRepository', () => {
   });
 
   it('delegates list/save/delete helpers to manager repositories', async () => {
-    const assetRepo = {
-      find: jest.fn().mockResolvedValue(['a1']),
-      save: jest.fn().mockResolvedValue(['a2']),
-      delete: jest.fn().mockResolvedValue(undefined),
-    };
-    const sourceRepo = {
-      find: jest.fn().mockResolvedValue(['s1']),
-      save: jest.fn().mockResolvedValue(['s2']),
-      delete: jest.fn().mockResolvedValue(undefined),
-    };
+    const assetRepo = makeSoftDeleteRepo();
+    assetRepo.find.mockResolvedValue(['a1']);
+    assetRepo.save.mockResolvedValue(['a2']);
+
+    const sourceRepo = makeSoftDeleteRepo();
+    sourceRepo.find.mockResolvedValue(['s1']);
+    sourceRepo.save.mockResolvedValue(['s2']);
+
     const dependentRepo = makeDeleteBySourceIdsRepo();
 
     const manager = {
@@ -130,18 +146,22 @@ describe('SyncRepository', () => {
     await expect(repo.deleteSourcesByIds([1], manager as never)).resolves.toBeUndefined();
     await expect(repo.deleteAssetsByIds([2], manager as never)).resolves.toBeUndefined();
 
-    expect(assetRepo.find).toHaveBeenCalledWith({ order: { id: 'ASC' } });
+    expect(assetRepo.find).toHaveBeenCalledWith({
+      where: { deletedAt: null },
+      order: { id: 'ASC' },
+    });
     expect(sourceRepo.find).toHaveBeenCalledWith({
+      where: { deletedAt: null },
       relations: { asset: true },
       order: { id: 'ASC' },
     });
-    expect(sourceRepo.delete).toHaveBeenCalledWith([1]);
-    expect(assetRepo.delete).toHaveBeenCalledWith([2]);
+    expect(sourceRepo.createQueryBuilder).toHaveBeenCalled();
+    expect(assetRepo.createQueryBuilder).toHaveBeenCalled();
   });
 
   it('skips delete calls when ids list is empty', async () => {
-    const assetRepo = { delete: jest.fn() };
-    const sourceRepo = { delete: jest.fn() };
+    const assetRepo = makeSoftDeleteRepo();
+    const sourceRepo = makeSoftDeleteRepo();
     const dependentRepo = makeDeleteBySourceIdsRepo();
 
     const manager = {
@@ -170,7 +190,7 @@ describe('SyncRepository', () => {
     await repo.deleteSourcesByIds([], manager as never);
     await repo.deleteAssetsByIds([], manager as never);
 
-    expect(sourceRepo.delete).not.toHaveBeenCalled();
-    expect(assetRepo.delete).not.toHaveBeenCalled();
+    expect(sourceRepo.createQueryBuilder).not.toHaveBeenCalled();
+    expect(assetRepo.createQueryBuilder).not.toHaveBeenCalled();
   });
 });

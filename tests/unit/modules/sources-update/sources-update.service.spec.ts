@@ -82,7 +82,9 @@ describe('SourcesUpdateService', () => {
     const syncRepo = {
       inTransaction: jest.fn(),
       listAllAssets: jest.fn(),
+      listAllAssetsIncludingDeleted: jest.fn(),
       listAllSources: jest.fn(),
+      listAllSourcesIncludingDeleted: jest.fn(),
       saveAssets: jest.fn(),
       saveSources: jest.fn(),
       deleteSourcesByIds: jest.fn(),
@@ -192,8 +194,8 @@ describe('SourcesUpdateService', () => {
     syncRepo.inTransaction.mockImplementation(async (work: (manager: unknown) => Promise<void>) => {
       await work({});
     });
-    syncRepo.listAllAssets.mockResolvedValue([dbAssetKeep, dbAssetStale]);
-    syncRepo.listAllSources.mockResolvedValue([dbSourceKeep, dbSourceStale]);
+    syncRepo.listAllAssetsIncludingDeleted.mockResolvedValue([dbAssetKeep, dbAssetStale]);
+    syncRepo.listAllSourcesIncludingDeleted.mockResolvedValue([dbSourceKeep, dbSourceStale]);
 
     const insertedAsset = makeAsset({
       id: 3,
@@ -300,8 +302,8 @@ describe('SourcesUpdateService', () => {
     syncRepo.inTransaction.mockImplementation(async (work: (manager: unknown) => Promise<void>) => {
       await work({});
     });
-    syncRepo.listAllAssets.mockResolvedValue([dbAsset]);
-    syncRepo.listAllSources.mockResolvedValue([]);
+    syncRepo.listAllAssetsIncludingDeleted.mockResolvedValue([dbAsset]);
+    syncRepo.listAllSourcesIncludingDeleted.mockResolvedValue([]);
     syncRepo.saveAssets.mockResolvedValue([]);
 
     const txError = new Error('saveSources failed');
@@ -403,8 +405,8 @@ describe('SourcesUpdateService', () => {
     syncRepo.inTransaction.mockImplementation(async (work: (manager: unknown) => Promise<void>) => {
       await work({});
     });
-    syncRepo.listAllAssets.mockResolvedValue([dbAssetStale]);
-    syncRepo.listAllSources.mockResolvedValue([dbSourceStale]);
+    syncRepo.listAllAssetsIncludingDeleted.mockResolvedValue([dbAssetStale]);
+    syncRepo.listAllSourcesIncludingDeleted.mockResolvedValue([dbSourceStale]);
     syncRepo.saveAssets.mockResolvedValue([]);
     syncRepo.saveSources.mockResolvedValue([]);
     syncRepo.deleteSourcesByIds.mockResolvedValue(undefined);

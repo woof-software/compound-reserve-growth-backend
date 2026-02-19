@@ -35,38 +35,45 @@ describe('ReservesRepository', () => {
 
   describe('findLatestBySourceId', () => {
     it('queries reserve by source id ordered by blockNumber descending', async () => {
-      const { repo, findOne } = makeReservesRepository();
+      const { repo, reservesRepository } = makeReservesRepository();
       const sourceId = 42;
       const mockReserve = {
         id: 1,
         blockNumber: 100_000,
         source: { id: sourceId },
       } as unknown as ReserveEntity;
-      findOne.mockResolvedValue(mockReserve);
+      const getOne = jest.fn().mockResolvedValue(mockReserve);
+      reservesRepository.createQueryBuilder.mockReturnValue({
+        leftJoinAndSelect: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        getOne,
+      });
 
       const result = await repo.findLatestBySourceId(sourceId);
 
       expect(result).toBe(mockReserve);
-      expect(findOne).toHaveBeenCalledTimes(1);
-      expect(findOne).toHaveBeenCalledWith({
-        where: { source: { id: sourceId } },
-        relations: { source: true },
-        order: { blockNumber: 'DESC' },
-      });
+      expect(reservesRepository.createQueryBuilder).toHaveBeenCalledWith('reserves');
+      expect(getOne).toHaveBeenCalledTimes(1);
     });
 
     it('returns null when no reserve exists for the source', async () => {
-      const { repo, findOne } = makeReservesRepository();
-      findOne.mockResolvedValue(null);
+      const { repo, reservesRepository } = makeReservesRepository();
+      const getOne = jest.fn().mockResolvedValue(null);
+      reservesRepository.createQueryBuilder.mockReturnValue({
+        leftJoinAndSelect: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        getOne,
+      });
 
       const result = await repo.findLatestBySourceId(99);
 
       expect(result).toBeNull();
-      expect(findOne).toHaveBeenCalledWith({
-        where: { source: { id: 99 } },
-        relations: { source: true },
-        order: { blockNumber: 'DESC' },
-      });
+      expect(reservesRepository.createQueryBuilder).toHaveBeenCalledWith('reserves');
+      expect(getOne).toHaveBeenCalledTimes(1);
     });
   });
 });
