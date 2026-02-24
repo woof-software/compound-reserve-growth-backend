@@ -15,19 +15,24 @@ export class TreasuryRepository {
     return this.treasuryRepository.save(treasury);
   }
 
-  async findById(id: number): Promise<TreasuryEntity> {
-    return this.treasuryRepository.findOne({
-      where: { id },
-      relations: { source: true },
-    });
+  async findById(id: number): Promise<TreasuryEntity | null> {
+    return this.treasuryRepository
+      .createQueryBuilder('treasury')
+      .innerJoinAndSelect('treasury.source', 'source')
+      .where('treasury.id = :id', { id })
+      .andWhere('source.deletedAt IS NULL')
+      .getOne();
   }
 
   async paginate(page: number = 1, perPage: number = 20): Promise<[TreasuryEntity[], number]> {
-    return this.treasuryRepository.findAndCount({
-      relations: { source: true },
-      order: { createdAt: 'DESC' },
-      skip: (page - 1) * perPage,
-      take: perPage,
-    });
+    const [items, total] = await this.treasuryRepository
+      .createQueryBuilder('treasury')
+      .innerJoinAndSelect('treasury.source', 'source')
+      .where('source.deletedAt IS NULL')
+      .orderBy('treasury.createdAt', 'DESC')
+      .skip((page - 1) * perPage)
+      .take(perPage)
+      .getManyAndCount();
+    return [items, total];
   }
 }

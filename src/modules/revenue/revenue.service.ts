@@ -28,6 +28,8 @@ export class RevenueService {
   }
 
   async findById(id: number): Promise<RevenueEntity> {
-    return this.revenueRepository.findById(id);
+    const entity = await this.revenueRepository.findById(id);
+    if (!entity) throw new NotFoundException(`Revenue ${id} not found`);
+    return entity;
   }
 }

@@ -201,6 +201,8 @@ Resilience features:
 - **Redis block cache** (30 days) to avoid duplicate RPC calls.
 - **Arbitrum period model** for pre-nitro vs nitro timings.
 - Failed price lookups default to `$1` and are logged + emailed.
+
+> Internally, the persistence step is implemented by `HistoryService.createReservesWithSource`.
 ```
 
 ---

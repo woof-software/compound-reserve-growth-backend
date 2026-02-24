@@ -29,6 +29,8 @@ export class TreasuryService {
   }
 
   async findById(id: number): Promise<TreasuryEntity> {
-    return this.treasuryRepo.findById(id);
+    const entity = await this.treasuryRepo.findById(id);
+    if (!entity) throw new NotFoundException(`Treasury ${id} not found`);
+    return entity;
   }
 }
