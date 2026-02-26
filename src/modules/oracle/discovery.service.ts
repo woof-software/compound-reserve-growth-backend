@@ -167,9 +167,9 @@ export class DiscoveryService implements OnModuleInit {
 
         const safeBlockNumber = await this.getSafeBlockNumber(comet.network, safeBlockByNetwork);
         if (safeBlockNumber === null) {
-          this.logger.warn('Skipping discovery for network without safe block', {
-            network: comet.network,
-          });
+          this.logger.warn(
+            `Skipping discovery for network without safe block network: ${comet.network}`,
+          );
           continue;
         }
 
@@ -178,7 +178,7 @@ export class DiscoveryService implements OnModuleInit {
         const blockTag = safeBlockNumber;
 
         const baseTokenPriceFeed = await cometContract.baseTokenPriceFeed({ blockTag });
-        this.logger.log('Base token price feed:', baseTokenPriceFeed);
+        this.logger.log(`Base token price feed: ${baseTokenPriceFeed}`);
 
         if (!checkedAddresses.has(baseTokenPriceFeed.toLowerCase())) {
           checkedAddresses.add(baseTokenPriceFeed.toLowerCase());
@@ -190,7 +190,7 @@ export class DiscoveryService implements OnModuleInit {
             blockTag,
           );
 
-          this.logger.log('Oracle info:', oracleInfo);
+          this.logger.log(`Oracle info: ${JSON.stringify(oracleInfo)}`);
 
           if (oracleInfo) {
             await this.oracleRepository.upsert(oracleInfo, ['address']);
@@ -225,7 +225,8 @@ export class DiscoveryService implements OnModuleInit {
           }
         }
       } catch (error) {
-        this.logger.error(`Failed to check Comet ${comet.address}:`, error);
+        const message = error instanceof Error ? error.message : String(error);
+        this.logger.error(`Failed to check Comet ${comet.address}: ${message}`);
       }
     }
 
@@ -279,18 +280,16 @@ export class DiscoveryService implements OnModuleInit {
 
       return oracleInfo;
     } catch (error) {
-      this.logger.error('Error checking oracle', {
-        oracleAddress,
-        network,
-        blockTag,
-        error: error instanceof Error ? error.message : String(error),
-      });
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.error(
+        `Error checking oracle address: ${oracleAddress} network: ${network} blockTag: ${blockTag} error: ${message}`,
+      );
       return null;
     }
   }
 
   /**
-   * Returns a finalized block number for the given network, caching the result per discovery run.
+   * Returns a lagged block number for the given network, caching the result per discovery run.
    * If the latest block cannot be fetched, stores null and returns null for that network.
    */
   private async getSafeBlockNumber(
@@ -307,27 +306,24 @@ export class DiscoveryService implements OnModuleInit {
       const latestBlock = await provider.getBlock('latest');
 
       if (!latestBlock) {
-        this.logger.warn('Could not get latest block during discovery', { network });
+        this.logger.warn(`Could not get latest block during discovery network: ${network}`);
         cache.set(network, null);
         return null;
       }
 
       const safeBlockNumber = Math.max(0, latestBlock.number - finalityConfirmations);
 
-      this.logger.log('Using finalized block for discovery reads', {
-        network,
-        latestBlock: latestBlock.number,
-        safeBlockNumber,
-        confirmations: finalityConfirmations,
-      });
+      this.logger.log(
+        `Using lagged block for discovery reads network: ${network} latestBlock: ${latestBlock.number} safeBlock: ${safeBlockNumber} lagBlocks: ${finalityConfirmations}`,
+      );
 
       cache.set(network, safeBlockNumber);
       return safeBlockNumber;
     } catch (error) {
-      this.logger.error('Failed to compute safe block number for discovery', {
-        network,
-        error: error instanceof Error ? error.message : String(error),
-      });
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.error(
+        `Failed to compute safe block number for discovery network: ${network} error: ${message}`,
+      );
       cache.set(network, null);
       return null;
     }

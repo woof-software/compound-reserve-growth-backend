@@ -71,6 +71,7 @@ describe('ContractService', () => {
       service,
       findLatestReserveBySource,
       providerFactory,
+      networkService,
       historyService,
       priceService,
       mailService,
@@ -261,6 +262,50 @@ describe('ContractService', () => {
       expect(findBlockByTimestampSpy).not.toHaveBeenCalled();
       expect(historyService.createReservesWithSource).not.toHaveBeenCalled();
       expect(priceService.getHistoricalPrice).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('getSafeBlockNumber', () => {
+    it('returns latest block minus configured lag confirmations', async () => {
+      const { service, provider, networkService } = makeDeps();
+
+      (provider as { getBlock?: jest.Mock }).getBlock = jest
+        .fn()
+        .mockResolvedValue({ number: 1_000 });
+      networkService.getFinalityConfirmations.mockReturnValue(64);
+
+      const result = await (
+        service as unknown as { getSafeBlockNumber: (network: string) => Promise<number> }
+      ).getSafeBlockNumber('eth');
+
+      expect(result).toBe(936);
+      expect(networkService.getFinalityConfirmations).toHaveBeenCalledWith('eth');
+      expect((provider as { getBlock: jest.Mock }).getBlock).toHaveBeenCalledWith('latest');
+    });
+
+    it('clamps safe block to zero when confirmations exceed latest block number', async () => {
+      const { service, provider, networkService } = makeDeps();
+
+      (provider as { getBlock?: jest.Mock }).getBlock = jest.fn().mockResolvedValue({ number: 10 });
+      networkService.getFinalityConfirmations.mockReturnValue(64);
+
+      const result = await (
+        service as unknown as { getSafeBlockNumber: (network: string) => Promise<number> }
+      ).getSafeBlockNumber('eth');
+
+      expect(result).toBe(0);
+    });
+
+    it('throws when latest block is not available', async () => {
+      const { service, provider } = makeDeps();
+
+      (provider as { getBlock?: jest.Mock }).getBlock = jest.fn().mockResolvedValue(null);
+
+      await expect(
+        (
+          service as unknown as { getSafeBlockNumber: (network: string) => Promise<number> }
+        ).getSafeBlockNumber('eth'),
+      ).rejects.toThrow('Could not fetch latest block for network eth');
     });
   });
 

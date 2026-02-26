@@ -115,10 +115,9 @@ export class ContractService implements OnModuleInit {
   async readMarketData(root: RootJson, networkPath: string): Promise<MarketData> {
     const [networkKey] = networkPath.split('/');
     if (!networkKey) {
-      this.logger.error('Invalid networkPath format', {
-        networkPath: root.networkPath,
-        expectedFormat: 'network/market',
-      });
+      this.logger.error(
+        `Invalid networkPath format networkPath: ${root.networkPath} expectedFormat: network/market`,
+      );
       throw new Error(`Invalid networkPath format: '${root.networkPath}'`);
     }
 
@@ -126,10 +125,9 @@ export class ContractService implements OnModuleInit {
     try {
       provider = this.providerFactory.get(networkKey);
     } catch (e) {
-      this.logger.error('Unsupported network in path', {
-        network: networkKey,
-        path: root.networkPath,
-      });
+      this.logger.error(
+        `Unsupported network in path network: ${networkKey} path: ${root.networkPath}`,
+      );
       throw e;
     }
 
@@ -199,11 +197,10 @@ export class ContractService implements OnModuleInit {
 
       return allMarkets;
     } catch (error) {
-      this.logger.error('Error finding comptroller markets', {
-        comptrollerAddress,
-        network,
-        error: error instanceof Error ? error.message : String(error),
-      });
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.error(
+        `Error finding comptroller markets comptroller: ${comptrollerAddress} network: ${network} error: ${message}`,
+      );
       throw error;
     }
   }
@@ -219,11 +216,10 @@ export class ContractService implements OnModuleInit {
 
       return symbol;
     } catch (error) {
-      this.logger.error('Error finding market symbol', {
-        marketAddress,
-        network,
-        error: error instanceof Error ? error.message : String(error),
-      });
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.error(
+        `Error finding market symbol market: ${marketAddress} network: ${network} error: ${message}`,
+      );
       throw error;
     }
   }
@@ -244,11 +240,10 @@ export class ContractService implements OnModuleInit {
 
       return { address: tokenAddress, symbol, decimals };
     } catch (error) {
-      this.logger.error('Error getting comet base token', {
-        cometAddress,
-        network,
-        error: error instanceof Error ? error.message : String(error),
-      });
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.error(
+        `Error getting comet base token comet: ${cometAddress} network: ${network} error: ${message}`,
+      );
       throw error;
     }
   }
@@ -290,11 +285,10 @@ export class ContractService implements OnModuleInit {
 
       return { address: tokenAddress, symbol, decimals };
     } catch (error) {
-      this.logger.error('Error getting market v2 underlying token', {
-        marketAddress,
-        network,
-        error: error instanceof Error ? error.message : String(error),
-      });
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.error(
+        `Error getting market v2 underlying token market: ${marketAddress} network: ${network} error: ${message}`,
+      );
       throw error;
     }
   }
@@ -382,8 +376,8 @@ export class ContractService implements OnModuleInit {
   }
 
   /**
-   * Returns a finalized block number for the given network (~15 min lag per network config).
-   * Used so all contract reads in a flow are consistent and not subject to reorg.
+   * Returns a lagged block number for the given network (~15 min lag per network config).
+   * This improves read consistency and reorg resilience, but is not protocol-level finality.
    */
   private async getSafeBlockNumber(network: string): Promise<number> {
     const finalityConfirmations = this.networkService.getFinalityConfirmations(network);

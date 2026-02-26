@@ -16,8 +16,8 @@ export class OracleService {
   constructor(private readonly providerFactory: ProviderFactory) {}
 
   /**
-   * Reads oracle state at a specific block so all fields are consistent and not subject to reorg.
-   * Caller must pass a finalized block number (e.g. latest - finalityConfirmations).
+   * Reads oracle state at a specific block so all fields are consistent and less sensitive to reorgs.
+   * Caller must pass a lagged block number (e.g. latest - finalityConfirmations).
    */
   async getOracleData(oracle: Oracle, blockNumber: number): Promise<OracleData> {
     try {
@@ -50,11 +50,10 @@ export class OracleService {
         timestamp: block.timestamp,
       };
     } catch (error) {
-      this.logger.error('Failed to get oracle data', {
-        oracleAddress: oracle.address,
-        blockNumber,
-        error: error instanceof Error ? error.message : String(error),
-      });
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.error(
+        `Failed to get oracle data oracle=${oracle.address} blockNumber=${blockNumber} error=${message}`,
+      );
       throw error;
     }
   }

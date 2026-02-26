@@ -60,20 +60,26 @@ export class CapoService {
       const oraclesByNetwork = this.groupOraclesByNetwork(oracles);
 
       for (const [network, networkOracles] of oraclesByNetwork) {
-        const finalityConfirmations = this.networkService.getFinalityConfirmations(network);
-        const provider = this.providerFactory.get(network);
-        const latestBlock = await provider.getBlock('latest');
-        if (!latestBlock) {
-          this.logger.warn('Could not get latest block', { network });
+        let safeBlockNumber: number;
+        try {
+          const lagConfirmations = this.networkService.getFinalityConfirmations(network);
+          const provider = this.providerFactory.get(network);
+          const latestBlock = await provider.getBlock('latest');
+
+          if (!latestBlock) {
+            this.logger.warn(`Could not get latest block for network: ${network}`);
+            continue;
+          }
+
+          safeBlockNumber = Math.max(0, latestBlock.number - lagConfirmations);
+          this.logger.log(
+            `Using lagged block for oracle reads network=${network} latestBlock=${latestBlock.number} safeBlock=${safeBlockNumber} lagBlocks=${lagConfirmations}`,
+          );
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          this.logger.error(`Failed to prepare lagged block for network: ${network}: ${message}`);
           continue;
         }
-        const safeBlockNumber = Math.max(0, latestBlock.number - finalityConfirmations);
-        this.logger.log('Using finalized block for oracle reads', {
-          network,
-          latestBlock: latestBlock.number,
-          safeBlockNumber,
-          confirmations: finalityConfirmations,
-        });
 
         for (const oracle of networkOracles) {
           try {
@@ -108,11 +114,9 @@ export class CapoService {
             await this.check24hPriceGrowth(oracle, data);
           } catch (error) {
             const message = error instanceof Error ? error.message : String(error);
-            this.logger.error('Failed to collect data for oracle', {
-              description: oracle.description,
-              oracleAddress: oracle.address,
-              error: message,
-            });
+            this.logger.error(
+              `Failed to collect data for oracle address: ${oracle.address} description: "${oracle.description}" error: ${message}`,
+            );
             await this.alertService.createAlert(
               oracle.address,
               oracle.chainId,
@@ -127,7 +131,8 @@ export class CapoService {
 
       this.logger.log('Oracle data collection completed successfully');
     } catch (error) {
-      this.logger.error('Error during oracle data collection:', error);
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.error(`Error during oracle data collection: ${message}`);
     } finally {
       this.isCollecting = false;
     }
@@ -281,7 +286,8 @@ export class CapoService {
         );
       }
     } catch (error) {
-      this.logger.error(`Failed to check 24h price growth for ${oracle.description}:`, error);
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.error(`Failed to check 24h price growth for ${oracle.description}: ${message}`);
     }
   }
 
