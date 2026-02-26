@@ -45,6 +45,7 @@ describe('ContractService', () => {
     };
     const provider = {};
     const providerFactory = { get: jest.fn().mockReturnValue(provider) };
+    const networkService = { getFinalityConfirmations: jest.fn().mockReturnValue(64) };
     const priceService = { getHistoricalPrice: jest.fn() };
     const algorithmService = { comet: jest.fn(), marketV2: jest.fn() };
     const mailService = { notifyGetHistoryError: jest.fn() };
@@ -59,6 +60,7 @@ describe('ContractService', () => {
       cacheManager as never,
       redisClient as never,
       providerFactory as never,
+      networkService as never,
       historyService as never,
       priceService as never,
       algorithmService as never,

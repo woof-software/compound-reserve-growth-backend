@@ -23,4 +23,11 @@ export class NetworkService {
   byChainId(chainId: number): NetworkConfig | undefined {
     return this.networks.find((n) => n.chainId === chainId);
   }
+
+  /** Number of block confirmations to use for finalized reads on the given network. */
+  getFinalityConfirmations(networkName: string): number {
+    const config = this.byName(networkName);
+    if (!config) throw new Error(`Unsupported network: ${networkName}`);
+    return config.finalityConfirmations;
+  }
 }

@@ -9,6 +9,7 @@ import { AlertService } from 'modules/alert/alert.service';
 import { SourceEntity } from 'modules/source/source.entity';
 import { OffsetRequest } from 'modules/history/request/offset.request';
 import { ProviderFactory } from 'modules/network/provider.factory';
+import { NetworkService } from 'modules/network/network.service';
 
 import { Snapshot } from './snapshot.entity';
 import { DailyAggregation } from './daily.entity';
@@ -39,6 +40,7 @@ export class CapoService {
     private oracleService: OracleService,
     private alertService: AlertService,
     private providerFactory: ProviderFactory,
+    private networkService: NetworkService,
   ) {}
 
   @Cron(CronExpression.EVERY_MINUTE)
@@ -55,47 +57,71 @@ export class CapoService {
       const oracles = await this.oracleRepository.find({ where: { isActive: true } });
       this.logger.log(`Found ${oracles.length} active oracles to monitor`);
 
-      for (const oracle of oracles) {
-        try {
-          const data = await this.oracleService.getOracleData(oracle);
-          const capoValues = this.oracleService.calculateCapoValues(data);
+      const oraclesByNetwork = this.groupOraclesByNetwork(oracles);
 
-          this.logger.log(
-            `Oracle ${oracle.description}: Current growth rate: ${capoValues.currentGrowthRate.toFixed(2)}%, Max allowed: ${capoValues.maxGrowthRate.toFixed(2)}%, Utilization: ${capoValues.utilizationPercent.toFixed(2)}%, Capped: ${capoValues.isCapped}`,
-          );
+      for (const [network, networkOracles] of oraclesByNetwork) {
+        const finalityConfirmations = this.networkService.getFinalityConfirmations(network);
+        const provider = this.providerFactory.get(network);
+        const latestBlock = await provider.getBlock('latest');
+        if (!latestBlock) {
+          this.logger.warn('Could not get latest block', { network });
+          continue;
+        }
+        const safeBlockNumber = Math.max(0, latestBlock.number - finalityConfirmations);
+        this.logger.log('Using finalized block for oracle reads', {
+          network,
+          latestBlock: latestBlock.number,
+          safeBlockNumber,
+          confirmations: finalityConfirmations,
+        });
 
-          const snapshot = this.snapshotRepository.create({
-            oracleAddress: oracle.address,
-            oracleName: oracle.description,
-            chainId: oracle.chainId,
-            ratio: data.ratio,
-            price: data.price,
-            snapshotRatio: data.snapshotRatio,
-            snapshotTimestamp: data.snapshotTimestamp,
-            maxYearlyGrowthPercent: data.maxYearlyGrowthPercent,
-            isCapped: data.isCapped,
-            currentGrowthRate: capoValues.currentGrowthRate.toString(),
-            blockNumber: data.blockNumber,
-            metadata: {
-              maxRatio: capoValues.maxRatio,
-              utilizationPercent: capoValues.utilizationPercent,
-              timestamp: data.timestamp,
-            },
-          });
+        for (const oracle of networkOracles) {
+          try {
+            const data = await this.oracleService.getOracleData(oracle, safeBlockNumber);
+            const capoValues = this.oracleService.calculateCapoValues(data);
 
-          await this.snapshotRepository.save(snapshot);
-          await this.checkAlerts(oracle, data, capoValues);
-          await this.check24hPriceGrowth(oracle, data);
-        } catch (error) {
-          this.logger.error(`Failed to collect data for ${oracle.description}:`, error);
-          await this.alertService.createAlert(
-            oracle.address,
-            oracle.chainId,
-            'ERROR',
-            'critical',
-            `Failed to collect oracle data: ${error.message}`,
-            { error: error.toString() },
-          );
+            this.logger.log(
+              `Oracle ${oracle.description}: Current growth rate: ${capoValues.currentGrowthRate.toFixed(2)}%, Max allowed: ${capoValues.maxGrowthRate.toFixed(2)}%, Utilization: ${capoValues.utilizationPercent.toFixed(2)}%, Capped: ${capoValues.isCapped}`,
+            );
+
+            const snapshot = this.snapshotRepository.create({
+              oracleAddress: oracle.address,
+              oracleName: oracle.description,
+              chainId: oracle.chainId,
+              ratio: data.ratio,
+              price: data.price,
+              snapshotRatio: data.snapshotRatio,
+              snapshotTimestamp: data.snapshotTimestamp,
+              maxYearlyGrowthPercent: data.maxYearlyGrowthPercent,
+              isCapped: data.isCapped,
+              currentGrowthRate: capoValues.currentGrowthRate.toString(),
+              blockNumber: data.blockNumber,
+              metadata: {
+                maxRatio: capoValues.maxRatio,
+                utilizationPercent: capoValues.utilizationPercent,
+                timestamp: data.timestamp,
+              },
+            });
+
+            await this.snapshotRepository.save(snapshot);
+            await this.checkAlerts(oracle, data, capoValues);
+            await this.check24hPriceGrowth(oracle, data);
+          } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            this.logger.error('Failed to collect data for oracle', {
+              description: oracle.description,
+              oracleAddress: oracle.address,
+              error: message,
+            });
+            await this.alertService.createAlert(
+              oracle.address,
+              oracle.chainId,
+              'ERROR',
+              'critical',
+              `Failed to collect oracle data: ${message}`,
+              { error: error instanceof Error ? error.toString() : String(error) },
+            );
+          }
         }
       }
 
@@ -105,6 +131,16 @@ export class CapoService {
     } finally {
       this.isCollecting = false;
     }
+  }
+
+  private groupOraclesByNetwork(oracles: Oracle[]): Map<string, Oracle[]> {
+    const map = new Map<string, Oracle[]>();
+    for (const oracle of oracles) {
+      const list = map.get(oracle.network) ?? [];
+      list.push(oracle);
+      map.set(oracle.network, list);
+    }
+    return map;
   }
 
   private async checkAlerts(

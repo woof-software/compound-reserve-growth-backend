@@ -7,6 +7,7 @@ import type { Redis } from 'ioredis';
 import { IncomesEntity, ReserveEntity, SpendsEntity } from 'modules/history/entities';
 import { REDIS_CLIENT } from 'modules/redis/redis.module';
 import { ProviderFactory } from 'modules/network/provider.factory';
+import { NetworkService } from 'modules/network/network.service';
 import { HistoryService } from 'modules/history/history.service';
 import { SourceEntity } from 'modules/source/source.entity';
 import { PriceService } from 'modules/price/price.service';
@@ -91,6 +92,7 @@ export class ContractService implements OnModuleInit {
     @Inject(CACHE_MANAGER) private cacheManager: Cache,
     @Inject(REDIS_CLIENT) private readonly redisClient: Redis,
     private readonly providerFactory: ProviderFactory,
+    private readonly networkService: NetworkService,
     private readonly historyService: HistoryService,
     private readonly priceService: PriceService,
     private readonly algorithmService: AlgorithmService,
@@ -113,9 +115,10 @@ export class ContractService implements OnModuleInit {
   async readMarketData(root: RootJson, networkPath: string): Promise<MarketData> {
     const [networkKey] = networkPath.split('/');
     if (!networkKey) {
-      this.logger.error(
-        `Invalid networkPath format: '${root.networkPath}'. Expected format: 'network/market'`,
-      );
+      this.logger.error('Invalid networkPath format', {
+        networkPath: root.networkPath,
+        expectedFormat: 'network/market',
+      });
       throw new Error(`Invalid networkPath format: '${root.networkPath}'`);
     }
 
@@ -123,21 +126,26 @@ export class ContractService implements OnModuleInit {
     try {
       provider = this.providerFactory.get(networkKey);
     } catch (e) {
-      this.logger.error(`Unsupported network '${networkKey}' in path '${root.networkPath}'`);
+      this.logger.error('Unsupported network in path', {
+        network: networkKey,
+        path: root.networkPath,
+      });
       throw e;
     }
+
+    const blockTag = await this.getSafeBlockNumber(networkKey);
 
     const cometAddress = root.comet;
     const cometContract = new ethers.Contract(cometAddress, CometABI, provider) as any;
 
-    const extensionDelegateAddress = await cometContract.extensionDelegate();
+    const extensionDelegateAddress = await cometContract.extensionDelegate({ blockTag });
     const extensionDelegateContract = new ethers.Contract(
       extensionDelegateAddress,
       CometExtensionABI,
       provider,
     ) as any;
 
-    const cometSymbol = await extensionDelegateContract.symbol();
+    const cometSymbol = await extensionDelegateContract.symbol({ blockTag });
 
     const rewardsAddress = root.rewards || '';
 
@@ -179,6 +187,7 @@ export class ContractService implements OnModuleInit {
   async getAllComptrollerMarkets(comptrollerAddress: string, network: string): Promise<string[]> {
     try {
       const provider = this.providerFactory.get(network);
+      const blockTag = await this.getSafeBlockNumber(network);
 
       const comptrollerContract = new ethers.Contract(
         comptrollerAddress,
@@ -186,11 +195,15 @@ export class ContractService implements OnModuleInit {
         provider,
       ) as any;
 
-      const allMarkets = await comptrollerContract.getAllMarkets();
+      const allMarkets = await comptrollerContract.getAllMarkets({ blockTag });
 
       return allMarkets;
     } catch (error) {
-      this.logger.error(`Error finding comptroller markets for ${comptrollerAddress}:`, error);
+      this.logger.error('Error finding comptroller markets', {
+        comptrollerAddress,
+        network,
+        error: error instanceof Error ? error.message : String(error),
+      });
       throw error;
     }
   }
@@ -198,14 +211,19 @@ export class ContractService implements OnModuleInit {
   async getMarketSymbol(marketAddress: string, network: string): Promise<string> {
     try {
       const provider = this.providerFactory.get(network);
+      const blockTag = await this.getSafeBlockNumber(network);
 
       const marketContract = new ethers.Contract(marketAddress, MarketV2ABI, provider) as any;
 
-      const symbol = await marketContract.symbol();
+      const symbol = await marketContract.symbol({ blockTag });
 
       return symbol;
     } catch (error) {
-      this.logger.error(`Error finding market symbol for ${marketAddress}:`, error);
+      this.logger.error('Error finding market symbol', {
+        marketAddress,
+        network,
+        error: error instanceof Error ? error.message : String(error),
+      });
       throw error;
     }
   }
@@ -213,20 +231,24 @@ export class ContractService implements OnModuleInit {
   async getCometBaseToken(cometAddress: string, network: string) {
     try {
       const provider = this.providerFactory.get(network);
+      const blockTag = await this.getSafeBlockNumber(network);
 
       const cometContract = new ethers.Contract(cometAddress, CometABI, provider) as any;
 
-      const tokenAddress = await cometContract.baseToken();
+      const tokenAddress = await cometContract.baseToken({ blockTag });
 
       const tokenContract = new ethers.Contract(tokenAddress, ERC20ABI, provider) as any;
 
-      const symbol = await tokenContract.symbol();
-
-      const decimals = await tokenContract.decimals();
+      const symbol = await tokenContract.symbol({ blockTag });
+      const decimals = await tokenContract.decimals({ blockTag });
 
       return { address: tokenAddress, symbol, decimals };
     } catch (error) {
-      this.logger.error(`Error getting comet ${cometAddress} base token:`, error);
+      this.logger.error('Error getting comet base token', {
+        cometAddress,
+        network,
+        error: error instanceof Error ? error.message : String(error),
+      });
       throw error;
     }
   }
@@ -243,10 +265,11 @@ export class ContractService implements OnModuleInit {
       }
 
       const provider = this.providerFactory.get(network);
+      const blockTag = await this.getSafeBlockNumber(network);
 
       const marketContract = new ethers.Contract(marketAddress, MarketV2ABI, provider) as any;
 
-      const tokenAddress = await marketContract.underlying();
+      const tokenAddress = await marketContract.underlying({ blockTag });
 
       const bytes32Tokens = [
         '0x89d24A6b4CcB1B6fAA2625fE562bDD9a23260359',
@@ -257,20 +280,21 @@ export class ContractService implements OnModuleInit {
 
       const tokenContract = new ethers.Contract(tokenAddress, tokenABI, provider) as any;
 
-      const rawSymbol = await tokenContract.symbol();
+      const rawSymbol = await tokenContract.symbol({ blockTag });
 
       const symbol = bytes32Tokens.includes(tokenAddress)
         ? ethers.toUtf8String(rawSymbol).replace(/\u0000/g, '')
         : rawSymbol;
 
-      const decimals = await tokenContract.decimals();
+      const decimals = await tokenContract.decimals({ blockTag });
 
       return { address: tokenAddress, symbol, decimals };
     } catch (error) {
-      this.logger.error(
-        `Error getting market v2 ${marketAddress} underlying token in network ${network}:`,
-        error,
-      );
+      this.logger.error('Error getting market v2 underlying token', {
+        marketAddress,
+        network,
+        error: error instanceof Error ? error.message : String(error),
+      });
       throw error;
     }
   }
@@ -280,12 +304,13 @@ export class ContractService implements OnModuleInit {
     cometAddress: string,
     network: string,
     provider: ethers.JsonRpcProvider,
-  ) {
+    blockTag: number,
+  ): Promise<string> {
     const legacyNetworks = ['mainnet', 'polygon'];
     const rewardsABI = legacyNetworks.includes(network) ? LegacyRewardsABI : RewardsABI;
     const rewardsContract = new ethers.Contract(rewardsAddress, rewardsABI, provider) as any;
 
-    const rewardConfig = await rewardsContract.rewardConfig(cometAddress);
+    const rewardConfig = await rewardsContract.rewardConfig(cometAddress, { blockTag });
     const tokenAddress = rewardConfig[0];
     return tokenAddress;
   }
@@ -354,6 +379,20 @@ export class ContractService implements OnModuleInit {
     } catch (error) {
       this.logger.warn(`Block cache SET error: ${(error as Error).message}`);
     }
+  }
+
+  /**
+   * Returns a finalized block number for the given network (~15 min lag per network config).
+   * Used so all contract reads in a flow are consistent and not subject to reorg.
+   */
+  private async getSafeBlockNumber(network: string): Promise<number> {
+    const finalityConfirmations = this.networkService.getFinalityConfirmations(network);
+    const provider = this.providerFactory.get(network);
+    const latestBlock = await provider.getBlock('latest');
+    if (!latestBlock) {
+      throw new Error(`Could not fetch latest block for network ${network}`);
+    }
+    return Math.max(0, latestBlock.number - finalityConfirmations);
   }
 
   // ==================== BLOCK SEARCH METHODS ====================
