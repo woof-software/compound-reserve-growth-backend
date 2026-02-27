@@ -60,72 +60,8 @@ export class CapoService {
       const oraclesByNetwork = this.groupOraclesByNetwork(oracles);
 
       for (const [network, networkOracles] of oraclesByNetwork) {
-        let safeBlockNumber: number;
-        try {
-          const lagConfirmations = this.networkService.getFinalityConfirmations(network);
-          const provider = this.providerFactory.get(network);
-          const latestBlock = await provider.getBlock('latest');
-
-          if (!latestBlock) {
-            this.logger.warn(`Could not get latest block for network: ${network}`);
-            continue;
-          }
-
-          safeBlockNumber = Math.max(0, latestBlock.number - lagConfirmations);
-          this.logger.log(
-            `Using lagged block for oracle reads network=${network} latestBlock=${latestBlock.number} safeBlock=${safeBlockNumber} lagBlocks=${lagConfirmations}`,
-          );
-        } catch (error) {
-          const message = error instanceof Error ? error.message : String(error);
-          this.logger.error(`Failed to prepare lagged block for network: ${network}: ${message}`);
-          continue;
-        }
-
         for (const oracle of networkOracles) {
-          try {
-            const data = await this.oracleService.getOracleData(oracle, safeBlockNumber);
-            const capoValues = this.oracleService.calculateCapoValues(data);
-
-            this.logger.log(
-              `Oracle ${oracle.description}: Current growth rate: ${capoValues.currentGrowthRate.toFixed(2)}%, Max allowed: ${capoValues.maxGrowthRate.toFixed(2)}%, Utilization: ${capoValues.utilizationPercent.toFixed(2)}%, Capped: ${capoValues.isCapped}`,
-            );
-
-            const snapshot = this.snapshotRepository.create({
-              oracleAddress: oracle.address,
-              oracleName: oracle.description,
-              chainId: oracle.chainId,
-              ratio: data.ratio,
-              price: data.price,
-              snapshotRatio: data.snapshotRatio,
-              snapshotTimestamp: data.snapshotTimestamp,
-              maxYearlyGrowthPercent: data.maxYearlyGrowthPercent,
-              isCapped: data.isCapped,
-              currentGrowthRate: capoValues.currentGrowthRate.toString(),
-              blockNumber: data.blockNumber,
-              metadata: {
-                maxRatio: capoValues.maxRatio,
-                utilizationPercent: capoValues.utilizationPercent,
-                timestamp: data.timestamp,
-              },
-            });
-
-            await this.snapshotRepository.save(snapshot);
-            await this.checkAlerts(oracle, data, capoValues);
-            await this.check24hPriceGrowth(oracle, data);
-          } catch (error) {
-            const message = error instanceof Error ? error.message : String(error);
-            this.logger.error(
-              `Failed to collect data for oracle address: ${oracle.address} description: "${oracle.description}" error: ${message}`,
-            );
-            await this.alertService.createAlert(
-              oracle.address,
-              oracle.chainId,
-              'ERROR',
-              'critical',
-              `Failed to collect oracle data: ${message}`,
-              { error: error instanceof Error ? error.toString() : String(error) },
-            );
-          }
+          await this.collectOracleForNetwork(oracle, network);
         }
       }
 
@@ -135,6 +71,87 @@ export class CapoService {
       this.logger.error(`Error during oracle data collection: ${message}`);
     } finally {
       this.isCollecting = false;
+    }
+  }
+
+  private async getSafeBlockNumberForNetwork(network: string): Promise<number | null> {
+    try {
+      const lagConfirmations = this.networkService.getFinalityConfirmations(network);
+      const provider = this.providerFactory.get(network);
+      const latestBlock = await provider.getBlock('latest');
+
+      if (!latestBlock) {
+        this.logger.warn(`Could not get latest block for network: ${network}`);
+        return null;
+      }
+
+      const safeBlockNumber = Math.max(0, latestBlock.number - lagConfirmations);
+      this.logger.log(
+        `Using lagged block for oracle reads network=${network} latestBlock=${latestBlock.number} safeBlock=${safeBlockNumber} lagBlocks=${lagConfirmations}`,
+      );
+
+      return safeBlockNumber;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.error(`Failed to prepare lagged block for network: ${network}: ${message}`);
+      return null;
+    }
+  }
+
+  private async collectOracleForNetwork(oracle: Oracle, network: string): Promise<void> {
+    const safeBlockNumber = await this.getSafeBlockNumberForNetwork(network);
+
+    if (safeBlockNumber === null) {
+      return;
+    }
+
+    try {
+      const data = await this.oracleService.getOracleData(oracle, safeBlockNumber);
+      const capoValues = this.oracleService.calculateCapoValues(data);
+
+      this.logger.log(
+        `Oracle ${oracle.description}: Current growth rate: ${capoValues.currentGrowthRate.toFixed(
+          2,
+        )}%, Max allowed: ${capoValues.maxGrowthRate.toFixed(
+          2,
+        )}%, Utilization: ${capoValues.utilizationPercent.toFixed(2)}%, Capped: ${capoValues.isCapped}`,
+      );
+
+      const snapshot = this.snapshotRepository.create({
+        oracleAddress: oracle.address,
+        oracleName: oracle.description,
+        chainId: oracle.chainId,
+        ratio: data.ratio,
+        price: data.price,
+        snapshotRatio: data.snapshotRatio,
+        snapshotTimestamp: data.snapshotTimestamp,
+        maxYearlyGrowthPercent: data.maxYearlyGrowthPercent,
+        isCapped: data.isCapped,
+        currentGrowthRate: capoValues.currentGrowthRate.toString(),
+        blockNumber: data.blockNumber,
+        metadata: {
+          maxRatio: capoValues.maxRatio,
+          utilizationPercent: capoValues.utilizationPercent,
+          timestamp: data.timestamp,
+        },
+      });
+
+      await this.snapshotRepository.save(snapshot);
+      await this.checkAlerts(oracle, data, capoValues);
+      await this.check24hPriceGrowth(oracle, data);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.error(
+        `Failed to collect data for oracle address: ${oracle.address} description: "${oracle.description}" error: ${message}`,
+      );
+      await this.alertService.createAlert(
+        oracle.address,
+        oracle.chainId,
+        'ERROR',
+        'critical',
+        `Failed to collect oracle data: ${message}`,
+        { error: error instanceof Error ? error.toString() : String(error) },
+      );
     }
   }
 
