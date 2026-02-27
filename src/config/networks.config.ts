@@ -58,7 +58,6 @@ export default registerAs('networks', (): NetworkConfig[] => [
     network: 'base',
     chainId: 8453,
     url: `https://rpc.ankr.com/base/${process.env.ANKR_KEY}`,
-    // url: `https://multi-boldest-patina.unichain-mainnet.quiknode.pro/${process.env.UNICHAIN_QUICKNODE_KEY}`,
     // ~2.00s blocks -> 450 confirmations ~= 900s (~15m)
     finalityConfirmations: 450,
   },
