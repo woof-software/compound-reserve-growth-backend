@@ -15,8 +15,8 @@ export default registerAs('networks', (): NetworkConfig[] => [
     network: 'sepolia',
     chainId: 11155111,
     url: `https://rpc.ankr.com/eth_sepolia/${process.env.ANKR_KEY}`,
-    // ~12.37s blocks -> 73 confirmations ~= 903s (~15m)
-    finalityConfirmations: 73,
+    // ~12.00s blocks -> 75 confirmations ~= 903s (~15m)
+    finalityConfirmations: 75,
   },
   {
     network: 'ronin',
@@ -65,35 +65,35 @@ export default registerAs('networks', (): NetworkConfig[] => [
     network: 'arbitrum',
     chainId: 42161,
     url: `https://rpc.ankr.com/arbitrum/${process.env.ANKR_KEY}`,
-    // ~0.251s blocks -> 3589 confirmations ~= 900s (~15m)
-    finalityConfirmations: 3589,
+    // ~0.250s blocks -> 3590 confirmations ~= 900s (~15m)
+    finalityConfirmations: 3590,
   },
   {
     network: 'avalanche',
     chainId: 43114,
     url: 'https://api.avax.network/ext/bc/C/rpc',
-    // ~1.022s blocks -> 881 confirmations ~= 900s (~15m)
-    finalityConfirmations: 881,
+    // ~1.00s blocks -> 880 confirmations ~= 900s (~15m)
+    finalityConfirmations: 880,
   },
   {
     network: 'fuji',
     chainId: 43113,
     url: 'https://api.avax-test.network/ext/bc/C/rpc',
-    // ~2.268s blocks -> 397 confirmations ~= 900s (~15m)
-    finalityConfirmations: 397,
+    // ~2.250s blocks -> 400 confirmations ~= 900s (~15m)
+    finalityConfirmations: 400,
   },
   {
     network: 'scroll',
     chainId: 534352,
     url: `https://rpc.ankr.com/scroll/${process.env.ANKR_KEY}`,
-    // ~1.199s blocks -> 751 confirmations ~= 901s (~15m)
-    finalityConfirmations: 751,
+    // ~1.20s blocks -> 750 confirmations ~= 901s (~15m)
+    finalityConfirmations: 750,
   },
   {
     network: 'linea',
     chainId: 59144,
     url: `https://omniscient-hardworking-gas.linea-mainnet.quiknode.pro/${process.env.LINEA_QUICKNODE_KEY}/`,
-    // ~1.874s blocks -> 481 confirmations ~= 901s (~15m)
-    finalityConfirmations: 481,
+    // ~1.90s blocks -> 480 confirmations ~= 901s (~15m)
+    finalityConfirmations: 480,
   },
 ]);
