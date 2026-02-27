@@ -290,7 +290,7 @@ export class DiscoveryService implements OnModuleInit {
 
   /**
    * Returns a lagged block number for the given network, caching the result per discovery run.
-   * If the latest block cannot be fetched, stores null and returns null for that network.
+   * If the latest block cannot be fetched, returns null without poisoning cache.
    */
   private async getSafeBlockNumber(
     network: string,
@@ -307,7 +307,6 @@ export class DiscoveryService implements OnModuleInit {
 
       if (!latestBlock) {
         this.logger.warn(`Could not get latest block during discovery network: ${network}`);
-        cache.set(network, null);
         return null;
       }
 
@@ -324,7 +323,6 @@ export class DiscoveryService implements OnModuleInit {
       this.logger.error(
         `Failed to compute safe block number for discovery network: ${network} error: ${message}`,
       );
-      cache.set(network, null);
       return null;
     }
   }
