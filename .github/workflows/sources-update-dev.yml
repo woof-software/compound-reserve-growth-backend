@@ -1,33 +1,51 @@
-name: Update sources (dev)
+name: Update sources DEV
 
 on:
   workflow_dispatch:
 
-jobs:
-  cli:
-    runs-on: ubuntu-22.04
-    environment: dev
+env:
+  ssh-key: "${{ secrets.DEV_SSH_KEY }}"
+  host: "${{ vars.DEV_NAME }}@${{ vars.DEV_IP }}"
+  name: "compound-update-sources-dev"
 
+jobs:
+  Build:
+    runs-on: ubuntu-22.04
     env:
-      NODE_ENV: development
-      DB_HOST: ${{ secrets.DB_HOST }}
-      DB_PORT: ${{ secrets.DB_PORT }}
-      DB_NAME: ${{ secrets.DB_NAME }}
-      DB_USER: ${{ secrets.DB_USER }}
-      DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+      tag: "latest" #or ${{ github.sha }}
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v6
 
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: "22"
-          cache: "yarn"
+      - name: Build docker image
+        run: |
+          docker build . -t ${{ env.name }}:${{ env.tag }}
 
-      - name: Install dependencies
-        run: yarn install --frozen-lockfile
+      - name: Save docker image
+        run: |
+          docker save -o ${{ env.name }}.tar ${{ env.name }}:${{ env.tag }}
 
-      - name: CLI sources:update
-        run: yarn cli:sources-update
+      - name: Generate SSH key
+        run: |
+          echo "${{ env.ssh-key }}" > ssh-key.pem
+          sudo chmod 400 ssh-key.pem
+
+      - name: Copy image to EC2
+        run: |
+          scp -i ssh-key.pem -o StrictHostKeyChecking=no ${{ env.name }}.tar ${{ env.host }}:${{ env.name }}.tar
+
+  Deploy:
+    needs: Build
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Generate SSH key
+        run: |
+          echo "${{ env.ssh-key }}" > ssh-key.pem
+          sudo chmod 400 ssh-key.pem
+
+      - name: Start image
+        run: |
+          ssh -i ssh-key.pem -o StrictHostKeyChecking=no ${{ env.host }} ' \
+          sudo docker load -i '${{ env.name }}'.tar && \
+          sudo docker compose -f backend/compose-sources-update.yaml up -d '
