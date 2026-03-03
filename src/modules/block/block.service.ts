@@ -228,7 +228,11 @@ export class BlockService implements OnModuleInit {
         typeof cachedRaw === 'string' ? (JSON.parse(cachedRaw) as unknown) : (cachedRaw as unknown);
 
       return this.isCachedBlockData(parsedValue) ? parsedValue : null;
-    } catch {
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.warn(
+        `Block cache GET error network=${network} blockNumber=${blockNumber} error=${message}`,
+      );
       return null;
     }
   }
@@ -284,7 +288,11 @@ export class BlockService implements OnModuleInit {
         } else {
           right = mid;
         }
-      } catch {
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        this.logger.warn(
+          `Binary search block read failed network=${network} mid=${mid} targetTs=${targetTs} error=${message}`,
+        );
         left = mid + 1;
       }
     }
@@ -375,10 +383,6 @@ export class BlockService implements OnModuleInit {
 
   private getArbitrumConfigForBlock(blockNumber: number): BlockTimingPeriod {
     return this.getNetworkPeriodConfigForBlock('arbitrum', blockNumber);
-  }
-
-  private getScrollConfigForBlock(blockNumber: number): BlockTimingPeriod {
-    return this.getNetworkPeriodConfigForBlock('scroll', blockNumber);
   }
 
   private getNetworkConfigForBlock(network: string, blockNumber: number): BlockTimingConfigItem {

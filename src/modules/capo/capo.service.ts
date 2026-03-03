@@ -1,4 +1,4 @@
-﻿import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Cron, CronExpression } from '@nestjs/schedule';
@@ -74,29 +74,13 @@ export class CapoService {
     }
   }
 
-  private async getSafeBlockNumberForNetwork(network: string): Promise<number | null> {
+  private async collectOracleForNetwork(oracle: Oracle, network: string): Promise<void> {
     try {
       const safeBlockNumber = await this.blockService.getSafeBlockNumber(network);
       this.logger.log(
         `Using lagged block for oracle reads network=${network} safeBlock=${safeBlockNumber}`,
       );
 
-      return safeBlockNumber;
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      this.logger.error(`Failed to prepare lagged block for network: ${network}: ${message}`);
-      return null;
-    }
-  }
-
-  private async collectOracleForNetwork(oracle: Oracle, network: string): Promise<void> {
-    const safeBlockNumber = await this.getSafeBlockNumberForNetwork(network);
-
-    if (safeBlockNumber === null) {
-      return;
-    }
-
-    try {
       const data = await this.oracleService.getOracleData(oracle, safeBlockNumber);
       const capoValues = this.oracleService.calculateCapoValues(data);
 

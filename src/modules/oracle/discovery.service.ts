@@ -191,8 +191,9 @@ export class DiscoveryService implements OnModuleInit {
             comet.network,
             blockTag,
           );
-
-          this.logger.log(`Oracle info: ${JSON.stringify(oracleInfo)}`);
+          this.logger.log(
+            `Oracle info address=${oracleInfo.address} network=${oracleInfo.network} chainId=${oracleInfo.chainId} maxYearlyRatioGrowthPercent=${oracleInfo.maxYearlyRatioGrowthPercent}`,
+          );
 
           if (oracleInfo) {
             await this.oracleRepository.upsert(oracleInfo, ['address']);
