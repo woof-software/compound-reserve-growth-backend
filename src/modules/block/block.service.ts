@@ -17,11 +17,25 @@ import type {
   CachedBlockData,
 } from './block.types';
 
-import { DAY_IN_SEC, SAFE_BLOCK_LAG_TIME_IN_SEC, SEC_IN_MS } from '@app/common/constants';
+import {
+  DAY_IN_SEC,
+  HOUR_IN_SEC,
+  MINUTE_IN_SEC,
+  SAFE_BLOCK_LAG_TIME_IN_SEC,
+  SEC_IN_MS,
+} from '@app/common/constants';
 
 @Injectable()
 export class BlockService implements OnModuleInit {
   private readonly logger = new Logger(BlockService.name);
+  private readonly ARBITRUM_WIDE_RANGE_THRESHOLD_BLOCKS = 100_000;
+  private readonly LINEA_ALLOWED_SLIP_IN_SEC = 10 * MINUTE_IN_SEC;
+  private readonly DEFAULT_ALLOWED_SLIP_IN_SEC = HOUR_IN_SEC;
+  private readonly ESTIMATION_SEARCH_PADDING_BLOCKS = 500;
+  private readonly BLOCK_CACHE_TTL_DAYS = 30;
+  private readonly BINARY_SEARCH_MAX_ITERATIONS = 25;
+  private readonly ARBITRUM_FAST_PATH_WINDOW_IN_SEC = 7 * DAY_IN_SEC;
+  private readonly ARBITRUM_SEARCH_RANGE_IN_SEC = HOUR_IN_SEC;
 
   constructor(
     @Inject(CACHE_MANAGER) private readonly cacheManager: Cache,
@@ -32,6 +46,7 @@ export class BlockService implements OnModuleInit {
   ) {}
 
   async onModuleInit(): Promise<void> {
+    // Ensure all configured networks have block timing data before any block-based operations run.
     this.validateBlockTimingConfiguration();
     await this.initializeRedis();
   }
@@ -97,7 +112,10 @@ export class BlockService implements OnModuleInit {
   ): Promise<number> {
     const upperBound = toBlock ?? (await provider.getBlockNumber());
 
-    if (network === 'arbitrum' && upperBound - fromBlock > 100000) {
+    if (
+      network === 'arbitrum' &&
+      upperBound - fromBlock > this.ARBITRUM_WIDE_RANGE_THRESHOLD_BLOCKS
+    ) {
       return this.findArbitrumBlockByTimestamp(provider, targetTs, fromBlock, upperBound);
     }
 
@@ -117,15 +135,22 @@ export class BlockService implements OnModuleInit {
 
     const estimatedBlockData = await this.getCachedBlock(network, provider, estimatedBlock);
 
-    const allowedSlip = network === 'linea' ? 600 : 3600;
+    const allowedSlip =
+      network === 'linea' ? this.LINEA_ALLOWED_SLIP_IN_SEC : this.DEFAULT_ALLOWED_SLIP_IN_SEC;
     if (Math.abs(estimatedBlockData.timestamp - targetTs) < allowedSlip) {
       return estimatedBlock;
     }
 
     const timeError = estimatedBlockData.timestamp - targetTs;
     const blockCorrection = Math.round(timeError / avgBlockTime);
-    const searchStart = Math.max(fromBlock, estimatedBlock - Math.abs(blockCorrection) - 500);
-    const searchEnd = Math.min(upperBound, estimatedBlock - blockCorrection + 500);
+    const searchStart = Math.max(
+      fromBlock,
+      estimatedBlock - Math.abs(blockCorrection) - this.ESTIMATION_SEARCH_PADDING_BLOCKS,
+    );
+    const searchEnd = Math.min(
+      upperBound,
+      estimatedBlock - blockCorrection + this.ESTIMATION_SEARCH_PADDING_BLOCKS,
+    );
 
     return this.binarySearchWithCache(network, provider, targetTs, searchStart, searchEnd);
   }
@@ -222,7 +247,7 @@ export class BlockService implements OnModuleInit {
         hash,
         cachedAt: Date.now(),
       };
-      const ttlSeconds = 30 * DAY_IN_SEC;
+      const ttlSeconds = this.BLOCK_CACHE_TTL_DAYS * DAY_IN_SEC;
 
       if (this.redisClient) {
         await this.redisClient.setex(key, ttlSeconds, JSON.stringify(blockData));
@@ -247,7 +272,7 @@ export class BlockService implements OnModuleInit {
     let right = toBlock;
     let iterations = 0;
 
-    while (left < right && iterations < 25) {
+    while (left < right && iterations < this.BINARY_SEARCH_MAX_ITERATIONS) {
       iterations++;
       const mid = Math.floor((left + right) / 2);
 
@@ -277,12 +302,12 @@ export class BlockService implements OnModuleInit {
     const referenceBlock = await this.getCachedBlock('arbitrum', provider, fromBlock);
 
     const timeDiff = targetTs - referenceBlock.timestamp;
-    if (timeDiff < 7 * 24 * 3600) {
+    if (timeDiff < this.ARBITRUM_FAST_PATH_WINDOW_IN_SEC) {
       const estimatedBlockDiff = Math.round(timeDiff / startPeriod.avgBlockTime);
       let estimatedBlock = fromBlock + estimatedBlockDiff;
       estimatedBlock = Math.max(fromBlock, Math.min(toBlock, estimatedBlock));
 
-      const searchRange = Math.round(3600 / startPeriod.avgBlockTime);
+      const searchRange = Math.round(this.ARBITRUM_SEARCH_RANGE_IN_SEC / startPeriod.avgBlockTime);
       const searchStart = Math.max(fromBlock, estimatedBlock - searchRange);
       const searchEnd = Math.min(toBlock, estimatedBlock + searchRange);
 
@@ -306,8 +331,10 @@ export class BlockService implements OnModuleInit {
 
       const nextBlockData = await this.getCachedBlock('arbitrum', provider, nextBlock);
 
-      if (Math.abs(nextBlockData.timestamp - targetTs) < 3600) {
-        const searchRange = Math.round(3600 / currentPeriod.avgBlockTime);
+      if (Math.abs(nextBlockData.timestamp - targetTs) < this.ARBITRUM_SEARCH_RANGE_IN_SEC) {
+        const searchRange = Math.round(
+          this.ARBITRUM_SEARCH_RANGE_IN_SEC / currentPeriod.avgBlockTime,
+        );
         const searchStart = Math.max(fromBlock, nextBlock - searchRange);
         const searchEnd = Math.min(toBlock, nextBlock + searchRange);
 
