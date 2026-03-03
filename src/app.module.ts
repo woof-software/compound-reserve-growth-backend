@@ -35,6 +35,7 @@ import redis from 'config/redis';
 import google from 'config/google';
 import admin from 'config/admin';
 import reserveSourcesConfig from 'config/reserve-sources.config';
+import blockTimingConfig from 'config/block-timing.config';
 import { DatabaseModule } from 'database/database.module';
 import { Logger } from 'infrastructure/logger';
 import { ExceptionInterceptor } from 'infrastructure/http/interceptors/exception.interceptor';
@@ -43,7 +44,16 @@ import { ExceptionInterceptor } from 'infrastructure/http/interceptors/exception
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      load: [appConfig, databaseConfig, networksConfig, redis, google, admin, reserveSourcesConfig],
+      load: [
+        appConfig,
+        databaseConfig,
+        networksConfig,
+        redis,
+        google,
+        admin,
+        reserveSourcesConfig,
+        blockTimingConfig,
+      ],
     }),
     ScheduleModule.forRoot(),
     ThrottlerModule.forRoot({
