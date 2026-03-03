@@ -7,7 +7,13 @@ import { ReservesRepository } from './reserves-repository.service';
 import { IncomesRepository } from './incomes-repository.service';
 import { SpendsRepository } from './spends-repository.service';
 import { CreateHistoryDto } from './dto/create-history.dto';
-import { Reserve, Incomes, Spends, StatsHistory, IncentivesHistory } from './entities';
+import {
+  ReserveEntity,
+  IncomesEntity,
+  SpendsEntity,
+  StatsHistory,
+  IncentivesHistory,
+} from './entities';
 import { PaginationDto } from './dto/pagination.dto';
 import { OffsetDto } from './dto/offset.dto';
 
@@ -29,11 +35,11 @@ export class HistoryService {
   ) {}
 
   // ?: not in use
-  async create(dto: CreateHistoryDto): Promise<Reserve> {
+  async create(dto: CreateHistoryDto): Promise<ReserveEntity> {
     const source = await this.sourceRepo.findById(dto.sourceId);
     if (!source) throw new NotFoundException(`Source ${dto.sourceId} not found`);
 
-    const reserve = new Reserve(
+    const reserve = new ReserveEntity(
       source,
       dto.blockNumber,
       dto.quantity,
@@ -43,39 +49,43 @@ export class HistoryService {
     );
     return this.reservesRepo.save(reserve);
   }
-  async createReservesWithSource(reserve: Reserve): Promise<Reserve> {
+  async createReservesWithSource(reserve: ReserveEntity): Promise<ReserveEntity> {
     return this.reservesRepo.save(reserve);
   }
 
-  async createIncomesWithSource(incomes: Incomes): Promise<Incomes> {
+  async createIncomesWithSource(incomes: IncomesEntity): Promise<IncomesEntity> {
     return this.incomesRepo.save(incomes);
   }
 
-  async createSpendsWithSource(spends: Spends): Promise<Spends> {
+  async createSpendsWithSource(spends: SpendsEntity): Promise<SpendsEntity> {
     return this.spendsRepo.save(spends);
   }
 
-  async findReservesById(id: number): Promise<Reserve> {
+  async findReservesById(id: number): Promise<ReserveEntity> {
     return this.reservesRepo.findById(id);
   }
 
-  async findIncomesById(id: number): Promise<Incomes> {
+  async findIncomesById(id: number): Promise<IncomesEntity> {
     return this.incomesRepo.findById(id);
   }
 
-  async findSpendsById(id: number): Promise<Spends> {
+  async findSpendsById(id: number): Promise<SpendsEntity> {
     return this.spendsRepo.findById(id);
   }
 
-  async findIncomesBySource(source: SourceEntity): Promise<Incomes> {
+  async findIncomesBySource(source: SourceEntity): Promise<IncomesEntity> {
     return this.incomesRepo.findBySourceId(source.id);
   }
 
-  async findSpendsBySource(source: SourceEntity): Promise<Spends> {
+  async findSpendsBySource(source: SourceEntity): Promise<SpendsEntity> {
     return this.spendsRepo.findBySourceId(source.id);
   }
 
-  async getTreasuryHistory(): Promise<Reserve[]> {
+  async findLatestReserveBySource(source: SourceEntity): Promise<ReserveEntity | null> {
+    return this.reservesRepo.findLatestBySourceId(source.id);
+  }
+
+  async getTreasuryHistory(): Promise<ReserveEntity[]> {
     const reserves = await this.reservesRepo.getTreasuryReserves();
     if (!reserves || reserves.length === 0) {
       throw new NotFoundException('No treasury history found');
@@ -85,15 +95,15 @@ export class HistoryService {
 
   async getPaginatedTreasuryHistory(
     paginationDto: PaginationDto,
-  ): Promise<PaginatedDataDto<Reserve>> {
+  ): Promise<PaginatedDataDto<ReserveEntity>> {
     return this.reservesRepo.getPaginatedTreasuryReserves(paginationDto);
   }
 
-  async getOffsetTreasuryHistory(dto: OffsetDto): Promise<OffsetDataDto<Reserve>> {
+  async getOffsetTreasuryHistory(dto: OffsetDto): Promise<OffsetDataDto<ReserveEntity>> {
     return this.reservesRepo.getOffsetTreasuryReserves(dto);
   }
 
-  async getRevenueHistory(): Promise<Reserve[]> {
+  async getRevenueHistory(): Promise<ReserveEntity[]> {
     const reserves = await this.reservesRepo.getRevenueReserves();
     if (!reserves || reserves.length === 0) {
       throw new NotFoundException('No revenue history found');
@@ -103,15 +113,15 @@ export class HistoryService {
 
   async getPaginatedRevenueHistory(
     paginationDto: PaginationDto,
-  ): Promise<PaginatedDataDto<Reserve>> {
+  ): Promise<PaginatedDataDto<ReserveEntity>> {
     return this.reservesRepo.getPaginatedRevenueReserves(paginationDto);
   }
 
-  async getOffsetRevenueHistory(dto: OffsetDto): Promise<OffsetDataDto<Reserve>> {
+  async getOffsetRevenueHistory(dto: OffsetDto): Promise<OffsetDataDto<ReserveEntity>> {
     return this.reservesRepo.getOffsetRevenueReserves(dto);
   }
 
-  async getTreasuryHoldings(): Promise<Reserve[]> {
+  async getTreasuryHoldings(): Promise<ReserveEntity[]> {
     const holdings = await this.reservesRepo.getTreasuryHoldings();
     if (!holdings || holdings.length === 0) {
       throw new NotFoundException('No treasury holdings found');
@@ -127,7 +137,7 @@ export class HistoryService {
     ]);
 
     // Create a Map for quick lookup of spends by sourceId and date
-    const spendsMap = new Map<string, Spends>();
+    const spendsMap = new Map<string, SpendsEntity>();
     spendsData.data.forEach((spData) => {
       const key = generateDailyKey(spData.source.id, spData.date);
       spendsMap.set(key, spData);

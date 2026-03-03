@@ -4,42 +4,49 @@ import { Repository } from 'typeorm';
 
 import { OffsetDto } from 'modules/history/dto/offset.dto';
 
-import { Incomes } from './entities';
+import { IncomesEntity } from './entities';
 
 import { OffsetDataDto } from '@app/common/dto/offset-data.dto';
 import { Algorithm } from '@app/common/enum/algorithm.enum';
 
 @Injectable()
 export class IncomesRepository {
-  constructor(@InjectRepository(Incomes) private readonly incomesRepository: Repository<Incomes>) {}
+  constructor(
+    @InjectRepository(IncomesEntity) private readonly incomesRepository: Repository<IncomesEntity>,
+  ) {}
 
-  async save(reserve: Incomes): Promise<Incomes> {
+  async save(reserve: IncomesEntity): Promise<IncomesEntity> {
     return this.incomesRepository.save(reserve);
   }
 
-  async findById(id: number): Promise<Incomes> {
-    return this.incomesRepository.findOne({
-      where: { id },
-      relations: { source: true },
-    });
+  async findById(id: number): Promise<IncomesEntity> {
+    return this.incomesRepository
+      .createQueryBuilder('incomes')
+      .leftJoinAndSelect('incomes.source', 'source')
+      .where('source.deletedAt IS NULL')
+      .andWhere('incomes.id = :id', { id })
+      .getOne();
   }
 
-  async findBySourceId(sourceId: number): Promise<Incomes> {
-    return this.incomesRepository.findOne({
-      where: { source: { id: sourceId } },
-      relations: { source: true },
-      order: { blockNumber: 'DESC' },
-    });
+  async findBySourceId(sourceId: number): Promise<IncomesEntity> {
+    return this.incomesRepository
+      .createQueryBuilder('incomes')
+      .leftJoinAndSelect('incomes.source', 'source')
+      .where('source.deletedAt IS NULL')
+      .andWhere('source.id = :sourceId', { sourceId })
+      .orderBy('incomes.blockNumber', 'DESC')
+      .getOne();
   }
 
-  async getOffsetStats(dto: OffsetDto): Promise<OffsetDataDto<Incomes>> {
+  async getOffsetStats(dto: OffsetDto): Promise<OffsetDataDto<IncomesEntity>> {
     const algorithmsArrayLiteral = `{${[Algorithm.COMET_STATS].join(',')}}`;
 
     const query = this.incomesRepository
       .createQueryBuilder('incomes')
       .leftJoinAndSelect('incomes.source', 'source')
       .leftJoinAndSelect('source.asset', 'asset')
-      .where('source.algorithm && :algorithms::text[]', {
+      .where('source.deletedAt IS NULL')
+      .andWhere('source.algorithm && :algorithms::text[]', {
         algorithms: algorithmsArrayLiteral,
       });
 
@@ -49,18 +56,19 @@ export class IncomesRepository {
 
     const [incomes, total] = await query.getManyAndCount();
 
-    return new OffsetDataDto<Incomes>(incomes, dto.limit ?? null, dto.offset ?? 0, total);
+    return new OffsetDataDto<IncomesEntity>(incomes, dto.limit ?? null, dto.offset ?? 0, total);
   }
 
   async deleteAll(): Promise<void> {
     await this.incomesRepository.clear();
   }
 
-  async findAllWithMissingPriceComp(): Promise<Incomes[]> {
+  async findAllWithMissingPriceComp(): Promise<IncomesEntity[]> {
     return this.incomesRepository
       .createQueryBuilder('incomes')
       .leftJoinAndSelect('incomes.source', 'source')
-      .where('incomes.priceComp IS NULL OR incomes.priceComp = 0')
+      .where('source.deletedAt IS NULL')
+      .andWhere('incomes.priceComp IS NULL OR incomes.priceComp = 0')
       .orderBy('incomes.date', 'ASC')
       .getMany();
   }

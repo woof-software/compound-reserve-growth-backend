@@ -186,7 +186,7 @@ Assets and sources are created or updated from the remote JSON; manual changes c
 +----------------------------+
              |
              v per source
-+----------------------------+   2. For each midnight UTC since creationBlock...
++----------------------------+   2. For each midnight UTC since startBlock (up to endBlock if set)...
 | ContractService.getHistory |---> `findBlockByTimestamp()` (binary search + cache)
 +----------------------------+   3. Read reserves:
              |                     - **Market v2:** `totalReserves()`
@@ -194,14 +194,15 @@ Assets and sources are created or updated from the remote JSON; manual changes c
              |                     - **Fallback:** ERC-20 balance / native ETH
              v
 +----------------------------+   4. Fetch USD price (PriceService -> CoinGecko)
-| HistoryService.create      |-+-> Persist `history` row (block, qty, price, value)
-+----------------------------+ |
-                               +-> Update source.checkedAt & blockNumber
+| HistoryService.create      |---> Persist reserve row (block, qty, price, value)
++----------------------------+
 
 Resilience features:
 - **Redis block cache** (30 days) to avoid duplicate RPC calls.
 - **Arbitrum period model** for pre-nitro vs nitro timings.
 - Failed price lookups default to `$1` and are logged + emailed.
+
+> Internally, the persistence step is implemented by `HistoryService.createReservesWithSource`.
 ```
 
 ---

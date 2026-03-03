@@ -8,7 +8,7 @@ import { PriceModule } from 'modules/price/price.module';
 import { RedisModule } from 'modules/redis/redis.module';
 import { Price } from 'modules/price/price.entity';
 
-import { Reserve, Incomes, Spends } from './entities';
+import { ReserveEntity, IncomesEntity, SpendsEntity } from './entities';
 import { ReservesRepository } from './reserves-repository.service';
 import { HistoryService } from './history.service';
 import { HistoryGetCommand } from './cli/history-get.command';
@@ -20,7 +20,7 @@ import { SpendsRepository } from './spends-repository.service';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Reserve, Incomes, Spends, Price]),
+    TypeOrmModule.forFeature([ReserveEntity, IncomesEntity, SpendsEntity, Price]),
     SourceModule,
     AssetModule,
     forwardRef(() => ContractModule),

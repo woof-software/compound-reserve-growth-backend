@@ -2,29 +2,36 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 
-import { Revenue } from './revenue.entity';
+import { RevenueEntity } from './revenue.entity';
 
 @Injectable()
 export class RevenueRepository {
-  constructor(@InjectRepository(Revenue) private readonly revenueRepository: Repository<Revenue>) {}
+  constructor(
+    @InjectRepository(RevenueEntity) private readonly revenueRepository: Repository<RevenueEntity>,
+  ) {}
 
-  async save(revenue: Revenue): Promise<Revenue> {
+  async save(revenue: RevenueEntity): Promise<RevenueEntity> {
     return this.revenueRepository.save(revenue);
   }
 
-  async findById(id: number): Promise<Revenue> {
-    return this.revenueRepository.findOne({
-      where: { id },
-      relations: { source: true },
-    });
+  async findById(id: number): Promise<RevenueEntity | null> {
+    return this.revenueRepository
+      .createQueryBuilder('revenue')
+      .innerJoinAndSelect('revenue.source', 'source')
+      .where('revenue.id = :id', { id })
+      .andWhere('source.deletedAt IS NULL')
+      .getOne();
   }
 
-  async paginate(page: number = 1, perPage: number = 20): Promise<[Revenue[], number]> {
-    return this.revenueRepository.findAndCount({
-      relations: { source: true },
-      order: { createdAt: 'DESC' },
-      skip: (page - 1) * perPage,
-      take: perPage,
-    });
+  async paginate(page: number = 1, perPage: number = 20): Promise<[RevenueEntity[], number]> {
+    const [items, total] = await this.revenueRepository
+      .createQueryBuilder('revenue')
+      .innerJoinAndSelect('revenue.source', 'source')
+      .where('source.deletedAt IS NULL')
+      .orderBy('revenue.createdAt', 'DESC')
+      .skip((page - 1) * perPage)
+      .take(perPage)
+      .getManyAndCount();
+    return [items, total];
   }
 }

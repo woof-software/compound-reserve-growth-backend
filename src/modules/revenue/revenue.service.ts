@@ -3,7 +3,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { SourceRepository } from 'modules/source/source.repository';
 
 import { RevenueRepository } from './revenue.repository';
-import { Revenue } from './revenue.entity';
+import { RevenueEntity } from './revenue.entity';
 import { CreateRevenueDto } from './dto/create-revenue.dto';
 
 @Injectable()
@@ -13,10 +13,10 @@ export class RevenueService {
     private readonly sourceRepository: SourceRepository,
   ) {}
 
-  async create(dto: CreateRevenueDto): Promise<Revenue> {
+  async create(dto: CreateRevenueDto): Promise<RevenueEntity> {
     const source = await this.sourceRepository.findById(dto.sourceId);
     if (!source) throw new NotFoundException(`Source ${dto.sourceId} not found`);
-    const revenue = new Revenue(
+    const revenue = new RevenueEntity(
       source,
       dto.blockNumber,
       dto.quantity,
@@ -27,7 +27,9 @@ export class RevenueService {
     return this.revenueRepository.save(revenue);
   }
 
-  async findById(id: number): Promise<Revenue> {
-    return this.revenueRepository.findById(id);
+  async findById(id: number): Promise<RevenueEntity> {
+    const entity = await this.revenueRepository.findById(id);
+    if (!entity) throw new NotFoundException(`Revenue ${id} not found`);
+    return entity;
   }
 }

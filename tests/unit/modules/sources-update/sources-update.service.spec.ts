@@ -40,7 +40,8 @@ describe('SourcesUpdateService', () => {
     address: string;
     asset: AssetEntity;
     algorithm: string[];
-    blockNumber?: number;
+    startBlock?: number;
+    endBlock?: number;
     network?: string;
     type?: string;
     market?: string;
@@ -50,9 +51,10 @@ describe('SourcesUpdateService', () => {
       params.network ?? 'eth',
       params.algorithm,
       params.type ?? 'treasury',
-      params.blockNumber ?? 1,
+      params.startBlock ?? 1,
       params.asset,
       params.market,
+      params.endBlock,
     );
     source.id = params.id;
     return source;
@@ -80,7 +82,9 @@ describe('SourcesUpdateService', () => {
     const syncRepo = {
       inTransaction: jest.fn(),
       listAllAssets: jest.fn(),
+      listAllAssetsIncludingDeleted: jest.fn(),
       listAllSources: jest.fn(),
+      listAllSourcesIncludingDeleted: jest.fn(),
       saveAssets: jest.fn(),
       saveSources: jest.fn(),
       deleteSourcesByIds: jest.fn(),
@@ -131,7 +135,7 @@ describe('SourcesUpdateService', () => {
       address: '0x0000000000000000000000000000000000000010',
       asset: dbAssetKeep,
       algorithm: [Algorithm.COMET, Algorithm.COMET_STATS],
-      blockNumber: 5,
+      startBlock: 5,
       market: 'old-market',
     });
     const dbSourceStale = makeSource({
@@ -139,7 +143,7 @@ describe('SourcesUpdateService', () => {
       address: '0x0000000000000000000000000000000000000020',
       asset: dbAssetStale,
       algorithm: [Algorithm.REWARDS],
-      blockNumber: 10,
+      startBlock: 10,
     });
 
     validationService.validateAll.mockResolvedValue({
@@ -190,8 +194,8 @@ describe('SourcesUpdateService', () => {
     syncRepo.inTransaction.mockImplementation(async (work: (manager: unknown) => Promise<void>) => {
       await work({});
     });
-    syncRepo.listAllAssets.mockResolvedValue([dbAssetKeep, dbAssetStale]);
-    syncRepo.listAllSources.mockResolvedValue([dbSourceKeep, dbSourceStale]);
+    syncRepo.listAllAssetsIncludingDeleted.mockResolvedValue([dbAssetKeep, dbAssetStale]);
+    syncRepo.listAllSourcesIncludingDeleted.mockResolvedValue([dbSourceKeep, dbSourceStale]);
 
     const insertedAsset = makeAsset({
       id: 3,
@@ -217,9 +221,14 @@ describe('SourcesUpdateService', () => {
     expect(syncRepo.deleteSourcesByIds).toHaveBeenCalledWith([202], expect.anything());
     expect(syncRepo.deleteAssetsByIds).toHaveBeenCalledWith([102], expect.anything());
 
+    const insertedSources = syncRepo.saveSources.mock.calls[0][0] as SourceEntity[];
+    expect(insertedSources).toHaveLength(1);
+    expect(insertedSources[0].id).toBe(11);
+    expect(insertedSources[0].asset.id).toBe(3);
+
     const updatedSources = syncRepo.saveSources.mock.calls[1][0] as SourceEntity[];
     expect(updatedSources[0].id).toBe(10);
-    expect(updatedSources[0].blockNumber).toBe(12);
+    expect(updatedSources[0].startBlock).toBe(12);
     expect(updatedSources[0].algorithm).toEqual([Algorithm.COMET_STATS, Algorithm.COMET]);
 
     const deleteSourcesOrder = syncRepo.deleteSourcesByIds.mock.invocationCallOrder[0];
@@ -293,8 +302,8 @@ describe('SourcesUpdateService', () => {
     syncRepo.inTransaction.mockImplementation(async (work: (manager: unknown) => Promise<void>) => {
       await work({});
     });
-    syncRepo.listAllAssets.mockResolvedValue([dbAsset]);
-    syncRepo.listAllSources.mockResolvedValue([]);
+    syncRepo.listAllAssetsIncludingDeleted.mockResolvedValue([dbAsset]);
+    syncRepo.listAllSourcesIncludingDeleted.mockResolvedValue([]);
     syncRepo.saveAssets.mockResolvedValue([]);
 
     const txError = new Error('saveSources failed');
@@ -313,7 +322,7 @@ describe('SourcesUpdateService', () => {
     await expect(service.run()).rejects.toThrow('reserveSources config is missing');
   });
 
-  it('skips invalid remote records and deletes stale db rows', async () => {
+  it('fails fast on invalid remote records and does not delete stale db rows', async () => {
     const { service, syncRepo, validationService, config } = makeDeps();
 
     mockedAxios.create.mockReturnValue({
@@ -334,7 +343,7 @@ describe('SourcesUpdateService', () => {
       address: '0x0000000000000000000000000000000000000020',
       asset: dbAssetStale,
       algorithm: [Algorithm.REWARDS],
-      blockNumber: 10,
+      startBlock: 10,
     });
 
     validationService.validateAll.mockResolvedValue({
@@ -396,19 +405,21 @@ describe('SourcesUpdateService', () => {
     syncRepo.inTransaction.mockImplementation(async (work: (manager: unknown) => Promise<void>) => {
       await work({});
     });
-    syncRepo.listAllAssets.mockResolvedValue([dbAssetStale]);
-    syncRepo.listAllSources.mockResolvedValue([dbSourceStale]);
+    syncRepo.listAllAssetsIncludingDeleted.mockResolvedValue([dbAssetStale]);
+    syncRepo.listAllSourcesIncludingDeleted.mockResolvedValue([dbSourceStale]);
     syncRepo.saveAssets.mockResolvedValue([]);
     syncRepo.saveSources.mockResolvedValue([]);
     syncRepo.deleteSourcesByIds.mockResolvedValue(undefined);
     syncRepo.deleteAssetsByIds.mockResolvedValue(undefined);
 
-    await service.run();
+    await expect(service.run()).rejects.toThrow(
+      'Sources update aborted: 1 asset validation error(s). No changes applied. Asset id=1: unknown chainId 999',
+    );
 
-    expect(syncRepo.saveAssets).toHaveBeenCalledTimes(1);
+    expect(syncRepo.saveAssets).not.toHaveBeenCalled();
     expect(syncRepo.saveSources).not.toHaveBeenCalled();
-    expect(syncRepo.deleteSourcesByIds).toHaveBeenCalledWith([202], expect.anything());
-    expect(syncRepo.deleteAssetsByIds).toHaveBeenCalledWith([102], expect.anything());
+    expect(syncRepo.deleteSourcesByIds).not.toHaveBeenCalled();
+    expect(syncRepo.deleteAssetsByIds).not.toHaveBeenCalled();
   });
 
   it('applyRemoteToAsset updates all mutable asset fields and reports change', () => {
@@ -456,7 +467,7 @@ describe('SourcesUpdateService', () => {
       address: '0x00000000000000000000000000000000000000aa',
       asset: oldAsset,
       algorithm: [Algorithm.COMET],
-      blockNumber: 1,
+      startBlock: 1,
       network: 'polygon',
       type: 'legacy',
       market: 'legacy-market',
@@ -471,6 +482,7 @@ describe('SourcesUpdateService', () => {
       {
         chainId: 1,
         startBlock: 99,
+        endBlock: null,
         market: null,
         algorithm: [Algorithm.REWARDS],
         type: 'treasury',
@@ -481,7 +493,7 @@ describe('SourcesUpdateService', () => {
     expect(changed).toBe(true);
     expect(source.network).toBe('eth');
     expect(source.asset.id).toBe(newAsset.id);
-    expect(source.blockNumber).toBe(99);
+    expect(source.startBlock).toBe(99);
     expect(source.market).toBeUndefined();
     expect(source.algorithm).toEqual([Algorithm.REWARDS]);
     expect(source.type).toBe('treasury');

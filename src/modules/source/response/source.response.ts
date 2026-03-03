@@ -22,6 +22,12 @@ export class SourceResponse {
   @ApiProperty({ example: 12 })
   public assetId: number;
 
+  @ApiProperty({ example: 18216242 })
+  public startBlock: number;
+
+  @ApiProperty({ example: 21246747, nullable: true })
+  public endBlock: number | null;
+
   constructor(source: SourceEntity) {
     this.id = source.id;
     this.address = source.address;
@@ -29,5 +35,7 @@ export class SourceResponse {
     this.type = source.type;
     this.market = source.market;
     this.assetId = source.asset.id;
+    this.startBlock = source.startBlock;
+    this.endBlock = source.endBlock ?? null;
   }
 }

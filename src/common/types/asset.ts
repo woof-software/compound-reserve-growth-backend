@@ -6,4 +6,5 @@ export interface Asset {
   network: string;
   type?: string;
   createdAt: Date;
+  deletedAt?: Date;
 }

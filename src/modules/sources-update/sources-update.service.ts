@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import axios from 'axios';
 import { EntityManager, QueryFailedError } from 'typeorm';
@@ -45,12 +45,12 @@ export class SourcesUpdateService {
       await this.syncRepo.inTransaction(async (manager) => {
         const dbState = await this.loadDbSyncState(manager);
         const assetPlan = this.prepareAssetSyncPlan(remoteAssets, dbState.assetById);
-        await this.persistAssetUpserts(assetPlan, dbState.assetById, manager);
         const sourcePlan = this.prepareSourceSyncPlan(
           remoteSources,
           assetPlan.remoteIdToAsset,
           dbState.sourceById,
         );
+        await this.persistAssetUpserts(assetPlan, dbState.assetById, manager);
         await this.persistSourceChanges(sourcePlan, manager);
         await this.persistAssetDeletes(assetPlan, manager);
       });
@@ -79,8 +79,8 @@ export class SourcesUpdateService {
 
   private async loadDbSyncState(manager: EntityManager): Promise<DbSyncState> {
     const [dbAssets, dbSources] = await Promise.all([
-      this.syncRepo.listAllAssets(manager),
-      this.syncRepo.listAllSources(manager),
+      this.syncRepo.listAllAssetsIncludingDeleted(manager),
+      this.syncRepo.listAllSourcesIncludingDeleted(manager),
     ]);
 
     return {
@@ -98,11 +98,12 @@ export class SourcesUpdateService {
     const updates: AssetEntity[] = [];
     const seenRemoteIds = new Set<number>();
     const existingAssetById = new Map<number, AssetEntity>(assetById);
+    const validationErrors: string[] = [];
 
     for (const remote of remoteAssets) {
       const network = this.resolveNetwork(remote.chainId);
       if (!network) {
-        this.logger.warn(`Unknown chainId for asset ${remote.id}: ${remote.chainId}`);
+        validationErrors.push(`Asset id=${remote.id}: unknown chainId ${remote.chainId}`);
         continue;
       }
 
@@ -110,8 +111,14 @@ export class SourcesUpdateService {
       const existing = assetById.get(remote.id);
 
       if (existing) {
+        const wasSoftDeleted = existing.deletedAt != null;
+        if (wasSoftDeleted) {
+          existing.deletedAt = null;
+        }
         const changed = this.applyRemoteToAsset(existing, remote);
-        if (changed) updates.push(existing);
+        if (changed || wasSoftDeleted) {
+          updates.push(existing);
+        }
         remoteIdToAsset.set(remote.id, existing);
         continue;
       }
@@ -124,12 +131,20 @@ export class SourcesUpdateService {
         remote.type ?? undefined,
       );
       asset.id = remote.id;
+      remoteIdToAsset.set(remote.id, asset);
       inserts.push({ remoteId: remote.id, asset });
     }
 
     const deletes = Array.from(existingAssetById.entries())
       .filter(([id]) => !seenRemoteIds.has(id))
-      .map(([, asset]) => asset);
+      .map(([, asset]) => asset)
+      .filter((a) => a.deletedAt == null);
+
+    if (validationErrors.length > 0) {
+      throw new BadRequestException(
+        `Sources update aborted: ${validationErrors.length} asset validation error(s). No changes applied. ${validationErrors.join('; ')}`,
+      );
+    }
 
     return { remoteIdToAsset, inserts, updates, deletes };
   }
@@ -169,10 +184,10 @@ export class SourcesUpdateService {
       .filter((id): id is number => typeof id === 'number');
 
     this.logger.warn(
-      `Deleting ${idsToDelete.length} stale asset(s): ${this.formatAssetBatchLog(assetPlan.deletes)}`,
+      `Soft-deleting ${idsToDelete.length} stale asset(s): ${this.formatAssetBatchLog(assetPlan.deletes)}`,
     );
     await this.syncRepo.deleteAssetsByIds(idsToDelete, manager);
-    this.logger.warn(`Deleted ${idsToDelete.length} stale asset(s)`);
+    this.logger.warn(`Soft-deleted ${idsToDelete.length} stale asset(s)`);
   }
 
   private prepareSourceSyncPlan(
@@ -184,24 +199,25 @@ export class SourcesUpdateService {
     const updates: SourceEntity[] = [];
     const seenRemoteIds = new Set<number>();
     const existingSourceById = new Map<number, SourceEntity>(sourceById);
+    const validationErrors: string[] = [];
 
     for (const remote of remoteSources) {
       const asset = remoteIdToAsset.get(remote.assetId);
       if (!asset) {
-        this.logger.warn(
-          `Skipping source id=${remote.id}: asset not found for assetId=${remote.assetId}`,
+        validationErrors.push(
+          `Source id=${remote.id}: asset not found for assetId=${remote.assetId}`,
         );
         continue;
       }
 
       const network = this.resolveNetwork(remote.chainId);
       if (!network) {
-        this.logger.warn(`Unknown chainId for source ${remote.id}: ${remote.chainId}`);
+        validationErrors.push(`Source id=${remote.id}: unknown chainId ${remote.chainId}`);
         continue;
       }
 
       if (!remote.type) {
-        this.logger.warn(`Missing type for source ${remote.id}`);
+        validationErrors.push(`Source id=${remote.id}: missing type`);
         continue;
       }
 
@@ -209,8 +225,12 @@ export class SourcesUpdateService {
       const existingSource = sourceById.get(remote.id);
 
       if (existingSource) {
+        const wasSoftDeleted = existingSource.deletedAt != null;
+        if (wasSoftDeleted) {
+          existingSource.deletedAt = null;
+        }
         const changed = this.applyRemoteToSource(existingSource, remote, asset);
-        if (changed) {
+        if (changed || wasSoftDeleted) {
           existingSource.checkedAt = new Date();
           updates.push(existingSource);
         }
@@ -225,6 +245,7 @@ export class SourcesUpdateService {
         remote.startBlock,
         asset,
         remote.market ?? undefined,
+        remote.endBlock ?? undefined,
       );
       source.id = remote.id;
       inserts.push(source);
@@ -233,7 +254,14 @@ export class SourcesUpdateService {
 
     const deletes = Array.from(existingSourceById.entries())
       .filter(([id]) => !seenRemoteIds.has(id))
-      .map(([, source]) => source);
+      .map(([, source]) => source)
+      .filter((s) => s.deletedAt == null);
+
+    if (validationErrors.length > 0) {
+      throw new BadRequestException(
+        `Sources update aborted: ${validationErrors.length} source validation error(s). No changes applied. ${validationErrors.join('; ')}`,
+      );
+    }
 
     return { inserts, updates, deletes };
   }
@@ -261,10 +289,10 @@ export class SourcesUpdateService {
         .filter((id): id is number => typeof id === 'number');
 
       this.logger.warn(
-        `Deleting ${idsToDelete.length} stale source(s): ${this.formatSourceBatchLog(sourcePlan.deletes)}`,
+        `Soft-deleting ${idsToDelete.length} stale source(s): ${this.formatSourceBatchLog(sourcePlan.deletes)}`,
       );
       await this.syncRepo.deleteSourcesByIds(idsToDelete, manager);
-      this.logger.warn(`Deleted ${idsToDelete.length} stale source(s)`);
+      this.logger.warn(`Soft-deleted ${idsToDelete.length} stale source(s)`);
     }
   }
 
@@ -326,8 +354,13 @@ export class SourcesUpdateService {
       source.asset = asset;
       changed = true;
     }
-    if (source.blockNumber !== remote.startBlock) {
-      source.blockNumber = remote.startBlock;
+    if (source.startBlock !== remote.startBlock) {
+      source.startBlock = remote.startBlock;
+      changed = true;
+    }
+    const remoteEndBlock = remote.endBlock ?? null;
+    if (source.endBlock !== remoteEndBlock) {
+      source.endBlock = remoteEndBlock;
       changed = true;
     }
     const currentMarket = source.market ?? undefined;

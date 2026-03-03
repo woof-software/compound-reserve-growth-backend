@@ -16,6 +16,7 @@
     "^@/(.*)$": "<rootDir>/src/$1",
     "^modules/(.*)$": "<rootDir>/src/modules/$1",
     "^config/(.*)$": "<rootDir>/src/config/$1",
-    "^infrastructure/(.*)$": "<rootDir>/src/infrastructure/$1"
+    "^infrastructure/(.*)$": "<rootDir>/src/infrastructure/$1",
+    "^@app/(.*)$": "<rootDir>/src/$1"
   }
 }

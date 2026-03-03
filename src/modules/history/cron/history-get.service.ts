@@ -7,7 +7,6 @@ import { StartCollectionResponse } from 'modules/admin/response';
 import { IncomesRepository } from 'modules/history/incomes-repository.service';
 import { SpendsRepository } from 'modules/history/spends-repository.service';
 import { ReservesRepository } from 'modules/history/reserves-repository.service';
-import { SourceEntity } from 'modules/source/source.entity';
 
 import { Algorithm } from 'common/enum/algorithm.enum';
 
@@ -40,12 +39,12 @@ export class GetHistoryService {
     processFunction: () => Promise<T>,
   ): Promise<T | void> {
     if (this.isProcessRunning()) {
-      this.logger.warn(`❌ ${processName} cannot start: another process is already running`);
+      this.logger.warn(`${processName} cannot start: another process is already running`);
       return;
     }
 
     this.isProcessing = true;
-    this.logger.log(`🔒 Starting ${processName}...`);
+    this.logger.log(`Starting ${processName}...`);
 
     try {
       return await processFunction();
@@ -53,66 +52,8 @@ export class GetHistoryService {
       this.logger.error(`An error occurred in ${processName}:`, error);
     } finally {
       this.isProcessing = false;
-      this.logger.log(`🔓 Completed ${processName}`);
+      this.logger.log(`Completed ${processName}`);
     }
-  }
-
-  /**
-   * Updates blockNumber for sources with reserves algorithms
-   * @param sources - Array of sources to update
-   * @param startDate - Optional date to start from. If not provided, uses contract creation block
-   * @returns Array of sources that were successfully updated (excluding those that failed or had no changes)
-   */
-  private async updateSourcesBlockNumber(
-    sources: SourceEntity[],
-    startDate: Date,
-  ): Promise<SourceEntity[]> {
-    this.logger.log(`Updating blockNumber for ${sources.length} sources...`);
-
-    let successCount = 0;
-    let failureCount = 0;
-    const successfullyUpdatedSources: SourceEntity[] = [];
-
-    // Process sources sequentially to avoid RPC batch limit errors
-    for (const source of sources) {
-      try {
-        this.logger.log(`Processing source ${source.id} (${source.address})...`);
-        const newBlockNumber = await this.contractService.getSourceBlockNumber(source, startDate);
-
-        if (newBlockNumber === source.blockNumber) {
-          this.logger.log(
-            `Source ${source.id} already has correct block number ${newBlockNumber}, skipping update`,
-          );
-          successCount++;
-          continue;
-        }
-
-        await this.sourceService.updateWithSource({
-          source,
-          blockNumber: newBlockNumber,
-          checkedAt: new Date(),
-        });
-
-        successfullyUpdatedSources.push(source);
-        successCount++;
-        this.logger.log(`Successfully updated source ${source.id} to block ${newBlockNumber}`);
-      } catch (error) {
-        failureCount++;
-        this.logger.error(
-          `Failed to update blockNumber for source ${source.id} (${source.address}): ${error.message}`,
-        );
-        // Continue processing other sources instead of stopping the entire process
-      }
-    }
-
-    this.logger.log(
-      `BlockNumber update completed: ${successCount} successful, ${failureCount} failed out of ${sources.length} sources`,
-    );
-    this.logger.log(
-      `Successfully updated ${successfullyUpdatedSources.length} sources that will have their reserves cleared`,
-    );
-
-    return successfullyUpdatedSources;
   }
 
   async getHistory() {
@@ -154,24 +95,13 @@ export class GetHistoryService {
 
       this.logger.log(`Found ${dbSources.length} sources for reserves processing`);
 
+      let startDate: Date | undefined;
       if (collectionSwitch?.clearData) {
-        const successfullyUpdatedSources = await this.updateSourcesBlockNumber(
-          dbSources,
-          collectionSwitch.data,
-        );
-
-        if (successfullyUpdatedSources.length > 0) {
-          this.logger.log(
-            `Clearing reserves for ${successfullyUpdatedSources.length} successfully updated sources...`,
-          );
-          const sourceIds = successfullyUpdatedSources.map((source) => source.id);
-          await this.reservesRepository.deleteBySourceIds(sourceIds);
-          this.logger.log(
-            `Reserves cleared successfully for ${successfullyUpdatedSources.length} sources.`,
-          );
-        } else {
-          this.logger.log('No sources were successfully updated, skipping reserves cleanup.');
-        }
+        const sourceIds = dbSources.map((s) => s.id);
+        this.logger.log(`Clearing reserves for ${sourceIds.length} sources...`);
+        await this.reservesRepository.deleteBySourceIds(sourceIds);
+        this.logger.log('Reserves cleared successfully.');
+        startDate = collectionSwitch.data;
       }
 
       for (const source of dbSources) {
@@ -180,7 +110,7 @@ export class GetHistoryService {
         );
 
         if (matchingAlgorithm) {
-          await this.contractService.saveReserves(source, matchingAlgorithm);
+          await this.contractService.saveReserves(source, matchingAlgorithm, startDate);
         }
       }
 
@@ -191,12 +121,12 @@ export class GetHistoryService {
   async startStatsProcessing(collectionSwitch?: StartCollectionResponse) {
     return this.executeWithLock('Stats Processing', async () => {
       this.logger.log('Starting to process stats...');
-      let data: Date;
+      let startDate: Date | undefined;
       if (collectionSwitch?.clearData) {
         this.logger.log('Clearing spends and incomes tables...');
         await Promise.all([this.spendsRepository.deleteAll(), this.incomesRepository.deleteAll()]);
         this.logger.log('Spends and incomes tables cleared successfully.');
-        data = collectionSwitch.data;
+        startDate = collectionSwitch.data;
       }
 
       const statsAlgorithms = [Algorithm.COMET_STATS];
@@ -210,7 +140,7 @@ export class GetHistoryService {
         );
 
         if (matchingAlgorithm) {
-          await this.contractService.saveStats(source, matchingAlgorithm, data);
+          await this.contractService.saveStats(source, matchingAlgorithm, startDate);
         }
       }
 
