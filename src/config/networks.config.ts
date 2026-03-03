@@ -6,6 +6,7 @@ export default registerAs('networks', (): NetworkConfig[] => [
   {
     network: 'mainnet',
     chainId: 1,
+    //url: `http://18.198.202.237:8545`,
     url: `https://rpc.ankr.com/eth/${process.env.ANKR_KEY}`,
   },
   {
@@ -37,6 +38,7 @@ export default registerAs('networks', (): NetworkConfig[] => [
     network: 'unichain',
     chainId: 130,
     url: `https://unichain.drpc.org`,
+    // url: `https://multi-boldest-patina.unichain-mainnet.quiknode.pro/${process.env.UNICHAIN_QUICKNODE_KEY}`,
   },
   {
     network: 'base',
