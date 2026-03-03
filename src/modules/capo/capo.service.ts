@@ -60,8 +60,13 @@ export class CapoService {
       const oraclesByNetwork = this.groupOraclesByNetwork(oracles);
 
       for (const [network, networkOracles] of oraclesByNetwork) {
+        const safeBlockNumber = await this.blockService.getSafeBlockNumber(network);
+        this.logger.log(
+          `Using lagged block for oracle reads network=${network} safeBlock=${safeBlockNumber}`,
+        );
+
         for (const oracle of networkOracles) {
-          await this.collectOracleForNetwork(oracle, network);
+          await this.collectOracleForNetwork(oracle, safeBlockNumber);
         }
       }
 
@@ -74,13 +79,8 @@ export class CapoService {
     }
   }
 
-  private async collectOracleForNetwork(oracle: Oracle, network: string): Promise<void> {
+  private async collectOracleForNetwork(oracle: Oracle, safeBlockNumber: number): Promise<void> {
     try {
-      const safeBlockNumber = await this.blockService.getSafeBlockNumber(network);
-      this.logger.log(
-        `Using lagged block for oracle reads network=${network} safeBlock=${safeBlockNumber}`,
-      );
-
       const data = await this.oracleService.getOracleData(oracle, safeBlockNumber);
       const capoValues = this.oracleService.calculateCapoValues(data);
 
