@@ -7,6 +7,7 @@ import { Cron, CronExpression } from '@nestjs/schedule';
 import { ProviderFactory } from 'modules/network/provider.factory';
 import { NetworkService } from 'modules/network/network.service';
 import { SourceRepository } from 'modules/source/source.repository';
+import { BlockService } from 'modules/block/block.service';
 import CometABI from 'modules/contract/abi/CometABI.json';
 import CapoABI from 'modules/capo/abi/ERC4626CorrelatedAssetsPriceOracle.json';
 
@@ -37,6 +38,7 @@ export class DiscoveryService implements OnModuleInit {
   constructor(
     private readonly providerFactory: ProviderFactory,
     private readonly networkService: NetworkService,
+    private readonly blockService: BlockService,
     private readonly sourceRepository: SourceRepository,
     @InjectRepository(Oracle) private readonly oracleRepository: Repository<Oracle>,
   ) {}
@@ -301,19 +303,10 @@ export class DiscoveryService implements OnModuleInit {
     }
 
     try {
-      const finalityConfirmations = this.networkService.getFinalityConfirmations(network);
-      const provider = this.providerFactory.get(network);
-      const latestBlock = await provider.getBlock('latest');
-
-      if (!latestBlock) {
-        this.logger.warn(`Could not get latest block during discovery network: ${network}`);
-        return null;
-      }
-
-      const safeBlockNumber = Math.max(0, latestBlock.number - finalityConfirmations);
+      const safeBlockNumber = await this.blockService.getSafeBlockNumber(network);
 
       this.logger.log(
-        `Using lagged block for discovery reads network: ${network} latestBlock: ${latestBlock.number} safeBlock: ${safeBlockNumber} lagBlocks: ${finalityConfirmations}`,
+        `Using lagged block for discovery reads network: ${network} safeBlock: ${safeBlockNumber}`,
       );
 
       cache.set(network, safeBlockNumber);

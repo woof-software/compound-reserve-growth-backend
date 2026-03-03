@@ -17,6 +17,7 @@ export const DAY_IN_SEC = DAY_IN_MS / 1000;
 export const YEAR_IN_SECONDS = YEAR_IN_DAYS * DAY_IN_SEC;
 export const MINUTE_IN_MS = 60000;
 export const MINUTE_IN_SEC = 60;
+export const SAFE_BLOCK_LAG_TIME_IN_SEC = 15 * MINUTE_IN_SEC;
 export const NULL_ADDRESS = '0x0000000000000000000000000000000000000000';
 export const USD_DECIMALS = 8;
 export const BATCH_SIZE = 2000;

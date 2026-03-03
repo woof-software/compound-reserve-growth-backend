@@ -17,7 +17,7 @@ import type {
   CachedBlockData,
 } from './block.types';
 
-import { DAY_IN_SEC, SEC_IN_MS } from '@app/common/constants';
+import { DAY_IN_SEC, SAFE_BLOCK_LAG_TIME_IN_SEC, SEC_IN_MS } from '@app/common/constants';
 
 @Injectable()
 export class BlockService implements OnModuleInit {
@@ -37,7 +37,6 @@ export class BlockService implements OnModuleInit {
   }
 
   async getSafeBlockNumber(network: string): Promise<number> {
-    const finalityConfirmations = this.networkService.getFinalityConfirmations(network);
     const provider = this.providerFactory.get(network);
     const latestBlock = await provider.getBlock('latest');
 
@@ -45,7 +44,24 @@ export class BlockService implements OnModuleInit {
       throw new Error(`Could not fetch latest block for network ${network}`);
     }
 
-    return Math.max(0, latestBlock.number - finalityConfirmations);
+    const blockOffset = this.getBlockOffsetByTimeForBlock(
+      network,
+      SAFE_BLOCK_LAG_TIME_IN_SEC,
+      latestBlock.number,
+    );
+
+    return Math.max(0, latestBlock.number - blockOffset);
+  }
+
+  async getBlockOffsetByTime(network: string, timeInSeconds: number): Promise<number> {
+    const provider = this.providerFactory.get(network);
+    const latestBlock = await provider.getBlock('latest');
+
+    if (!latestBlock) {
+      throw new Error(`Could not fetch latest block for network ${network}`);
+    }
+
+    return this.getBlockOffsetByTimeForBlock(network, timeInSeconds, latestBlock.number);
   }
 
   async getCachedBlock(
@@ -364,6 +380,20 @@ export class BlockService implements OnModuleInit {
     }
 
     return networkConfig;
+  }
+
+  private getBlockOffsetByTimeForBlock(
+    network: string,
+    timeInSeconds: number,
+    blockNumber: number,
+  ): number {
+    const normalizedTimeInSeconds = Math.max(0, timeInSeconds);
+    if (normalizedTimeInSeconds === 0) {
+      return 0;
+    }
+
+    const networkConfig = this.getNetworkConfigForBlock(network, blockNumber);
+    return Math.max(1, Math.ceil(normalizedTimeInSeconds / networkConfig.avgBlockTime));
   }
 
   private getPeriodForBlock(periods: BlockTimingPeriod[], blockNumber: number): BlockTimingPeriod {

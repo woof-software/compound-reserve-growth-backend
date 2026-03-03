@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+﻿import { Injectable, Logger } from '@nestjs/common';
 import { ethers } from 'ethers';
 
 import { ProviderFactory } from 'modules/network/provider.factory';
@@ -17,7 +17,7 @@ export class OracleService {
 
   /**
    * Reads oracle state at a specific block so all fields are consistent and less sensitive to reorgs.
-   * Caller must pass a lagged block number (e.g. latest - finalityConfirmations).
+   * Caller must pass a lagged block number (e.g. value from BlockService.getSafeBlockNumber).
    */
   async getOracleData(oracle: Oracle, blockNumber: number): Promise<OracleData> {
     try {
@@ -87,7 +87,7 @@ export class OracleService {
     this.logger.log(
       `Oracle ${oracleData.snapshotRatio} - ${oracleData.ratio} | dt=${timeDiff}s | ` +
         `Current growth: ${currentGrowthRate.toFixed(4)}% | ` +
-        `Max allowed: ${maxGrowthFraction} (fraction) ≈ ${maxGrowthPercent}% | ` +
+        `Max allowed: ${maxGrowthFraction} (fraction) ~= ${maxGrowthPercent}% | ` +
         `Utilization: ${utilization.toFixed(2)}% | ` +
         `Capped: ${oracleData.isCapped}`,
     );

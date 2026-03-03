@@ -8,6 +8,7 @@ import { SourceEntity } from 'modules/source/source.entity';
 import { OracleModule } from 'modules/oracle/oracle.module';
 import { AlertModule } from 'modules/alert/alert.module';
 import { Oracle } from 'modules/oracle/oracle.entity';
+import { BlockModule } from 'modules/block/block.module';
 
 import { CapoController } from './capo.controller';
 import { CapoService } from './capo.service';
@@ -21,6 +22,7 @@ import { DailyAggregation } from './daily.entity';
     MailModule,
     OracleModule,
     AlertModule,
+    BlockModule,
     TypeOrmModule.forFeature([Snapshot, DailyAggregation, SourceEntity]),
     TypeOrmModule.forFeature([Oracle]),
   ],

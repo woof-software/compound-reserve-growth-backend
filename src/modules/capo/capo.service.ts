@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+﻿import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Cron, CronExpression } from '@nestjs/schedule';
@@ -9,7 +9,7 @@ import { AlertService } from 'modules/alert/alert.service';
 import { SourceEntity } from 'modules/source/source.entity';
 import { OffsetRequest } from 'modules/history/request/offset.request';
 import { ProviderFactory } from 'modules/network/provider.factory';
-import { NetworkService } from 'modules/network/network.service';
+import { BlockService } from 'modules/block/block.service';
 
 import { Snapshot } from './snapshot.entity';
 import { DailyAggregation } from './daily.entity';
@@ -40,7 +40,7 @@ export class CapoService {
     private oracleService: OracleService,
     private alertService: AlertService,
     private providerFactory: ProviderFactory,
-    private networkService: NetworkService,
+    private blockService: BlockService,
   ) {}
 
   @Cron(CronExpression.EVERY_MINUTE)
@@ -76,18 +76,9 @@ export class CapoService {
 
   private async getSafeBlockNumberForNetwork(network: string): Promise<number | null> {
     try {
-      const lagConfirmations = this.networkService.getFinalityConfirmations(network);
-      const provider = this.providerFactory.get(network);
-      const latestBlock = await provider.getBlock('latest');
-
-      if (!latestBlock) {
-        this.logger.warn(`Could not get latest block for network: ${network}`);
-        return null;
-      }
-
-      const safeBlockNumber = Math.max(0, latestBlock.number - lagConfirmations);
+      const safeBlockNumber = await this.blockService.getSafeBlockNumber(network);
       this.logger.log(
-        `Using lagged block for oracle reads network=${network} latestBlock=${latestBlock.number} safeBlock=${safeBlockNumber} lagBlocks=${lagConfirmations}`,
+        `Using lagged block for oracle reads network=${network} safeBlock=${safeBlockNumber}`,
       );
 
       return safeBlockNumber;
@@ -217,7 +208,7 @@ export class CapoService {
     {
       // One-sided check: alert only if price is above CAP by >= threshold
       //    CAP price is implied by current ratio vs time-adjusted maxRatio:
-      //    capPrice ≈ (maxRatio / ratio) * currentPrice
+      //    capPrice ~= (maxRatio / ratio) * currentPrice
       const ratio = Number(data.ratio);
       const maxRatio = Number(capoValues.maxRatio);
       const currentPrice = Number(data.price);

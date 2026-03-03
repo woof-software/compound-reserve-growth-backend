@@ -77,7 +77,7 @@ describe('BlockService', () => {
       } as const);
 
     const provider = {
-      getBlock: jest.fn(),
+      getBlock: jest.fn().mockResolvedValue({ number: 1000 }),
       getBlockNumber: jest.fn().mockResolvedValue(1000),
     };
 
@@ -88,7 +88,6 @@ describe('BlockService', () => {
     const networkNames = params?.networkNames ?? Object.keys(timingConfig.networks);
     const networkService = {
       all: jest.fn().mockReturnValue(networkNames.map((network) => ({ network }))),
-      getFinalityConfirmations: jest.fn().mockReturnValue(64),
     };
 
     const configService =
@@ -165,23 +164,20 @@ describe('BlockService', () => {
   });
 
   describe('getSafeBlockNumber', () => {
-    it('returns latest block minus finality confirmations', async () => {
-      const { service, provider, providerFactory, networkService } = makeDeps();
+    it('returns latest block minus 15m offset in blocks', async () => {
+      const { service, provider, providerFactory } = makeDeps();
       provider.getBlock.mockResolvedValue({ number: 1000 });
-      networkService.getFinalityConfirmations.mockReturnValue(64);
 
       const result = await service.getSafeBlockNumber('mainnet');
 
-      expect(result).toBe(936);
+      expect(result).toBe(925);
       expect(providerFactory.get).toHaveBeenCalledWith('mainnet');
-      expect(networkService.getFinalityConfirmations).toHaveBeenCalledWith('mainnet');
       expect(provider.getBlock).toHaveBeenCalledWith('latest');
     });
 
-    it('clamps safe block number to zero when confirmations exceed latest block', async () => {
-      const { service, provider, networkService } = makeDeps();
+    it('clamps safe block number to zero when time-based offset exceeds latest block', async () => {
+      const { service, provider } = makeDeps();
       provider.getBlock.mockResolvedValue({ number: 10 });
-      networkService.getFinalityConfirmations.mockReturnValue(64);
 
       const result = await service.getSafeBlockNumber('mainnet');
 
@@ -195,6 +191,33 @@ describe('BlockService', () => {
       await expect(service.getSafeBlockNumber('mainnet')).rejects.toThrow(
         'Could not fetch latest block for network mainnet',
       );
+    });
+  });
+
+  describe('getBlockOffsetByTime', () => {
+    it('returns block offset by average block time for fixed network', async () => {
+      const { service } = makeDeps();
+
+      const result = await service.getBlockOffsetByTime('mainnet', 900);
+
+      expect(result).toBe(75);
+    });
+
+    it('returns block offset for the latest period in period-based network', async () => {
+      const { service, provider } = makeDeps();
+      provider.getBlock.mockResolvedValue({ number: 58_000_050 });
+
+      const result = await service.getBlockOffsetByTime('arbitrum', 900);
+
+      expect(result).toBe(3600);
+    });
+
+    it('returns zero offset for non-positive time', async () => {
+      const { service } = makeDeps();
+
+      const result = await service.getBlockOffsetByTime('mainnet', 0);
+
+      expect(result).toBe(0);
     });
   });
 
