@@ -60,10 +60,19 @@ export class CapoService {
       const oraclesByNetwork = this.groupOraclesByNetwork(oracles);
 
       for (const [network, networkOracles] of oraclesByNetwork) {
-        const safeBlockNumber = await this.blockService.getSafeBlockNumber(network);
-        this.logger.log(
-          `Using lagged block for oracle reads network=${network} safeBlock=${safeBlockNumber}`,
-        );
+        let safeBlockNumber: number;
+        try {
+          safeBlockNumber = await this.blockService.getSafeBlockNumber(network);
+          this.logger.log(
+            `Using lagged block for oracle reads network=${network} safeBlock=${safeBlockNumber}`,
+          );
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          this.logger.error(
+            `Failed to compute safe block for network=${network}. Skipping network in this run. Error: ${message}`,
+          );
+          continue;
+        }
 
         for (const oracle of networkOracles) {
           await this.collectOracleForNetwork(oracle, safeBlockNumber);

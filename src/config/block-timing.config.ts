@@ -1,6 +1,6 @@
 import { registerAs } from '@nestjs/config';
 
-import { BlockTimingConfigData } from 'modules/block/block.types';
+import type { BlockTimingConfigData } from 'modules/block/block.types';
 
 export default registerAs(
   'blockTiming',
