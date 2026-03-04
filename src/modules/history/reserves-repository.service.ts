@@ -1,11 +1,9 @@
 import { Injectable } from '@nestjs/common';
-import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
-import { DataSource, Repository } from 'typeorm';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
 import { ethers } from 'ethers';
 
-import { Price } from 'modules/price/price.entity';
-
-import { IncentivesHistory, ReserveEntity, SpendsEntity } from './entities';
+import { IncentivesHistory, ReserveEntity } from './entities';
 import { PaginationDto } from './dto/pagination.dto';
 import { OffsetDto } from './dto/offset.dto';
 
@@ -14,13 +12,20 @@ import { PaginatedDataDto } from '@app/common/dto/paginated-data.dto';
 import { OffsetDataDto } from '@app/common/dto/offset-data.dto';
 import { Order } from '@/common/enum/order.enum';
 
+type IncentivesHistoryRaw = {
+  sourceId: number | null;
+  date: string | null;
+  incomes: number | null;
+  rewardsSupply: number | null;
+  rewardsBorrow: number | null;
+  priceComp: number | null;
+  total: number;
+};
+
 @Injectable()
 export class ReservesRepository {
   constructor(
     @InjectRepository(ReserveEntity) private readonly reservesRepository: Repository<ReserveEntity>,
-    @InjectRepository(SpendsEntity) private readonly spendsRepository: Repository<SpendsEntity>,
-    @InjectRepository(Price) private readonly priceRepository: Repository<Price>,
-    @InjectDataSource() private readonly dataSource: DataSource,
   ) {}
 
   async save(reserve: ReserveEntity): Promise<ReserveEntity> {
@@ -262,110 +267,185 @@ export class ReservesRepository {
     dto: OffsetDto,
     algorithms = [Algorithm.COMET_STATS, Algorithm.MARKET_V2, Algorithm.AERA_COMPOUND_RESERVES],
   ): Promise<OffsetDataDto<IncentivesHistory>> {
-    const { order = Order.ASC } = dto;
+    const order = dto.order === Order.DESC ? Order.DESC : Order.ASC;
+    const algorithmsArrayLiteral = `{${algorithms.join(',')}}`;
+    const offset = dto.offset ?? 0;
+    const limit = dto.limit ?? null;
+    const hasLimit = limit !== null;
+    const sortDirection = order === Order.DESC ? 'DESC' : 'ASC';
 
-    // Subquery S: pick latest spends per (sourceId, date)
-    const sSub = this.spendsRepository.createQueryBuilder('s').select([
-      's."sourceId" AS "sourceId"',
-      's."date" AS "date"',
-      's."valueSupply" AS "valueSupply"',
-      's."valueBorrow" AS "valueBorrow"',
-      's."priceComp" AS "priceComp"',
-      // pick the latest by created_at (fallback id)
-      `ROW_NUMBER() OVER (
-       PARTITION BY s."sourceId", s."date"
-       ORDER BY s."createdAt" DESC, s."id" DESC
-     ) AS rn`,
-    ]);
-
-    // !: we also bring asset.decimals to normalize raw quantity
-    const rBase = this.reservesRepository
-      .createQueryBuilder('r0')
-      .innerJoin('r0.source', 'src0')
-      .innerJoin('src0.asset', 'a0')
-      .where('src0.deletedAt IS NULL')
-      .andWhere('src0.algorithm && :algorithms::text[]', { algorithms })
-      .select([
-        `r0."sourceId" AS "sourceId"`,
-        `r0."date"     AS "date"`,
-        `r0."price"    AS "price"`,
-        `r0."value"    AS "value"`, // original stored value (used for the very first row)
-        // store quantity as numeric for math
-        `r0."quantity"::numeric AS "qty"`,
-        `a0."decimals"          AS "decimals"`,
-        // previous quantity in the timeline per source
-        `LAG(r0."quantity"::numeric) OVER (
-         PARTITION BY r0."sourceId"
-         ORDER BY r0."date", r0."id"
-       ) AS "prevQty"`,
-      ]);
-
-    // Subquery P: one price per (symbol, date) for COMP (latest if duplicates)
-    // !: equality join on date;
-    const pSub = this.priceRepository
-      .createQueryBuilder('p')
-      .select([
-        `p."symbol" AS "symbol"`,
-        `p."date"   AS "date"`,
-        `p."price"  AS "price"`,
-        `ROW_NUMBER() OVER (
-         PARTITION BY p."symbol", p."date"
-         ORDER BY p."createdAt" DESC, p."id" DESC
-       ) AS rn`,
-      ])
-      .where('p."symbol" = :comp', { comp: 'COMP' });
-
-    // Data QB: merged rows (reserves + latest spends)
-    const dataQb = this.dataSource
-      .createQueryBuilder()
-      .from(`(${rBase.getQuery()})`, 'rb')
-      .setParameters(rBase.getParameters())
-      // join latest spends per (sourceId, date)
-      .leftJoin(
-        `(${sSub.getQuery()})`,
-        'ls',
-        `ls."sourceId" = rb."sourceId" AND ls."date" = rb."date" AND ls.rn = 1`,
+    const cteSql = `
+      WITH "filtered_sources" AS (
+        SELECT s."id", s."assetId"
+        FROM "source" s
+        WHERE s."deletedAt" IS NULL
+          AND s."algorithm" && $1::text[]
+      ),
+      "latest_spends_ranked" AS (
+        SELECT
+          s."sourceId" AS "sourceId",
+          s."date"::date AS "day",
+          s."valueSupply" AS "valueSupply",
+          s."valueBorrow" AS "valueBorrow",
+          s."priceComp" AS "priceComp",
+          ROW_NUMBER() OVER (
+            PARTITION BY s."sourceId", s."date"::date
+            ORDER BY s."createdAt" DESC, s."id" DESC
+          ) AS "rn"
+        FROM "spends" s
+        INNER JOIN "filtered_sources" fs ON fs."id" = s."sourceId"
+      ),
+      "latest_spends" AS (
+        SELECT
+          lsr."sourceId",
+          lsr."day",
+          lsr."valueSupply",
+          lsr."valueBorrow",
+          lsr."priceComp"
+        FROM "latest_spends_ranked" lsr
+        WHERE lsr."rn" = 1
+      ),
+      "latest_comp_prices_ranked" AS (
+        SELECT
+          p."date"::date AS "day",
+          p."price" AS "priceComp",
+          ROW_NUMBER() OVER (
+            PARTITION BY p."date"::date
+            ORDER BY p."createdAt" DESC, p."id" DESC
+          ) AS "rn"
+        FROM "price" p
+        WHERE p."symbol" = 'COMP'
+      ),
+      "latest_comp_prices" AS (
+        SELECT lcpr."day", lcpr."priceComp"
+        FROM "latest_comp_prices_ranked" lcpr
+        WHERE lcpr."rn" = 1
+      ),
+      "reserve_rows" AS (
+        SELECT
+          r."sourceId" AS "sourceId",
+          r."date"::date AS "day",
+          r."price" AS "price",
+          r."value" AS "value",
+          r."quantity"::numeric AS "quantity",
+          a."decimals" AS "decimals",
+          LAG(r."quantity"::numeric) OVER (
+            PARTITION BY r."sourceId"
+            ORDER BY r."date" ASC, r."id" ASC
+          ) AS "previousQuantity"
+        FROM "reserves" r
+        INNER JOIN "filtered_sources" fs ON fs."id" = r."sourceId"
+        INNER JOIN "asset" a ON a."id" = fs."assetId"
+      ),
+      "reserve_days" AS (
+        SELECT DISTINCT
+          rr."sourceId",
+          rr."day"
+        FROM "reserve_rows" rr
+      ),
+      "base_rows" AS (
+        SELECT
+          rr."sourceId" AS "sourceId",
+          rr."day" AS "day",
+          CASE
+            WHEN rr."previousQuantity" IS NULL THEN rr."value"::double precision
+            ELSE (
+              ((rr."quantity" - rr."previousQuantity") / POWER(10::numeric, rr."decimals"))::double precision
+              * rr."price"
+            )
+          END AS "incomes",
+          COALESCE(ls."valueSupply", 0)::double precision AS "rewardsSupply",
+          COALESCE(ls."valueBorrow", 0)::double precision AS "rewardsBorrow",
+          COALESCE(NULLIF(ls."priceComp", 0), cp."priceComp", 0)::double precision AS "priceComp"
+        FROM "reserve_rows" rr
+        LEFT JOIN "latest_spends" ls
+          ON ls."sourceId" = rr."sourceId"
+          AND ls."day" = rr."day"
+        LEFT JOIN "latest_comp_prices" cp
+          ON cp."day" = rr."day"
+      ),
+      "spends_without_reserve" AS (
+        SELECT
+          ls."sourceId",
+          ls."day",
+          ls."valueSupply",
+          ls."valueBorrow",
+          ls."priceComp"
+        FROM "latest_spends" ls
+        LEFT JOIN "reserve_days" rd
+          ON rd."sourceId" = ls."sourceId"
+          AND rd."day" = ls."day"
+        WHERE rd."sourceId" IS NULL
+      ),
+      "spends_only_rows" AS (
+        SELECT
+          swr."sourceId" AS "sourceId",
+          swr."day" AS "day",
+          0::double precision AS "incomes",
+          COALESCE(swr."valueSupply", 0)::double precision AS "rewardsSupply",
+          COALESCE(swr."valueBorrow", 0)::double precision AS "rewardsBorrow",
+          COALESCE(NULLIF(swr."priceComp", 0), cp."priceComp", 0)::double precision AS "priceComp"
+        FROM "spends_without_reserve" swr
+        LEFT JOIN "latest_comp_prices" cp
+          ON cp."day" = swr."day"
+      ),
+      "merged_rows" AS (
+        SELECT * FROM "base_rows"
+        UNION ALL
+        SELECT * FROM "spends_only_rows"
       )
-      .setParameters(sSub.getParameters())
-      .leftJoin(`(${pSub.getQuery()})`, 'cp', `cp."date" = rb."date" AND cp.rn = 1`)
-      .setParameters(pSub.getParameters())
-      .select([
-        `rb."sourceId" AS "sourceId"`,
-        `rb."date"     AS "date"`,
-        `
-    CASE
-      WHEN rb."prevQty" IS NULL
-      THEN rb."value"::double precision
-      ELSE ((rb."qty" - rb."prevQty") / POWER(10::numeric, rb."decimals")) * rb."price"
-    END
-    AS "incomes"
-    `,
-        `COALESCE(ls."valueSupply", 0) AS "rewardsSupply"`,
-        `COALESCE(ls."valueBorrow", 0) AS "rewardsBorrow"`,
-        `COALESCE(ls."priceComp", cp."price", 0) AS "priceComp"`,
-      ])
-      .orderBy(`rb."date"`, order)
-      .offset(dto.offset ?? 0);
+    `;
 
-    if (dto.limit) dataQb.limit(dto.limit);
+    const query = `
+      ${cteSql},
+      "paged_rows" AS (
+        SELECT
+          mr."sourceId",
+          (EXTRACT(EPOCH FROM (mr."day"::timestamp AT TIME ZONE 'UTC')) * 1000)::bigint AS "date",
+          mr."incomes",
+          mr."rewardsSupply",
+          mr."rewardsBorrow",
+          mr."priceComp"
+        FROM "merged_rows" mr
+        ORDER BY mr."day" ${sortDirection}, mr."sourceId" ASC
+        OFFSET $2
+        ${hasLimit ? 'LIMIT $3' : ''}
+      ),
+      "total_rows" AS (
+        SELECT COUNT(*)::int AS "total"
+        FROM "merged_rows"
+      )
+      SELECT
+        pr."sourceId",
+        pr."date",
+        pr."incomes",
+        pr."rewardsSupply",
+        pr."rewardsBorrow",
+        pr."priceComp",
+        tr."total"
+      FROM "total_rows" tr
+      LEFT JOIN "paged_rows" pr ON TRUE;
+    `;
 
-    // Count QB: count ONLY reserves under the same filter (no joins to spends)
-    const countQb = this.reservesRepository
-      .createQueryBuilder('r')
-      .innerJoin('r.source', 'src')
-      .where('src.deletedAt IS NULL')
-      .andWhere('src.algorithm && :algorithms::text[]', { algorithms });
+    const params = hasLimit
+      ? [algorithmsArrayLiteral, offset, limit]
+      : [algorithmsArrayLiteral, offset];
+    const rawRows = (await this.reservesRepository.query(query, params)) as IncentivesHistoryRaw[];
 
-    const [rows, totalReserves] = await Promise.all([
-      dataQb.getRawMany<IncentivesHistory>(),
-      countQb.getCount(),
-    ]);
+    const total = rawRows.length > 0 ? Number(rawRows[0].total ?? 0) : 0;
+    const data = rawRows
+      .filter((row) => row.sourceId !== null && row.date !== null)
+      .map(
+        (row): IncentivesHistory => ({
+          sourceId: Number(row.sourceId),
+          date: new Date(Number(row.date)),
+          incomes: Number(row.incomes),
+          rewardsSupply: Number(row.rewardsSupply),
+          rewardsBorrow: Number(row.rewardsBorrow),
+          priceComp: Number(row.priceComp),
+        }),
+      );
 
-    return new OffsetDataDto<IncentivesHistory>(
-      rows,
-      dto.limit ?? null,
-      dto.offset ?? 0,
-      totalReserves,
-    );
+    return new OffsetDataDto<IncentivesHistory>(data, limit, offset, total);
   }
 }
