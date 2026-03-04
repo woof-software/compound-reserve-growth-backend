@@ -3,8 +3,6 @@ import { Inject, Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import type { Cache } from 'cache-manager';
 import type { Redis } from 'ioredis';
 
-import { REDIS_CLIENT } from 'modules/redis/redis.module';
-
 import { PriceProviderInterface } from './interfaces/price-provider.interface';
 import { CachedPrice } from './interfaces/cached-price.interface';
 import { CoinGeckoProviderService } from './providers/coingecko/coingecko.service';
@@ -12,6 +10,7 @@ import { STABLECOIN_PRICES } from './constants';
 import { Price } from './price.entity';
 import { PriceRepository } from './price.repository';
 
+import { REDIS_CLIENT } from 'infrastructure/redis/redis.module';
 import { DAY_IN_MS, DAY_IN_SEC, HOUR_IN_SEC, SEC_IN_MS } from '@app/common/constants';
 
 @Injectable()

@@ -4,12 +4,13 @@ import { Repository } from 'typeorm';
 import { ethers } from 'ethers';
 import { Cron, CronExpression } from '@nestjs/schedule';
 
-import { ProviderFactory } from 'modules/network/provider.factory';
-import { NetworkService } from 'modules/network/network.service';
 import { SourceRepository } from 'modules/source/source.repository';
 import CometABI from 'modules/contract/abi/CometABI.json';
 import CapoABI from 'modules/capo/abi/ERC4626CorrelatedAssetsPriceOracle.json';
 
+import { ProviderFactory } from 'common/chains/network/provider.factory';
+import { NetworkService } from 'common/chains/network/network.service';
+import { BlockService } from 'common/chains/block/block.service';
 import { Algorithm } from 'common/enum/algorithm.enum';
 
 import { Oracle } from './oracle.entity';
@@ -37,6 +38,7 @@ export class DiscoveryService implements OnModuleInit {
   constructor(
     private readonly providerFactory: ProviderFactory,
     private readonly networkService: NetworkService,
+    private readonly blockService: BlockService,
     private readonly sourceRepository: SourceRepository,
     @InjectRepository(Oracle) private readonly oracleRepository: Repository<Oracle>,
   ) {}
@@ -159,16 +161,26 @@ export class DiscoveryService implements OnModuleInit {
   ): Promise<CapoOracleInfo[]> {
     const discoveredOracles: CapoOracleInfo[] = [];
     const checkedAddresses = new Set<string>();
+    const safeBlockByNetwork = new Map<string, number | null>();
 
     for (const comet of cometAddresses) {
       try {
         this.logger.log(`Checking Comet ${comet.address} on ${comet.network}`);
 
+        const safeBlockNumber = await this.getSafeBlockNumber(comet.network, safeBlockByNetwork);
+        if (safeBlockNumber === null) {
+          this.logger.warn(
+            `Skipping discovery for network without safe block network: ${comet.network}`,
+          );
+          continue;
+        }
+
         const provider = this.providerFactory.get(comet.network);
         const cometContract = new ethers.Contract(comet.address, CometABI, provider);
+        const blockTag = safeBlockNumber;
 
-        const baseTokenPriceFeed = await cometContract.baseTokenPriceFeed();
-        this.logger.log('Base token price feed:', baseTokenPriceFeed);
+        const baseTokenPriceFeed = await cometContract.baseTokenPriceFeed({ blockTag });
+        this.logger.log(`Base token price feed: ${baseTokenPriceFeed}`);
 
         if (!checkedAddresses.has(baseTokenPriceFeed.toLowerCase())) {
           checkedAddresses.add(baseTokenPriceFeed.toLowerCase());
@@ -177,11 +189,13 @@ export class DiscoveryService implements OnModuleInit {
             baseTokenPriceFeed,
             comet.chainId,
             comet.network,
+            blockTag,
           );
 
-          this.logger.log('Oracle info:', oracleInfo);
-
           if (oracleInfo) {
+            this.logger.log(
+              `Oracle info address=${oracleInfo.address} network=${oracleInfo.network} chainId=${oracleInfo.chainId} maxYearlyRatioGrowthPercent=${oracleInfo.maxYearlyRatioGrowthPercent}`,
+            );
             await this.oracleRepository.upsert(oracleInfo, ['address']);
             discoveredOracles.push(oracleInfo);
             this.logger.log(
@@ -190,10 +204,10 @@ export class DiscoveryService implements OnModuleInit {
           }
         }
 
-        const numAssets = await cometContract.numAssets();
+        const numAssets = await cometContract.numAssets({ blockTag });
 
         for (let i = 0; i < numAssets; i++) {
-          const assetInfo = await cometContract.getAssetInfo(i);
+          const assetInfo = await cometContract.getAssetInfo(i, { blockTag });
           const priceFeed = assetInfo.priceFeed;
 
           if (!checkedAddresses.has(priceFeed.toLowerCase())) {
@@ -203,6 +217,7 @@ export class DiscoveryService implements OnModuleInit {
               priceFeed,
               comet.chainId,
               comet.network,
+              blockTag,
             );
 
             if (oracleInfo) {
@@ -213,7 +228,8 @@ export class DiscoveryService implements OnModuleInit {
           }
         }
       } catch (error) {
-        this.logger.error(`Failed to check Comet ${comet.address}:`, error);
+        const message = error instanceof Error ? error.message : String(error);
+        this.logger.error(`Failed to check Comet ${comet.address}: ${message}`);
       }
     }
 
@@ -224,6 +240,7 @@ export class DiscoveryService implements OnModuleInit {
     oracleAddress: string,
     chainId: number,
     network: string,
+    blockTag: number,
   ): Promise<CapoOracleInfo | null> {
     try {
       const provider = this.providerFactory.get(network);
@@ -231,20 +248,22 @@ export class DiscoveryService implements OnModuleInit {
 
       let maxYearlyRatioGrowthPercent: number;
       try {
-        maxYearlyRatioGrowthPercent = await oracleContract.maxYearlyRatioGrowthPercent();
+        maxYearlyRatioGrowthPercent = await oracleContract.maxYearlyRatioGrowthPercent({
+          blockTag,
+        });
       } catch {
         return null;
       }
 
       // Sequential RPC calls to avoid excessive parallel requests
-      const description = await oracleContract.description();
-      const ratioProvider = await oracleContract.ratioProvider();
-      const baseAggregator = await oracleContract.assetToBaseAggregator();
-      const manager = await oracleContract.manager();
-      const snapshotRatio = await oracleContract.snapshotRatio();
-      const snapshotTimestamp = await oracleContract.snapshotTimestamp();
-      const minimumSnapshotDelay = await oracleContract.minimumSnapshotDelay();
-      const decimals = await oracleContract.decimals();
+      const description = await oracleContract.description({ blockTag });
+      const ratioProvider = await oracleContract.ratioProvider({ blockTag });
+      const baseAggregator = await oracleContract.assetToBaseAggregator({ blockTag });
+      const manager = await oracleContract.manager({ blockTag });
+      const snapshotRatio = await oracleContract.snapshotRatio({ blockTag });
+      const snapshotTimestamp = await oracleContract.snapshotTimestamp({ blockTag });
+      const minimumSnapshotDelay = await oracleContract.minimumSnapshotDelay({ blockTag });
+      const decimals = await oracleContract.decimals({ blockTag });
 
       const oracleInfo: CapoOracleInfo = {
         address: oracleAddress,
@@ -264,7 +283,40 @@ export class DiscoveryService implements OnModuleInit {
 
       return oracleInfo;
     } catch (error) {
-      this.logger.error(`Error checking oracle ${oracleAddress}:`, error.message);
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.error(
+        `Error checking oracle address: ${oracleAddress} network: ${network} blockTag: ${blockTag} error: ${message}`,
+      );
+      return null;
+    }
+  }
+
+  /**
+   * Returns a lagged block number for the given network, caching the result per discovery run.
+   * If the latest block cannot be fetched, returns null without poisoning cache.
+   */
+  private async getSafeBlockNumber(
+    network: string,
+    cache: Map<string, number | null>,
+  ): Promise<number | null> {
+    if (cache.has(network)) {
+      return cache.get(network) ?? null;
+    }
+
+    try {
+      const safeBlockNumber = await this.blockService.getSafeBlockNumber(network);
+
+      this.logger.log(
+        `Using lagged block for discovery reads network: ${network} safeBlock: ${safeBlockNumber}`,
+      );
+
+      cache.set(network, safeBlockNumber);
+      return safeBlockNumber;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.error(
+        `Failed to compute safe block number for discovery network: ${network} error: ${message}`,
+      );
       return null;
     }
   }

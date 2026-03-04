@@ -1,8 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ethers } from 'ethers';
 
-import { ProviderFactory } from 'modules/network/provider.factory';
 import CapoABI from 'modules/capo/abi/ERC4626CorrelatedAssetsPriceOracle.json';
+
+import { ProviderFactory } from 'common/chains/network/provider.factory';
 
 import { Oracle } from './oracle.entity';
 
@@ -15,20 +16,28 @@ export class OracleService {
 
   constructor(private readonly providerFactory: ProviderFactory) {}
 
-  async getOracleData(oracle: Oracle): Promise<OracleData> {
+  /**
+   * Reads oracle state at a specific block so all fields are consistent and less sensitive to reorgs.
+   * Caller must pass a lagged block number (e.g. value from BlockService.getSafeBlockNumber).
+   */
+  async getOracleData(oracle: Oracle, blockNumber: number): Promise<OracleData> {
     try {
       const provider = this.providerFactory.get(oracle.network);
       const oracleContract = new ethers.Contract(oracle.address, CapoABI, provider);
+      const blockTag = blockNumber;
 
-      const currentBlock = await provider.getBlock('latest');
+      const block = await provider.getBlock(blockTag);
+      if (!block) {
+        throw new Error(`Block ${blockNumber} not found`);
+      }
 
-      const latestRoundData = await oracleContract.latestRoundData();
-      const ratio = await oracleContract.getRatio();
-      const isCapped = await oracleContract.isCapped();
-      const decimals = await oracleContract.decimals();
-      const snapshotRatio = await oracleContract.snapshotRatio();
-      const snapshotTimestamp = await oracleContract.snapshotTimestamp();
-      const maxYearlyGrowthPercent = await oracleContract.maxYearlyRatioGrowthPercent();
+      const latestRoundData = await oracleContract.latestRoundData({ blockTag });
+      const ratio = await oracleContract.getRatio({ blockTag });
+      const isCapped = await oracleContract.isCapped({ blockTag });
+      const decimals = await oracleContract.decimals({ blockTag });
+      const snapshotRatio = await oracleContract.snapshotRatio({ blockTag });
+      const snapshotTimestamp = await oracleContract.snapshotTimestamp({ blockTag });
+      const maxYearlyGrowthPercent = await oracleContract.maxYearlyRatioGrowthPercent({ blockTag });
 
       const price = latestRoundData.answer;
       return {
@@ -38,11 +47,14 @@ export class OracleService {
         snapshotTimestamp: Number(snapshotTimestamp),
         maxYearlyGrowthPercent: Number(maxYearlyGrowthPercent),
         isCapped,
-        blockNumber: currentBlock.number,
-        timestamp: currentBlock.timestamp,
+        blockNumber: block.number,
+        timestamp: block.timestamp,
       };
     } catch (error) {
-      this.logger.error(`Failed to get oracle data for ${oracle.address}:`, error);
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.error(
+        `Failed to get oracle data oracle=${oracle.address} blockNumber=${blockNumber} error=${message}`,
+      );
       throw error;
     }
   }
@@ -76,7 +88,7 @@ export class OracleService {
     this.logger.log(
       `Oracle ${oracleData.snapshotRatio} - ${oracleData.ratio} | dt=${timeDiff}s | ` +
         `Current growth: ${currentGrowthRate.toFixed(4)}% | ` +
-        `Max allowed: ${maxGrowthFraction} (fraction) ≈ ${maxGrowthPercent}% | ` +
+        `Max allowed: ${maxGrowthFraction} (fraction) ~= ${maxGrowthPercent}% | ` +
         `Utilization: ${utilization.toFixed(2)}% | ` +
         `Capped: ${oracleData.isCapped}`,
     );

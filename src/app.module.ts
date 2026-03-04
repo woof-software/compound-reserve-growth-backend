@@ -10,14 +10,12 @@ import Redis from 'ioredis';
 
 import { ContractModule } from 'modules/contract/contract.module';
 import { GithubModule } from 'modules/github/github.module';
-import { NetworkModule } from 'modules/network/network.module';
 import { AssetModule } from 'modules/asset/asset.module';
 import { SourceModule } from 'modules/source/source.module';
 import { HistoryModule } from 'modules/history/history.module';
 import { TreasuryModule } from 'modules/treasury/treasury.module';
 import { RevenueModule } from 'modules/revenue/revenue.module';
 import { PriceModule } from 'modules/price/price.module';
-import { RedisModule, REDIS_CLIENT } from 'modules/redis/redis.module';
 import { RunwayModule } from 'modules/runway/runway.module';
 import { MailModule } from 'modules/mail/mail.module';
 import { EventModule } from 'modules/event/event.module';
@@ -26,8 +24,11 @@ import { CapoModule } from 'modules/capo/capo.module';
 import { getAdminModule } from 'modules/admin';
 import { HistoryCronModule } from 'modules/history/history-cron.module';
 
+import { NetworkModule } from 'common/chains/network/network.module';
+
 import { AppController } from './app.controller';
 
+import { RedisModule, REDIS_CLIENT } from 'infrastructure/redis/redis.module';
 import appConfig from 'config/app';
 import databaseConfig from 'config/database';
 import networksConfig from 'config/networks.config';
@@ -35,6 +36,7 @@ import redis from 'config/redis';
 import google from 'config/google';
 import admin from 'config/admin';
 import reserveSourcesConfig from 'config/reserve-sources.config';
+import blockTimingConfig from 'config/block-timing.config';
 import { DatabaseModule } from 'database/database.module';
 import { Logger } from 'infrastructure/logger';
 import { ExceptionInterceptor } from 'infrastructure/http/interceptors/exception.interceptor';
@@ -43,7 +45,16 @@ import { ExceptionInterceptor } from 'infrastructure/http/interceptors/exception
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      load: [appConfig, databaseConfig, networksConfig, redis, google, admin, reserveSourcesConfig],
+      load: [
+        appConfig,
+        databaseConfig,
+        networksConfig,
+        redis,
+        google,
+        admin,
+        reserveSourcesConfig,
+        blockTimingConfig,
+      ],
     }),
     ScheduleModule.forRoot(),
     ThrottlerModule.forRoot({

@@ -3,7 +3,6 @@ import { Controller, Injectable, HttpStatus, HttpCode, Get, Query, Inject } from
 import { Throttle } from '@nestjs/throttler';
 import Redis from 'ioredis';
 
-import { REDIS_CLIENT } from 'modules/redis/redis.module';
 import { IncentiveHistoryResponse } from 'modules/history/response/incentives-history.response';
 
 import { HistoryService } from './history.service';
@@ -17,6 +16,7 @@ import { ReserveFullResponse } from './response/reserve-full.response';
 import { OffsetRequest } from './request/offset.request';
 import { OffsetDto } from './dto/offset.dto';
 
+import { REDIS_CLIENT } from 'infrastructure/redis/redis.module';
 import { ApiPaginatedResponse } from '@app/common/swagger/api-paginated-response.decorator';
 import { PaginatedDataResponse } from '@app/common/response/paginated-data.response';
 import { PaginationMetaResponse } from '@app/common/response/pagination-meta.response';

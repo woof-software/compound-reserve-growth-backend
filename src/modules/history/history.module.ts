@@ -5,7 +5,6 @@ import { AssetModule } from 'modules/asset/asset.module';
 import { SourceModule } from 'modules/source/source.module';
 import { ContractModule } from 'modules/contract/contract.module';
 import { PriceModule } from 'modules/price/price.module';
-import { RedisModule } from 'modules/redis/redis.module';
 import { Price } from 'modules/price/price.entity';
 
 import { ReserveEntity, IncomesEntity, SpendsEntity } from './entities';
@@ -17,6 +16,8 @@ import { HistoryController } from './history.controller';
 import { GetHistoryService } from './cron/history-get.service';
 import { IncomesRepository } from './incomes-repository.service';
 import { SpendsRepository } from './spends-repository.service';
+
+import { RedisModule } from 'infrastructure/redis/redis.module';
 
 @Module({
   imports: [
