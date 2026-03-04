@@ -58,7 +58,7 @@ describe('BlockService', () => {
   const makeDeps = (params?: {
     timingConfig?: BlockTimingConfigData;
     networkNames?: string[];
-    configService?: { get: jest.Mock };
+    configService?: { get?: jest.Mock; getOrThrow?: jest.Mock };
     redisClient?: Record<string, unknown>;
   }) => {
     const timingConfig = params?.timingConfig ?? createTimingConfig();
@@ -94,6 +94,22 @@ describe('BlockService', () => {
       params?.configService ??
       ({
         get: jest.fn((key: string) => (key === 'blockTiming' ? timingConfig : undefined)),
+        getOrThrow: jest.fn((key: string) => {
+          if (key === 'blockTiming') {
+            return timingConfig;
+          }
+
+          if (key.startsWith('blockTiming.networks.')) {
+            const network = key.replace('blockTiming.networks.', '');
+            const networkConfig = timingConfig.networks[network];
+            if (!networkConfig) {
+              throw new Error(`Configuration key "${key}" does not exist`);
+            }
+            return networkConfig;
+          }
+
+          throw new Error(`Configuration key "${key}" does not exist`);
+        }),
       } as const);
 
     const service = new BlockService(
@@ -419,19 +435,21 @@ describe('BlockService', () => {
       const { service } = makeDeps();
 
       expect(() => service.getBlocksPerDay('unknown-network', 1)).toThrow(
-        'Block timing is not configured for network: unknown-network',
+        'Configuration key "blockTiming.networks.unknown-network" does not exist',
       );
     });
 
-    it('throws clear error when blockTiming config key is missing', () => {
+    it('throws clear error when network block timing config key is missing', () => {
       const { service } = makeDeps({
         configService: {
-          get: jest.fn().mockReturnValue(undefined),
+          getOrThrow: jest.fn().mockImplementation((key: string) => {
+            throw new Error(`Configuration key "${key}" does not exist`);
+          }),
         },
       });
 
       expect(() => service.getBlocksPerDay('mainnet', 1)).toThrow(
-        'Block timing configuration is missing at config key "blockTiming"',
+        'Configuration key "blockTiming.networks.mainnet" does not exist',
       );
     });
   });
