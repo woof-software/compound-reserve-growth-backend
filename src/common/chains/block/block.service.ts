@@ -5,9 +5,8 @@ import { JsonRpcProvider } from 'ethers';
 import type { Cache } from 'cache-manager';
 import type { Redis } from 'ioredis';
 
-import { REDIS_CLIENT } from 'modules/redis/redis.module';
-import { ProviderFactory } from 'modules/network/provider.factory';
-import { NetworkService } from 'modules/network/network.service';
+import { ProviderFactory } from 'common/chains/network/provider.factory';
+import { NetworkService } from 'common/chains/network/network.service';
 
 import type {
   BlockTimingConfigData,
@@ -17,6 +16,7 @@ import type {
   CachedBlockData,
 } from './block.types';
 
+import { REDIS_CLIENT } from 'infrastructure/redis/redis.module';
 import {
   DAY_IN_SEC,
   HOUR_IN_SEC,
@@ -198,12 +198,7 @@ export class BlockService implements OnModuleInit {
   }
 
   private get timingConfig(): BlockTimingConfigData {
-    const config = this.configService.get<BlockTimingConfigData>('blockTiming');
-    if (!config) {
-      throw new Error('Block timing configuration is missing at config key "blockTiming"');
-    }
-
-    return config;
+    return this.configService.getOrThrow<BlockTimingConfigData>('blockTiming');
   }
 
   private async getBlockFromCache(
@@ -405,12 +400,9 @@ export class BlockService implements OnModuleInit {
   }
 
   private getNetworkConfig(network: string): BlockTimingNetworkConfig {
-    const networkConfig = this.timingConfig.networks[network];
-    if (!networkConfig) {
-      throw new Error(`Block timing is not configured for network: ${network}`);
-    }
-
-    return networkConfig;
+    return this.configService.getOrThrow<BlockTimingNetworkConfig>(
+      `blockTiming.networks.${network}`,
+    );
   }
 
   private getBlockOffsetByTimeForBlock(

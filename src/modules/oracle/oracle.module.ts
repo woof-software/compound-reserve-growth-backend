@@ -1,9 +1,10 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 
-import { NetworkModule } from 'modules/network/network.module';
 import { SourceModule } from 'modules/source/source.module';
-import { BlockModule } from 'modules/block/block.module';
+
+import { NetworkModule } from 'common/chains/network/network.module';
+import { BlockModule } from 'common/chains/block/block.module';
 
 import { Oracle } from './oracle.entity';
 import { OracleService } from './oracle.service';

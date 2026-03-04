@@ -8,8 +8,9 @@ import { OracleService } from 'modules/oracle/oracle.service';
 import { AlertService } from 'modules/alert/alert.service';
 import { SourceEntity } from 'modules/source/source.entity';
 import { OffsetRequest } from 'modules/history/request/offset.request';
-import { ProviderFactory } from 'modules/network/provider.factory';
-import { BlockService } from 'modules/block/block.service';
+
+import { ProviderFactory } from 'common/chains/network/provider.factory';
+import { BlockService } from 'common/chains/block/block.service';
 
 import { Snapshot } from './snapshot.entity';
 import { DailyAggregation } from './daily.entity';

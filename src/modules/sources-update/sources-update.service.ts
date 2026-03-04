@@ -5,7 +5,8 @@ import { EntityManager, QueryFailedError } from 'typeorm';
 
 import { AssetEntity } from 'modules/asset/asset.entity';
 import { SourceEntity } from 'modules/source/source.entity';
-import { NetworkService } from 'modules/network/network.service';
+
+import { NetworkService } from 'common/chains/network/network.service';
 
 import {
   AssetInsertItem,

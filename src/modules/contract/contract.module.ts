@@ -1,10 +1,11 @@
 import { forwardRef, Module } from '@nestjs/common';
 
-import { NetworkModule } from 'modules/network/network.module';
 import { HistoryModule } from 'modules/history/history.module';
 import { PriceModule } from 'modules/price/price.module';
 import { MailModule } from 'modules/mail/mail.module';
-import { BlockModule } from 'modules/block/block.module';
+
+import { NetworkModule } from 'common/chains/network/network.module';
+import { BlockModule } from 'common/chains/block/block.module';
 
 import { AlgorithmService } from './algorithm.service';
 import { ContractService } from './contract.service';

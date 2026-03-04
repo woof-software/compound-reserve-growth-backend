@@ -1,5 +1,5 @@
-import { BlockService } from '@/modules/block/block.service';
-import type { BlockTimingConfigData } from '@/modules/block/block.types';
+import { BlockService } from '@/common/chains/block/block.service';
+import type { BlockTimingConfigData } from '@/common/chains/block/block.types';
 
 describe('BlockService', () => {
   const createTimingConfig = (extraNetworks: BlockTimingConfigData['networks'] = {}) => ({

@@ -4,13 +4,13 @@ import { Repository } from 'typeorm';
 import { ethers } from 'ethers';
 import { Cron, CronExpression } from '@nestjs/schedule';
 
-import { ProviderFactory } from 'modules/network/provider.factory';
-import { NetworkService } from 'modules/network/network.service';
 import { SourceRepository } from 'modules/source/source.repository';
-import { BlockService } from 'modules/block/block.service';
 import CometABI from 'modules/contract/abi/CometABI.json';
 import CapoABI from 'modules/capo/abi/ERC4626CorrelatedAssetsPriceOracle.json';
 
+import { ProviderFactory } from 'common/chains/network/provider.factory';
+import { NetworkService } from 'common/chains/network/network.service';
+import { BlockService } from 'common/chains/block/block.service';
 import { Algorithm } from 'common/enum/algorithm.enum';
 
 import { Oracle } from './oracle.entity';

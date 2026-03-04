@@ -1,8 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ethers } from 'ethers';
 
-import { ProviderFactory } from 'modules/network/provider.factory';
 import CapoABI from 'modules/capo/abi/ERC4626CorrelatedAssetsPriceOracle.json';
+
+import { ProviderFactory } from 'common/chains/network/provider.factory';
 
 import { Oracle } from './oracle.entity';
 

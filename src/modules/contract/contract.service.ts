@@ -2,14 +2,15 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ethers } from 'ethers';
 
 import { IncomesEntity, ReserveEntity, SpendsEntity } from 'modules/history/entities';
-import { ProviderFactory } from 'modules/network/provider.factory';
 import { HistoryService } from 'modules/history/history.service';
 import { SourceEntity } from 'modules/source/source.entity';
 import { PriceService } from 'modules/price/price.service';
 import { MailService } from 'modules/mail/mail.service';
 import { STABLECOIN_PRICES } from 'modules/price/constants';
 import { AlgorithmService } from 'modules/contract/algorithm.service';
-import { BlockService } from 'modules/block/block.service';
+
+import { ProviderFactory } from 'common/chains/network/provider.factory';
+import { BlockService } from 'common/chains/block/block.service';
 
 import CometABI from './abi/CometABI.json';
 import CometExtensionABI from './abi/CometExtensionABI.json';
