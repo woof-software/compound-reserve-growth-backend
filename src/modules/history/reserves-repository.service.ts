@@ -263,6 +263,17 @@ export class ReservesRepository {
       .execute();
   }
 
+  /**
+   * Single-query incentives history flow:
+   * 1) Filter active sources by requested algorithms.
+   * 2) Pick latest spends per source/day and latest COMP price per day.
+   * 3) Build reserve-based rows and compute incomes from quantity deltas.
+   * 4) Fill rewards and priceComp (with COMP fallback when needed).
+   * 5) Add spends-only rows for source/day pairs without reserves.
+   * 6) UNION ALL both datasets into one stream.
+   * 7) Apply deterministic ordering and offset/limit pagination.
+   * 8) Return paged rows and total count in the same SQL execution.
+   */
   async getOffsetIncentivesHistory(
     dto: OffsetDto,
     algorithms = [Algorithm.COMET_STATS, Algorithm.MARKET_V2, Algorithm.AERA_COMPOUND_RESERVES],
