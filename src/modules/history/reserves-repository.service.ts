@@ -280,49 +280,39 @@ export class ReservesRepository {
         WHERE s."deletedAt" IS NULL
           AND s."algorithm" && $1::text[]
       ),
-      "latest_spends_ranked" AS (
-        SELECT
+      "latest_spends" AS (
+        SELECT DISTINCT ON (s."sourceId", s."date"::date)
+          s."id" AS "spendId",
           s."sourceId" AS "sourceId",
+          s."date" AS "date",
           s."date"::date AS "day",
           s."valueSupply" AS "valueSupply",
           s."valueBorrow" AS "valueBorrow",
-          s."priceComp" AS "priceComp",
-          ROW_NUMBER() OVER (
-            PARTITION BY s."sourceId", s."date"::date
-            ORDER BY s."createdAt" DESC, s."id" DESC
-          ) AS "rn"
+          s."priceComp" AS "priceComp"
         FROM "spends" s
         INNER JOIN "filtered_sources" fs ON fs."id" = s."sourceId"
-      ),
-      "latest_spends" AS (
-        SELECT
-          lsr."sourceId",
-          lsr."day",
-          lsr."valueSupply",
-          lsr."valueBorrow",
-          lsr."priceComp"
-        FROM "latest_spends_ranked" lsr
-        WHERE lsr."rn" = 1
-      ),
-      "latest_comp_prices_ranked" AS (
-        SELECT
-          p."date"::date AS "day",
-          p."price" AS "priceComp",
-          ROW_NUMBER() OVER (
-            PARTITION BY p."date"::date
-            ORDER BY p."createdAt" DESC, p."id" DESC
-          ) AS "rn"
-        FROM "price" p
-        WHERE p."symbol" = 'COMP'
+        ORDER BY
+          s."sourceId" ASC,
+          s."date"::date ASC,
+          s."createdAt" DESC,
+          s."id" DESC
       ),
       "latest_comp_prices" AS (
-        SELECT lcpr."day", lcpr."priceComp"
-        FROM "latest_comp_prices_ranked" lcpr
-        WHERE lcpr."rn" = 1
+        SELECT DISTINCT ON (p."date"::date)
+          p."date"::date AS "day",
+          p."price" AS "priceComp"
+        FROM "price" p
+        WHERE p."symbol" = 'COMP'
+        ORDER BY
+          p."date"::date ASC,
+          p."createdAt" DESC,
+          p."id" DESC
       ),
       "reserve_rows" AS (
         SELECT
+          r."id" AS "reserveId",
           r."sourceId" AS "sourceId",
+          r."date" AS "date",
           r."date"::date AS "day",
           r."price" AS "price",
           r."value" AS "value",
@@ -336,16 +326,12 @@ export class ReservesRepository {
         INNER JOIN "filtered_sources" fs ON fs."id" = r."sourceId"
         INNER JOIN "asset" a ON a."id" = fs."assetId"
       ),
-      "reserve_days" AS (
-        SELECT DISTINCT
-          rr."sourceId",
-          rr."day"
-        FROM "reserve_rows" rr
-      ),
       "base_rows" AS (
         SELECT
+          rr."reserveId" AS "reserveId",
+          ls."spendId" AS "spendId",
           rr."sourceId" AS "sourceId",
-          rr."day" AS "day",
+          rr."date" AS "date",
           CASE
             WHEN rr."previousQuantity" IS NULL THEN rr."value"::double precision
             ELSE (
@@ -363,35 +349,48 @@ export class ReservesRepository {
         LEFT JOIN "latest_comp_prices" cp
           ON cp."day" = rr."day"
       ),
-      "spends_without_reserve" AS (
-        SELECT
-          ls."sourceId",
-          ls."day",
-          ls."valueSupply",
-          ls."valueBorrow",
-          ls."priceComp"
-        FROM "latest_spends" ls
-        LEFT JOIN "reserve_days" rd
-          ON rd."sourceId" = ls."sourceId"
-          AND rd."day" = ls."day"
-        WHERE rd."sourceId" IS NULL
-      ),
       "spends_only_rows" AS (
         SELECT
-          swr."sourceId" AS "sourceId",
-          swr."day" AS "day",
+          NULL::int AS "reserveId",
+          ls."spendId" AS "spendId",
+          ls."sourceId" AS "sourceId",
+          ls."date" AS "date",
           0::double precision AS "incomes",
-          COALESCE(swr."valueSupply", 0)::double precision AS "rewardsSupply",
-          COALESCE(swr."valueBorrow", 0)::double precision AS "rewardsBorrow",
-          COALESCE(NULLIF(swr."priceComp", 0), cp."priceComp", 0)::double precision AS "priceComp"
-        FROM "spends_without_reserve" swr
+          COALESCE(ls."valueSupply", 0)::double precision AS "rewardsSupply",
+          COALESCE(ls."valueBorrow", 0)::double precision AS "rewardsBorrow",
+          COALESCE(NULLIF(ls."priceComp", 0), cp."priceComp", 0)::double precision AS "priceComp"
+        FROM "latest_spends" ls
         LEFT JOIN "latest_comp_prices" cp
-          ON cp."day" = swr."day"
+          ON cp."day" = ls."day"
+        WHERE NOT EXISTS (
+          SELECT 1
+          FROM "reserve_rows" rr
+          WHERE rr."sourceId" = ls."sourceId"
+            AND rr."day" = ls."day"
+        )
       ),
       "merged_rows" AS (
-        SELECT * FROM "base_rows"
+        SELECT
+          "reserveId",
+          "spendId",
+          "sourceId",
+          "date",
+          "incomes",
+          "rewardsSupply",
+          "rewardsBorrow",
+          "priceComp"
+        FROM "base_rows"
         UNION ALL
-        SELECT * FROM "spends_only_rows"
+        SELECT
+          "reserveId",
+          "spendId",
+          "sourceId",
+          "date",
+          "incomes",
+          "rewardsSupply",
+          "rewardsBorrow",
+          "priceComp"
+        FROM "spends_only_rows"
       )
     `;
 
@@ -400,13 +399,17 @@ export class ReservesRepository {
       "paged_rows" AS (
         SELECT
           mr."sourceId",
-          (EXTRACT(EPOCH FROM (mr."day"::timestamp AT TIME ZONE 'UTC')) * 1000)::bigint AS "date",
+          (EXTRACT(EPOCH FROM (mr."date" AT TIME ZONE 'UTC')) * 1000)::bigint AS "date",
           mr."incomes",
           mr."rewardsSupply",
           mr."rewardsBorrow",
           mr."priceComp"
         FROM "merged_rows" mr
-        ORDER BY mr."day" ${sortDirection}, mr."sourceId" ASC
+        ORDER BY
+          mr."date" ${sortDirection},
+          mr."sourceId" ASC,
+          mr."reserveId" ASC NULLS LAST,
+          mr."spendId" ASC NULLS LAST
         OFFSET $2
         ${limit !== null ? 'LIMIT $3' : ''}
       ),
