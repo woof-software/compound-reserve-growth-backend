@@ -83,6 +83,7 @@ describe('BlockService', () => {
 
     const providerFactory = {
       get: jest.fn().mockReturnValue(provider),
+      multicall: jest.fn().mockReturnValue(provider),
     };
 
     const networkNames = params?.networkNames ?? Object.keys(timingConfig.networks);
@@ -187,7 +188,7 @@ describe('BlockService', () => {
       const result = await service.getSafeBlockNumber('mainnet');
 
       expect(result).toBe(925);
-      expect(providerFactory.get).toHaveBeenCalledWith('mainnet');
+      expect(providerFactory.multicall).toHaveBeenCalledWith('mainnet');
       expect(provider.getBlock).toHaveBeenCalledWith('latest');
     });
 

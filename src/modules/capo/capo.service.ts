@@ -297,7 +297,7 @@ export class CapoService {
   async aggregateDailyData() {
     this.logger.log('Starting daily aggregation...');
 
-    const provider = this.providerFactory.get('mainnet');
+    const provider = this.providerFactory.multicall('mainnet');
     const latestBlock = await provider.getBlock('latest');
     const chainNow = new Date(latestBlock.timestamp * 1000);
     const systemNow = new Date();

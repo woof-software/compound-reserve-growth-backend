@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { ethers } from 'ethers';
+import { MulticallProvider, MulticallWrapper } from 'ethers-multicall-provider';
 
 import { NetworkService } from './network.service';
 
@@ -20,17 +21,11 @@ export class ProviderFactory {
     }
 
     if (!this.cache.has(config.chainId)) {
-      const provider = new ethers.JsonRpcProvider(config.url, config.chainId);
-
-      const originalGetConnection = provider._getConnection.bind(provider);
-      provider._getConnection = () => {
-        const connection = originalGetConnection();
-        if (connection && typeof connection === 'object') {
-          (connection as any).timeout = 30000; // 30 seconds timeout
-        }
-        return connection;
-      };
-
+      const provider = new ethers.JsonRpcProvider(
+        config.url,
+        config.chainId,
+        config.batchMaxCount ? { batchMaxCount: config.batchMaxCount } : {},
+      );
       this.cache.set(config.chainId, provider);
     }
 
@@ -39,5 +34,12 @@ export class ProviderFactory {
       throw new Error(`Failed to create provider for chainId: ${config.chainId}`);
     }
     return provider;
+  }
+
+  multicall(
+    identifier: string | number,
+    maxMulticallDataLength = 400_000,
+  ): MulticallProvider<ethers.JsonRpcProvider> {
+    return MulticallWrapper.wrap(this.get(identifier), maxMulticallDataLength);
   }
 }
