@@ -271,7 +271,6 @@ export class ReservesRepository {
     const algorithmsArrayLiteral = `{${algorithms.join(',')}}`;
     const offset = dto.offset ?? 0;
     const limit = dto.limit ?? null;
-    const hasLimit = limit !== null;
     const sortDirection = order === Order.DESC ? 'DESC' : 'ASC';
 
     const cteSql = `
@@ -409,7 +408,7 @@ export class ReservesRepository {
         FROM "merged_rows" mr
         ORDER BY mr."day" ${sortDirection}, mr."sourceId" ASC
         OFFSET $2
-        ${hasLimit ? 'LIMIT $3' : ''}
+        ${!limit ? 'LIMIT $3' : ''}
       ),
       "total_rows" AS (
         SELECT COUNT(*)::int AS "total"
@@ -427,7 +426,7 @@ export class ReservesRepository {
       LEFT JOIN "paged_rows" pr ON TRUE;
     `;
 
-    const params = hasLimit
+    const params = !limit
       ? [algorithmsArrayLiteral, offset, limit]
       : [algorithmsArrayLiteral, offset];
     const rawRows = (await this.reservesRepository.query(query, params)) as IncentivesHistoryRaw[];
