@@ -1,6 +1,8 @@
 import { ReserveEntity } from '@/modules/history/entities';
 import { SourceEntity } from '@/modules/source/source.entity';
 import { HistoryService } from '@/modules/history/history.service';
+import { OffsetDto } from '@/modules/history/dto/offset.dto';
+import { Order } from '@/common/enum/order.enum';
 
 describe('HistoryService', () => {
   const makeSource = (id: number): SourceEntity => {
@@ -20,8 +22,10 @@ describe('HistoryService', () => {
 
   const makeDeps = () => {
     const findLatestBySourceId = jest.fn();
+    const getOffsetIncentivesHistory = jest.fn();
     const reservesRepo = {
       findLatestBySourceId,
+      getOffsetIncentivesHistory,
       findById: jest.fn(),
       save: jest.fn(),
       getTreasuryReserves: jest.fn(),
@@ -41,7 +45,7 @@ describe('HistoryService', () => {
       sourceRepo as never,
     );
 
-    return { service, findLatestBySourceId };
+    return { service, findLatestBySourceId, getOffsetIncentivesHistory };
   };
 
   beforeEach(() => {
@@ -72,6 +76,57 @@ describe('HistoryService', () => {
 
       expect(result).toBeNull();
       expect(findLatestBySourceId).toHaveBeenCalledWith(20);
+    });
+  });
+
+  describe('getIncentiveHistory', () => {
+    it('returns row with zero incomes when repository provides incentives without reserves', async () => {
+      const { service, getOffsetIncentivesHistory } = makeDeps();
+      const date = new Date('2026-01-03T00:00:00.000Z');
+      getOffsetIncentivesHistory.mockResolvedValue({
+        data: [
+          {
+            sourceId: 3,
+            date,
+            incomes: 0,
+            rewardsSupply: 7,
+            rewardsBorrow: 1,
+            priceComp: 11,
+          },
+        ],
+        limit: null,
+        offset: 0,
+        total: 1,
+      });
+
+      const result = await service.getIncentiveHistory(new OffsetDto(undefined, 0, Order.ASC));
+
+      expect(result.total).toBe(1);
+      expect(result.data).toHaveLength(1);
+      expect(result.data[0]).toMatchObject({
+        sourceId: 3,
+        incomes: 0,
+        rewardsSupply: 7,
+        rewardsBorrow: 1,
+        priceComp: 11,
+      });
+    });
+
+    it('preserves total when page data is empty due to high offset', async () => {
+      const { service, getOffsetIncentivesHistory } = makeDeps();
+      getOffsetIncentivesHistory.mockResolvedValue({
+        data: [],
+        limit: 2,
+        offset: 10,
+        total: 5,
+      });
+
+      const result = await service.getIncentiveHistory(new OffsetDto(2, 10, Order.ASC));
+
+      expect(result.data).toEqual([]);
+      expect(result.limit).toBe(2);
+      expect(result.offset).toBe(10);
+      expect(result.total).toBe(5);
     });
   });
 });
