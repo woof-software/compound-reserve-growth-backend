@@ -408,7 +408,7 @@ export class ReservesRepository {
         FROM "merged_rows" mr
         ORDER BY mr."day" ${sortDirection}, mr."sourceId" ASC
         OFFSET $2
-        ${!limit ? 'LIMIT $3' : ''}
+        ${limit !== null ? 'LIMIT $3' : ''}
       ),
       "total_rows" AS (
         SELECT COUNT(*)::int AS "total"
@@ -426,9 +426,8 @@ export class ReservesRepository {
       LEFT JOIN "paged_rows" pr ON TRUE;
     `;
 
-    const params = !limit
-      ? [algorithmsArrayLiteral, offset, limit]
-      : [algorithmsArrayLiteral, offset];
+    const params =
+      limit !== null ? [algorithmsArrayLiteral, offset, limit] : [algorithmsArrayLiteral, offset];
     const rawRows = (await this.reservesRepository.query(query, params)) as IncentivesHistoryRaw[];
 
     const total = rawRows.length > 0 ? Number(rawRows[0].total ?? 0) : 0;

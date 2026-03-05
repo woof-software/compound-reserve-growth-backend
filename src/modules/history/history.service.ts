@@ -203,7 +203,12 @@ export class HistoryService {
     const incentivesData = await this.reservesRepo.getOffsetIncentivesHistory(dto, allAlgorithms);
 
     if (incentivesData.data.length === 0) {
-      return new OffsetDataDto<IncentivesHistory>([], dto.limit ?? null, dto.offset ?? 0, 0);
+      return new OffsetDataDto<IncentivesHistory>(
+        [],
+        incentivesData.limit,
+        incentivesData.offset,
+        incentivesData.total,
+      );
     }
 
     const indexesWithoutPrice: number[] = [];
