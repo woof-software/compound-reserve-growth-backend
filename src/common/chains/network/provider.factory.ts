@@ -7,6 +7,8 @@ import { NetworkService } from './network.service';
 @Injectable()
 export class ProviderFactory {
   private cache = new Map<number, ethers.JsonRpcProvider>();
+  private readonly timeoutPatchedProviders = new WeakSet<ethers.JsonRpcProvider>();
+  private readonly RPC_TIMEOUT_MS = 30_000;
 
   constructor(private readonly networkService: NetworkService) {}
 
@@ -26,6 +28,7 @@ export class ProviderFactory {
         config.chainId,
         config.batchMaxCount ? { batchMaxCount: config.batchMaxCount } : {},
       );
+      this.applyRpcTimeout(provider);
       this.cache.set(config.chainId, provider);
     }
 
@@ -40,6 +43,30 @@ export class ProviderFactory {
     identifier: string | number,
     maxMulticallDataLength = 400_000,
   ): MulticallProvider<ethers.JsonRpcProvider> {
-    return MulticallWrapper.wrap(this.get(identifier), maxMulticallDataLength);
+    const provider = this.get(identifier);
+
+    if (MulticallWrapper.isMulticallProvider(provider)) {
+      provider.maxMulticallDataLength = maxMulticallDataLength;
+      return provider;
+    }
+
+    const multicallProvider = MulticallWrapper.wrap(provider, maxMulticallDataLength);
+    this.applyRpcTimeout(multicallProvider);
+    return multicallProvider;
+  }
+
+  private applyRpcTimeout(provider: ethers.JsonRpcProvider): void {
+    if (this.timeoutPatchedProviders.has(provider)) {
+      return;
+    }
+
+    const originalGetConnection = provider._getConnection.bind(provider);
+    provider._getConnection = () => {
+      const connection = originalGetConnection();
+      connection.timeout = this.RPC_TIMEOUT_MS;
+      return connection;
+    };
+
+    this.timeoutPatchedProviders.add(provider);
   }
 }

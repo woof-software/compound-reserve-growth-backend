@@ -41,4 +41,24 @@ describe('ProviderFactory', () => {
     const provider = factory.multicall('mainnet', 123_456);
     expect(provider.maxMulticallDataLength).toBe(123_456);
   });
+
+  it('applies 30s timeout for regular rpc provider', () => {
+    const { factory } = makeFactory();
+
+    const provider = factory.get('mainnet') as {
+      _getConnection: () => { timeout?: number };
+    };
+
+    expect(provider._getConnection().timeout).toBe(30_000);
+  });
+
+  it('applies 30s timeout for multicall provider', () => {
+    const { factory } = makeFactory();
+
+    const provider = factory.multicall('mainnet') as unknown as {
+      _getConnection: () => { timeout?: number };
+    };
+
+    expect(provider._getConnection().timeout).toBe(30_000);
+  });
 });
