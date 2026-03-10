@@ -135,9 +135,7 @@ describe('DiscoveryService', () => {
     blockService.getSafeBlockNumber.mockResolvedValue(555);
 
     const cometContract = {
-      baseTokenPriceFeed: jest
-        .fn()
-        .mockResolvedValue('0x00000000000000000000000000000000000000b0'),
+      baseTokenPriceFeed: jest.fn().mockResolvedValue('0x00000000000000000000000000000000000000b0'),
       numAssets: jest.fn().mockResolvedValue(2n),
       getAssetInfo: jest
         .fn()
@@ -158,9 +156,7 @@ describe('DiscoveryService', () => {
         blockTag: number,
       ) => Promise<null>;
     };
-    const checkIfCapoOracleSpy = jest
-      .spyOn(internal, 'checkIfCapoOracle')
-      .mockResolvedValue(null);
+    const checkIfCapoOracleSpy = jest.spyOn(internal, 'checkIfCapoOracle').mockResolvedValue(null);
 
     const result = await service.discoverCapoOracles([
       {
