@@ -82,7 +82,7 @@ export class DiscoveryService implements OnModuleInit {
 
     //   if (oracleRow && (!oracleRow.snapshotRatio || !oracleRow.decimals)) {
     //     try {
-    //       const provider = this.providerFactory.get('mainnet');
+    //       const provider = this.providerFactory.multicall('mainnet');
     //       const oracleContract = new ethers.Contract(standaloneOracleAddress, CapoABI, provider);
     //       const [
     //         snapshotRatioBn,
@@ -175,12 +175,24 @@ export class DiscoveryService implements OnModuleInit {
           continue;
         }
 
-        const provider = this.providerFactory.get(comet.network);
+        const provider = this.providerFactory.multicall(comet.network);
         const cometContract = new ethers.Contract(comet.address, CometABI, provider);
         const blockTag = safeBlockNumber;
 
-        const baseTokenPriceFeed = await cometContract.baseTokenPriceFeed({ blockTag });
+        const [baseTokenPriceFeed, numAssetsRaw] = await Promise.all([
+          cometContract.baseTokenPriceFeed({ blockTag }),
+          cometContract.numAssets({ blockTag }),
+        ]);
+
         this.logger.log(`Base token price feed: ${baseTokenPriceFeed}`);
+
+        const assetInfos = await this.loadCometAssetInfos(
+          comet.address,
+          comet.network,
+          cometContract,
+          blockTag,
+          numAssetsRaw,
+        );
 
         if (!checkedAddresses.has(baseTokenPriceFeed.toLowerCase())) {
           checkedAddresses.add(baseTokenPriceFeed.toLowerCase());
@@ -204,10 +216,7 @@ export class DiscoveryService implements OnModuleInit {
           }
         }
 
-        const numAssets = await cometContract.numAssets({ blockTag });
-
-        for (let i = 0; i < numAssets; i++) {
-          const assetInfo = await cometContract.getAssetInfo(i, { blockTag });
+        for (const assetInfo of assetInfos) {
           const priceFeed = assetInfo.priceFeed;
 
           if (!checkedAddresses.has(priceFeed.toLowerCase())) {
@@ -236,6 +245,34 @@ export class DiscoveryService implements OnModuleInit {
     return discoveredOracles;
   }
 
+  private async loadCometAssetInfos(
+    cometAddress: string,
+    network: string,
+    cometContract: ethers.Contract,
+    blockTag: number,
+    numAssetsRaw: unknown,
+  ): Promise<Array<{ priceFeed: string }>> {
+    const numAssets = Number(numAssetsRaw);
+    if (!Number.isSafeInteger(numAssets) || numAssets < 0) {
+      throw new Error(`Invalid numAssets value for comet ${cometAddress}: ${numAssetsRaw}`);
+    }
+
+    const assetInfos: Array<{ priceFeed: string }> =
+      numAssets > 0
+        ? ((await Promise.all(
+            Array.from({ length: numAssets }, (_, index) =>
+              cometContract.getAssetInfo(index, { blockTag }),
+            ),
+          )) as Array<{ priceFeed: string }>)
+        : [];
+
+    this.logger.debug(
+      `Comet discovery read via multicall comet=${cometAddress} network=${network} block=${blockTag} batchedCalls=${numAssets + 2}`,
+    );
+
+    return assetInfos;
+  }
+
   private async checkIfCapoOracle(
     oracleAddress: string,
     chainId: number,
@@ -243,29 +280,41 @@ export class DiscoveryService implements OnModuleInit {
     blockTag: number,
   ): Promise<CapoOracleInfo | null> {
     try {
-      const provider = this.providerFactory.get(network);
+      const provider = this.providerFactory.multicall(network);
       const oracleContract = new ethers.Contract(oracleAddress, CapoABI, provider);
 
       let maxYearlyRatioGrowthPercent: number;
       try {
-        maxYearlyRatioGrowthPercent = await oracleContract.maxYearlyRatioGrowthPercent({
-          blockTag,
-        });
+        maxYearlyRatioGrowthPercent = Number(
+          await oracleContract.maxYearlyRatioGrowthPercent({
+            blockTag,
+          }),
+        );
       } catch {
         return null;
       }
 
-      // Sequential RPC calls to avoid excessive parallel requests
-      const description = await oracleContract.description({ blockTag });
-      const ratioProvider = await oracleContract.ratioProvider({ blockTag });
-      const baseAggregator = await oracleContract.assetToBaseAggregator({ blockTag });
-      const manager = await oracleContract.manager({ blockTag });
-      const snapshotRatio = await oracleContract.snapshotRatio({ blockTag });
-      const snapshotTimestamp = await oracleContract.snapshotTimestamp({ blockTag });
-      const minimumSnapshotDelay = await oracleContract.minimumSnapshotDelay({ blockTag });
-      const decimals = await oracleContract.decimals({ blockTag });
+      const [
+        description,
+        ratioProvider,
+        baseAggregator,
+        manager,
+        snapshotRatio,
+        snapshotTimestamp,
+        minimumSnapshotDelay,
+        decimals,
+      ] = await Promise.all([
+        oracleContract.description({ blockTag }),
+        oracleContract.ratioProvider({ blockTag }),
+        oracleContract.assetToBaseAggregator({ blockTag }),
+        oracleContract.manager({ blockTag }),
+        oracleContract.snapshotRatio({ blockTag }),
+        oracleContract.snapshotTimestamp({ blockTag }),
+        oracleContract.minimumSnapshotDelay({ blockTag }),
+        oracleContract.decimals({ blockTag }),
+      ]);
 
-      const oracleInfo: CapoOracleInfo = {
+      return {
         address: oracleAddress,
         chainId,
         network,
@@ -280,8 +329,6 @@ export class DiscoveryService implements OnModuleInit {
         manager,
         isActive: true,
       };
-
-      return oracleInfo;
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       this.logger.error(

@@ -1,4 +1,5 @@
 import { ethers } from 'ethers';
+import { MulticallProvider } from 'ethers-multicall-provider';
 
 export interface RootJson {
   comet: string; // Comet contract address
@@ -52,5 +53,5 @@ export interface MarketData {
   market: string;
   cometAddress: string;
   rewardsAddress?: string; // optional, if not present, rewards are not used
-  provider: ethers.JsonRpcProvider;
+  provider: MulticallProvider<ethers.JsonRpcProvider>;
 }

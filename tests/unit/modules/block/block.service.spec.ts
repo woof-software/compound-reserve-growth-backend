@@ -83,6 +83,7 @@ describe('BlockService', () => {
 
     const providerFactory = {
       get: jest.fn().mockReturnValue(provider),
+      multicall: jest.fn().mockReturnValue(provider),
     };
 
     const networkNames = params?.networkNames ?? Object.keys(timingConfig.networks);
