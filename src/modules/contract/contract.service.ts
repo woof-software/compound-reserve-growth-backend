@@ -87,7 +87,7 @@ export class ContractService {
 
   async getContractCreationBlock(contractAddress: string, network: string): Promise<number> {
     try {
-      const provider = this.providerFactory.multicall(network);
+      const provider = this.providerFactory.get(network);
       const currentBlock = await provider.getBlockNumber();
       let left = 0;
       let right = currentBlock;
@@ -113,7 +113,7 @@ export class ContractService {
 
   async getAllComptrollerMarkets(comptrollerAddress: string, network: string): Promise<string[]> {
     try {
-      const provider = this.providerFactory.multicall(network);
+      const provider = this.providerFactory.get(network);
       const blockTag = await this.blockService.getSafeBlockNumber(network);
 
       const comptrollerContract = new ethers.Contract(
@@ -136,7 +136,7 @@ export class ContractService {
 
   async getMarketSymbol(marketAddress: string, network: string): Promise<string> {
     try {
-      const provider = this.providerFactory.multicall(network);
+      const provider = this.providerFactory.get(network);
       const blockTag = await this.blockService.getSafeBlockNumber(network);
 
       const marketContract = new ethers.Contract(marketAddress, MarketV2ABI, provider) as any;

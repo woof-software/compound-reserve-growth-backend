@@ -188,7 +188,7 @@ describe('BlockService', () => {
       const result = await service.getSafeBlockNumber('mainnet');
 
       expect(result).toBe(925);
-      expect(providerFactory.multicall).toHaveBeenCalledWith('mainnet');
+      expect(providerFactory.get).toHaveBeenCalledWith('mainnet');
       expect(provider.getBlock).toHaveBeenCalledWith('latest');
     });
 

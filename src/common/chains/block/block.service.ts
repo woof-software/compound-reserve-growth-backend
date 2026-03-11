@@ -53,7 +53,7 @@ export class BlockService implements OnModuleInit {
   }
 
   async getSafeBlockNumber(network: string): Promise<number> {
-    const provider = this.providerFactory.multicall(network);
+    const provider = this.providerFactory.get(network);
     const latestBlock = await provider.getBlock('latest');
 
     if (!latestBlock) {
@@ -70,7 +70,7 @@ export class BlockService implements OnModuleInit {
   }
 
   async getBlockOffsetByTime(network: string, timeInSeconds: number): Promise<number> {
-    const provider = this.providerFactory.multicall(network);
+    const provider = this.providerFactory.get(network);
     const latestBlock = await provider.getBlock('latest');
 
     if (!latestBlock) {
