@@ -3,7 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { SchedulerRegistry } from '@nestjs/schedule';
 import { CronJob } from 'cron';
 
-import { GetHistoryService } from 'modules/history/cron/history-get.service';
+import { HistoryCollectionQueueService } from 'modules/history/queue/history-collection-queue.service';
 
 import { TAppConfig } from 'config/app';
 
@@ -13,7 +13,7 @@ export class HistoryGetCron implements OnApplicationBootstrap, OnApplicationShut
   private readonly logger = new Logger(HistoryGetCron.name);
 
   constructor(
-    private readonly getHistoryService: GetHistoryService,
+    private readonly historyCollectionQueueService: HistoryCollectionQueueService,
     private readonly configService: ConfigService,
     private readonly schedulerRegistry: SchedulerRegistry,
   ) {}
@@ -70,7 +70,11 @@ export class HistoryGetCron implements OnApplicationBootstrap, OnApplicationShut
 
   async getHistoryTask() {
     try {
-      await this.getHistoryService.getHistory();
+      const wasStarted = await this.historyCollectionQueueService.enqueueDailySync();
+      if (!wasStarted) {
+        this.logger.warn('History indexing cron was blocked - another collection job is running');
+      }
+
       return;
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);

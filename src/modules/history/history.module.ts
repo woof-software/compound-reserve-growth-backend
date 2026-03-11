@@ -16,6 +16,7 @@ import { HistoryController } from './history.controller';
 import { GetHistoryService } from './cron/history-get.service';
 import { IncomesRepository } from './incomes-repository.service';
 import { SpendsRepository } from './spends-repository.service';
+import { HistoryCollectionQueueService } from './queue/history-collection-queue.service';
 
 import { RedisModule } from 'infrastructure/redis/redis.module';
 
@@ -36,6 +37,7 @@ import { RedisModule } from 'infrastructure/redis/redis.module';
     HistoryGetCommand,
     StatsGetCommand,
     GetHistoryService,
+    HistoryCollectionQueueService,
   ],
   exports: [
     HistoryService,
@@ -43,6 +45,7 @@ import { RedisModule } from 'infrastructure/redis/redis.module';
     IncomesRepository,
     SpendsRepository,
     GetHistoryService,
+    HistoryCollectionQueueService,
   ],
   controllers: [HistoryController],
 })

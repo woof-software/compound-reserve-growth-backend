@@ -3,10 +3,10 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ContractService } from 'modules/contract/contract.service';
 import { SourceService } from 'modules/source/source.service';
 import { PriceService } from 'modules/price/price.service';
-import { StartCollectionResponse } from 'modules/admin/response';
 import { IncomesRepository } from 'modules/history/incomes-repository.service';
 import { SpendsRepository } from 'modules/history/spends-repository.service';
 import { ReservesRepository } from 'modules/history/reserves-repository.service';
+import { HistoryCollectionRequest } from 'modules/history/types/history-collection-request.type';
 
 import { Algorithm } from 'common/enum/algorithm.enum';
 
@@ -70,7 +70,7 @@ export class GetHistoryService {
     });
   }
 
-  async startReservesProcessing(collectionSwitch?: StartCollectionResponse) {
+  async startReservesProcessing(collectionSwitch?: HistoryCollectionRequest) {
     return this.executeWithLock('Reserves Processing', async () => {
       this.logger.log('Starting to process reserves...');
 
@@ -118,7 +118,7 @@ export class GetHistoryService {
     });
   }
 
-  async startStatsProcessing(collectionSwitch?: StartCollectionResponse) {
+  async startStatsProcessing(collectionSwitch?: HistoryCollectionRequest) {
     return this.executeWithLock('Stats Processing', async () => {
       this.logger.log('Starting to process stats...');
       let startDate: Date | undefined;
