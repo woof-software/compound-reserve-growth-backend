@@ -13,6 +13,7 @@ import { GithubModule } from 'modules/github/github.module';
 import { AssetModule } from 'modules/asset/asset.module';
 import { SourceModule } from 'modules/source/source.module';
 import { HistoryModule } from 'modules/history/history.module';
+import { HistoryIndexerModule } from 'modules/history/history-indexer.module';
 import { TreasuryModule } from 'modules/treasury/treasury.module';
 import { RevenueModule } from 'modules/revenue/revenue.module';
 import { PriceModule } from 'modules/price/price.module';
@@ -22,7 +23,6 @@ import { EventModule } from 'modules/event/event.module';
 import { CoinGeckoModule } from 'modules/price/providers/coingecko/coingecko.module';
 import { CapoModule } from 'modules/capo/capo.module';
 import { getAdminModule } from 'modules/admin';
-import { HistoryCronModule } from 'modules/history/history-cron.module';
 
 import { NetworkModule } from 'common/chains/network/network.module';
 
@@ -93,7 +93,7 @@ import { ExceptionInterceptor } from 'infrastructure/http/interceptors/exception
     SourceModule,
     AssetModule,
     HistoryModule,
-    HistoryCronModule,
+    HistoryIndexerModule,
     TreasuryModule,
     RevenueModule,
     CoinGeckoModule,

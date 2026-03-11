@@ -14,6 +14,7 @@ async function bootstrap() {
   logger.setLogLevels(logLevel);
 
   const app = await NestFactory.create(AppModule, { logger });
+  app.enableShutdownHooks();
   const configService = app.get(ConfigService);
   const appConfig = configService.get<TAppConfig>('app');
 
