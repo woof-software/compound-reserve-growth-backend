@@ -2,7 +2,7 @@ import { Injectable, Logger, OnApplicationBootstrap, OnApplicationShutdown } fro
 import { ConfigService } from '@nestjs/config';
 import { Job, Worker } from 'bullmq';
 
-import { GetHistoryService } from 'modules/history/cron/history-get.service';
+import { HistoryProcessingService } from 'modules/history/services/history-processing.service';
 import { HistoryCollectionRequest } from 'modules/history/types/history-collection-request.type';
 
 import {
@@ -47,7 +47,7 @@ export class HistoryCollectionWorkerService
 
   constructor(
     private readonly configService: ConfigService,
-    private readonly getHistoryService: GetHistoryService,
+    private readonly historyProcessingService: HistoryProcessingService,
     private readonly historyCollectionQueueService: HistoryCollectionQueueService,
   ) {}
 
@@ -89,15 +89,15 @@ export class HistoryCollectionWorkerService
   private async processJob(job: HistoryCollectionJob): Promise<void> {
     switch (job.name) {
       case HistoryCollectionJobName.DailySync:
-        await this.getHistoryService.getHistory();
+        await this.historyProcessingService.getHistory();
         return;
       case HistoryCollectionJobName.ReservesCollect:
-        await this.getHistoryService.startReservesProcessing(
+        await this.historyProcessingService.startReservesProcessing(
           deserializeCollectionSwitch(job.data.collectionSwitch),
         );
         return;
       case HistoryCollectionJobName.StatsCollect:
-        await this.getHistoryService.startStatsProcessing(
+        await this.historyProcessingService.startStatsProcessing(
           deserializeCollectionSwitch(job.data.collectionSwitch),
         );
         return;

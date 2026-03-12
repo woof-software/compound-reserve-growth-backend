@@ -1,19 +1,16 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
 import { ethers } from 'ethers';
 import { Cron, CronExpression } from '@nestjs/schedule';
 
 import { SourceRepository } from 'modules/source/source.repository';
 import CometABI from 'modules/contract/abi/CometABI.json';
 import CapoABI from 'modules/capo/abi/ERC4626CorrelatedAssetsPriceOracle.json';
+import { OracleRepository } from 'modules/oracle/repositories/oracle.repository';
 
 import { ProviderFactory } from 'common/chains/network/provider.factory';
 import { NetworkService } from 'common/chains/network/network.service';
 import { BlockService } from 'common/chains/block/block.service';
 import { Algorithm } from 'common/enum/algorithm.enum';
-
-import { Oracle } from './oracle.entity';
 
 interface CapoOracleInfo {
   address: string;
@@ -40,96 +37,17 @@ export class DiscoveryService implements OnModuleInit {
     private readonly networkService: NetworkService,
     private readonly blockService: BlockService,
     private readonly sourceRepository: SourceRepository,
-    @InjectRepository(Oracle) private readonly oracleRepository: Repository<Oracle>,
+    private readonly oracleRepository: OracleRepository,
   ) {}
 
-  async onModuleInit() {
-    // if (process.env.MOCK_CAPO === 'true') {
-    //   await this.oracleRepository.upsert(
-    //     {
-    //       address: '0x1111111111111111111111111111111111111111',
-    //       chainId: 1,
-    //       network: 'mainnet',
-    //       description: 'Mock CAPO',
-    //       maxYearlyRatioGrowthPercent: 500,
-    //       snapshotRatio: '1000000000000000000',
-    //       snapshotTimestamp: Math.floor(Date.now() / 1_000),
-    //       decimals: 18,
-    //       isActive: true,
-    //     },
-    //     ['address'],
-    //   );
-    // }
-    // this.logger.log('DiscoveryService initialized');
-
-    // const standaloneOracleAddress = '0xdd5b1151ef4808137b0b6e80765192b62968e643'.toLowerCase();
-
-    // try {
-    //   await this.oracleRepository.upsert(
-    //     {
-    //       address: standaloneOracleAddress,
-    //       chainId: 1,
-    //       network: 'mainnet',
-    //       description: 'wstETH / USD Oracle',
-    //       isActive: true,
-    //     },
-    //     ['address'],
-    //   );
-
-    //   const oracleRow = await this.oracleRepository.findOne({
-    //     where: { address: standaloneOracleAddress },
-    //   });
-
-    //   if (oracleRow && (!oracleRow.snapshotRatio || !oracleRow.decimals)) {
-    //     try {
-    //       const provider = this.providerFactory.multicall('mainnet');
-    //       const oracleContract = new ethers.Contract(standaloneOracleAddress, CapoABI, provider);
-    //       const [
-    //         snapshotRatioBn,
-    //         snapshotTimestampBn,
-    //         decimals,
-    //         minDelay,
-    //         ratioProvider,
-    //         baseAgg,
-    //         maxYearlyRatioGrowthPercent,
-    //         snapshotTimestamp,
-    //       ] = await Promise.all([
-    //         oracleContract.snapshotRatio(),
-    //         oracleContract.snapshotTimestamp(),
-    //         oracleContract.decimals(),
-    //         oracleContract.minimumSnapshotDelay(),
-    //         oracleContract.ratioProvider(),
-    //         oracleContract.assetToBaseAggregator(),
-    //         oracleContract.maxYearlyRatioGrowthPercent(),
-    //         oracleContract.snapshotTimestamp(),
-    //       ]);
-
-    //       oracleRow.snapshotRatio = snapshotRatioBn.toString();
-    //       oracleRow.snapshotTimestamp = Number(snapshotTimestampBn);
-    //       oracleRow.decimals = Number(decimals);
-    //       oracleRow.minimumSnapshotDelay = Number(minDelay);
-    //       oracleRow.ratioProvider = ratioProvider.toLowerCase();
-    //       oracleRow.baseAggregator = baseAgg.toLowerCase();
-    //       oracleRow.maxYearlyRatioGrowthPercent = Number(maxYearlyRatioGrowthPercent);
-    //       oracleRow.snapshotTimestamp = Number(snapshotTimestamp);
-
-    //       await this.oracleRepository.save(oracleRow);
-    //       this.logger.log(`Oracle ${standaloneOracleAddress} initialised from on-chain data`);
-    //     } catch (e) {
-    //       this.logger.warn(`Could not fetch on-chain oracle data: ${e.message}`);
-    //     }
-    //   }
-
-    //   this.logger.log(`Standalone oracle ${standaloneOracleAddress} upserted`);
-    // } catch (e) {
-    //   this.logger.error(`Failed to upsert standalone oracle: ${e.message}`);
-    // }
+  async onModuleInit(): Promise<void> {
     await this.syncFromSources();
     this.logger.log('Initial discovery completed');
   }
+
   async syncFromSources(): Promise<CapoOracleInfo[]> {
     const sources = await this.sourceRepository.list();
-    const comets = sources.filter((s) => s.algorithm.includes(Algorithm.COMET));
+    const comets = sources.filter((source) => source.algorithm.includes(Algorithm.COMET));
 
     this.logger.log(`Found ${comets.length} COMET sources for discovery`);
 
@@ -138,12 +56,12 @@ export class DiscoveryService implements OnModuleInit {
       return [];
     }
 
-    const cometDescriptors = comets.map((c) => {
-      const netCfg = this.networkService.byName(c.network);
+    const cometDescriptors = comets.map((source) => {
+      const netCfg = this.networkService.byName(source.network);
       return {
-        address: c.address,
+        address: source.address,
         chainId: netCfg?.chainId ?? 0,
-        network: c.network,
+        network: source.network,
       };
     });
 
@@ -152,7 +70,7 @@ export class DiscoveryService implements OnModuleInit {
   }
 
   @Cron(CronExpression.EVERY_4_HOURS)
-  async scheduledSync() {
+  async scheduledSync(): Promise<void> {
     await this.syncFromSources();
   }
 
@@ -208,7 +126,7 @@ export class DiscoveryService implements OnModuleInit {
             this.logger.log(
               `Oracle info address=${oracleInfo.address} network=${oracleInfo.network} chainId=${oracleInfo.chainId} maxYearlyRatioGrowthPercent=${oracleInfo.maxYearlyRatioGrowthPercent}`,
             );
-            await this.oracleRepository.upsert(oracleInfo, ['address']);
+            await this.oracleRepository.upsertByAddress(oracleInfo);
             discoveredOracles.push(oracleInfo);
             this.logger.log(
               `Found CAPO oracle at ${baseTokenPriceFeed}: ${oracleInfo.description}`,
@@ -230,7 +148,7 @@ export class DiscoveryService implements OnModuleInit {
             );
 
             if (oracleInfo) {
-              await this.oracleRepository.upsert(oracleInfo, ['address']);
+              await this.oracleRepository.upsertByAddress(oracleInfo);
               discoveredOracles.push(oracleInfo);
               this.logger.log(`Found CAPO oracle at ${priceFeed}: ${oracleInfo.description}`);
             }
@@ -290,7 +208,11 @@ export class DiscoveryService implements OnModuleInit {
             blockTag,
           }),
         );
-      } catch {
+      } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : String(error);
+        this.logger.warn(
+          `Oracle does not expose CAPO growth data address=${oracleAddress} network=${network} blockTag=${blockTag} error=${message}`,
+        );
         return null;
       }
 
@@ -338,10 +260,6 @@ export class DiscoveryService implements OnModuleInit {
     }
   }
 
-  /**
-   * Returns a lagged block number for the given network, caching the result per discovery run.
-   * If the latest block cannot be fetched, returns null without poisoning cache.
-   */
   private async getSafeBlockNumber(
     network: string,
     cache: Map<string, number | null>,

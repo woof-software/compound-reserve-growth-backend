@@ -3,9 +3,9 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ethers } from 'ethers';
 
-import { IncentivesHistory, ReserveEntity } from './entities';
-import { PaginationDto } from './dto/pagination.dto';
-import { OffsetDto } from './dto/offset.dto';
+import { IncentivesHistory, ReserveEntity } from 'modules/history/entities';
+import { PaginationDto } from 'modules/history/dto/pagination.dto';
+import { OffsetDto } from 'modules/history/dto/offset.dto';
 
 import { Algorithm } from '@app/common/enum/algorithm.enum';
 import { PaginatedDataDto } from '@app/common/dto/paginated-data.dto';
@@ -32,7 +32,7 @@ export class ReservesRepository {
     return this.reservesRepository.save(reserve);
   }
 
-  async findById(id: number): Promise<ReserveEntity> {
+  async findById(id: number): Promise<ReserveEntity | null> {
     return this.reservesRepository
       .createQueryBuilder('reserves')
       .leftJoinAndSelect('reserves.source', 'source')

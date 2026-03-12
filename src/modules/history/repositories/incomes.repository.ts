@@ -3,8 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 
 import { OffsetDto } from 'modules/history/dto/offset.dto';
-
-import { IncomesEntity } from './entities';
+import { IncomesEntity } from 'modules/history/entities';
 
 import { OffsetDataDto } from '@app/common/dto/offset-data.dto';
 import { Algorithm } from '@app/common/enum/algorithm.enum';
@@ -19,7 +18,7 @@ export class IncomesRepository {
     return this.incomesRepository.save(reserve);
   }
 
-  async findById(id: number): Promise<IncomesEntity> {
+  async findById(id: number): Promise<IncomesEntity | null> {
     return this.incomesRepository
       .createQueryBuilder('incomes')
       .leftJoinAndSelect('incomes.source', 'source')
@@ -28,7 +27,7 @@ export class IncomesRepository {
       .getOne();
   }
 
-  async findBySourceId(sourceId: number): Promise<IncomesEntity> {
+  async findBySourceId(sourceId: number): Promise<IncomesEntity | null> {
     return this.incomesRepository
       .createQueryBuilder('incomes')
       .leftJoinAndSelect('incomes.source', 'source')

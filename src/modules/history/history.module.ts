@@ -5,24 +5,23 @@ import { AssetModule } from 'modules/asset/asset.module';
 import { SourceModule } from 'modules/source/source.module';
 import { ContractModule } from 'modules/contract/contract.module';
 import { PriceModule } from 'modules/price/price.module';
-import { Price } from 'modules/price/price.entity';
 
 import { ReserveEntity, IncomesEntity, SpendsEntity } from './entities';
-import { ReservesRepository } from './reserves-repository.service';
-import { HistoryService } from './history.service';
 import { HistoryGetCommand } from './cli/history-get.command';
 import { StatsGetCommand } from './cli/stats-get.command';
 import { HistoryController } from './history.controller';
-import { GetHistoryService } from './cron/history-get.service';
-import { IncomesRepository } from './incomes-repository.service';
-import { SpendsRepository } from './spends-repository.service';
 import { HistoryCollectionQueueService } from './queue/history-collection-queue.service';
+import { IncomesRepository } from './repositories/incomes.repository';
+import { ReservesRepository } from './repositories/reserves.repository';
+import { SpendsRepository } from './repositories/spends.repository';
+import { HistoryProcessingService } from './services/history-processing.service';
+import { HistoryService } from './services/history.service';
 
 import { RedisModule } from 'infrastructure/redis/redis.module';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([ReserveEntity, IncomesEntity, SpendsEntity, Price]),
+    TypeOrmModule.forFeature([ReserveEntity, IncomesEntity, SpendsEntity]),
     SourceModule,
     AssetModule,
     forwardRef(() => ContractModule),
@@ -36,7 +35,7 @@ import { RedisModule } from 'infrastructure/redis/redis.module';
     HistoryService,
     HistoryGetCommand,
     StatsGetCommand,
-    GetHistoryService,
+    HistoryProcessingService,
     HistoryCollectionQueueService,
   ],
   exports: [
@@ -44,7 +43,7 @@ import { RedisModule } from 'infrastructure/redis/redis.module';
     ReservesRepository,
     IncomesRepository,
     SpendsRepository,
-    GetHistoryService,
+    HistoryProcessingService,
     HistoryCollectionQueueService,
   ],
   controllers: [HistoryController],

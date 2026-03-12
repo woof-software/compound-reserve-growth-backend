@@ -4,8 +4,8 @@ import { Throttle } from '@nestjs/throttler';
 import Redis from 'ioredis';
 
 import { IncentiveHistoryResponse } from 'modules/history/response/incentives-history.response';
+import { HistoryService } from 'modules/history/services/history.service';
 
-import { HistoryService } from './history.service';
 import { ReserveResponse } from './response/reserve.response';
 import { PaginationDto } from './dto/pagination.dto';
 import { PaginationRequest } from './request/pagination.request';

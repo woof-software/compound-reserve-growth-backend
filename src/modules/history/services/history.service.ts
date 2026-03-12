@@ -3,19 +3,19 @@ import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { SourceRepository } from 'modules/source/source.repository';
 import { SourceEntity } from 'modules/source/source.entity';
 
-import { ReservesRepository } from './reserves-repository.service';
-import { IncomesRepository } from './incomes-repository.service';
-import { SpendsRepository } from './spends-repository.service';
-import { CreateHistoryDto } from './dto/create-history.dto';
+import { ReservesRepository } from '../repositories/reserves.repository';
+import { IncomesRepository } from '../repositories/incomes.repository';
+import { SpendsRepository } from '../repositories/spends.repository';
+import { CreateHistoryDto } from '../dto/create-history.dto';
 import {
   ReserveEntity,
   IncomesEntity,
   SpendsEntity,
   StatsHistory,
   IncentivesHistory,
-} from './entities';
-import { PaginationDto } from './dto/pagination.dto';
-import { OffsetDto } from './dto/offset.dto';
+} from '../entities';
+import { PaginationDto } from '../dto/pagination.dto';
+import { OffsetDto } from '../dto/offset.dto';
 
 import { PaginatedDataDto } from '@app/common/dto/paginated-data.dto';
 import { OffsetDataDto } from '@app/common/dto/offset-data.dto';
@@ -34,10 +34,11 @@ export class HistoryService {
     private readonly sourceRepo: SourceRepository,
   ) {}
 
-  // ?: not in use
   async create(dto: CreateHistoryDto): Promise<ReserveEntity> {
     const source = await this.sourceRepo.findById(dto.sourceId);
-    if (!source) throw new NotFoundException(`Source ${dto.sourceId} not found`);
+    if (!source) {
+      throw new NotFoundException(`Source ${dto.sourceId} not found`);
+    }
 
     const reserve = new ReserveEntity(
       source,
@@ -61,23 +62,23 @@ export class HistoryService {
     return this.spendsRepo.save(spends);
   }
 
-  async findReservesById(id: number): Promise<ReserveEntity> {
+  async findReservesById(id: number): Promise<ReserveEntity | null> {
     return this.reservesRepo.findById(id);
   }
 
-  async findIncomesById(id: number): Promise<IncomesEntity> {
+  async findIncomesById(id: number): Promise<IncomesEntity | null> {
     return this.incomesRepo.findById(id);
   }
 
-  async findSpendsById(id: number): Promise<SpendsEntity> {
+  async findSpendsById(id: number): Promise<SpendsEntity | null> {
     return this.spendsRepo.findById(id);
   }
 
-  async findIncomesBySource(source: SourceEntity): Promise<IncomesEntity> {
+  async findIncomesBySource(source: SourceEntity): Promise<IncomesEntity | null> {
     return this.incomesRepo.findBySourceId(source.id);
   }
 
-  async findSpendsBySource(source: SourceEntity): Promise<SpendsEntity> {
+  async findSpendsBySource(source: SourceEntity): Promise<SpendsEntity | null> {
     return this.spendsRepo.findBySourceId(source.id);
   }
 
@@ -198,7 +199,9 @@ export class HistoryService {
       Algorithm.AERA_COMPOUND_RESERVES,
     ];
 
-    if (!dto.order) dto.order = Order.ASC;
+    if (!dto.order) {
+      dto.order = Order.ASC;
+    }
 
     const incentivesData = await this.reservesRepo.getOffsetIncentivesHistory(dto, allAlgorithms);
 
@@ -215,7 +218,6 @@ export class HistoryService {
     let firstPrice = 0;
     let previousPrice = 0;
     const data: IncentivesHistory[] = incentivesData.data.map((item, index) => {
-      item.priceComp;
       if (!item.priceComp) {
         this.logger.warn(`incentives -> priceComp not found for ${item.date}`, item);
         if (previousPrice) {
@@ -230,7 +232,11 @@ export class HistoryService {
       return item;
     });
 
-    if (firstPrice) indexesWithoutPrice.forEach((ind) => (data[ind].priceComp = firstPrice));
+    if (firstPrice) {
+      indexesWithoutPrice.forEach((index) => {
+        data[index].priceComp = firstPrice;
+      });
+    }
 
     return new OffsetDataDto<IncentivesHistory>(
       data,

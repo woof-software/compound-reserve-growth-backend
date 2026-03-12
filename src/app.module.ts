@@ -3,7 +3,6 @@ import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { MailerModule } from '@nestjs-modules/mailer';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
-import { ScheduleModule } from '@nestjs/schedule';
 import { CacheModule } from '@nestjs/cache-manager';
 import { redisStore } from 'cache-manager-ioredis-yet';
 import Redis from 'ioredis';
@@ -13,7 +12,6 @@ import { GithubModule } from 'modules/github/github.module';
 import { AssetModule } from 'modules/asset/asset.module';
 import { SourceModule } from 'modules/source/source.module';
 import { HistoryModule } from 'modules/history/history.module';
-import { HistoryIndexerModule } from 'modules/history/history-indexer.module';
 import { TreasuryModule } from 'modules/treasury/treasury.module';
 import { RevenueModule } from 'modules/revenue/revenue.module';
 import { PriceModule } from 'modules/price/price.module';
@@ -38,6 +36,7 @@ import admin from 'config/admin';
 import reserveSourcesConfig from 'config/reserve-sources.config';
 import blockTimingConfig from 'config/block-timing.config';
 import { DatabaseModule } from 'database/database.module';
+import { BackgroundWorkerModule } from 'infrastructure/process/background-worker.module';
 import { Logger } from 'infrastructure/logger';
 import { ExceptionInterceptor } from 'infrastructure/http/interceptors/exception.interceptor';
 
@@ -56,7 +55,6 @@ import { ExceptionInterceptor } from 'infrastructure/http/interceptors/exception
         blockTimingConfig,
       ],
     }),
-    ScheduleModule.forRoot(),
     ThrottlerModule.forRoot({
       throttlers: [
         {
@@ -93,7 +91,7 @@ import { ExceptionInterceptor } from 'infrastructure/http/interceptors/exception
     SourceModule,
     AssetModule,
     HistoryModule,
-    HistoryIndexerModule,
+    BackgroundWorkerModule,
     TreasuryModule,
     RevenueModule,
     CoinGeckoModule,
