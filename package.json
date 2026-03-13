@@ -11,8 +11,8 @@
     "start": "nest start",
     "start:dev": "nest start --watch",
     "start:debug": "nest start --debug --watch",
-    "start:prod": "node dist/src/main",
-    "start:indexer": "nest build && node dist/src/indexer/indexer.main",
+    "start:prod": "node dist/src/apps/api/main.js",
+    "start:indexer": "nest build && node dist/src/apps/indexer/main.js",
     "test": "jest --coverage --config tests/jest-unit.json",
     "test:unit": "jest --config tests/jest-unit.json",
     "lint": "eslint \"{src,apps,libs,tests}/**/*.ts\" --fix",
@@ -22,7 +22,7 @@
     "migration:create": "yarn run typeorm -- migration:create ./src/database/migrations/migration",
     "migration:revert": "yarn run typeorm -- -d ./src/database/typeorm.config.ts migration:revert",
     "migration:show": "yarn run typeorm -- migration:show -d ./src/database/typeorm.config.ts",
-    "cli:sources-update": "node dist/src/cli/sources-update/cli-sources-update.js sources:update",
+    "cli:sources-update": "nest build && node dist/src/cli/sources-update/cli-sources-update.js sources:update",
     "cli:history-get": "nest build && node dist/src/cli/history/cli-history-get.js history:get",
     "cli:stats:get": "nest build && node dist/src/cli/history/cli-stats-get.js stats:get",
     "cli:event-fill": "nest build && node dist/src/cli/event/cli-event-fill.js event:fill",
@@ -107,5 +107,6 @@
     ],
     "coverageDirectory": "../coverage",
     "testEnvironment": "node"
-  }
+  },
+  "packageManager": "yarn@1.22.22+sha512.a6b2f7906b721bba3d67d4aff083df04dad64c399707841b7acf00f6b133b7ac24255f2652fa22ae3534329dc6180534e98d17432037ff6fd140556e2bb3137e"
 }

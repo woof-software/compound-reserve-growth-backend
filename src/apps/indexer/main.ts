@@ -2,13 +2,15 @@ import 'dotenv/config';
 import { LogLevel, Logger } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 
-import { IndexerModule } from './indexer.module';
+import { IndexerAppModule } from './indexer-app.module';
 
 async function bootstrap() {
   const logLevel = (process.env.LOG_LEVEL?.split(',') || ['error']) as LogLevel[];
   const logger = new Logger('IndexerBootstrap');
 
-  const app = await NestFactory.createApplicationContext(IndexerModule, { logger: logLevel });
+  const app = await NestFactory.createApplicationContext(IndexerAppModule, {
+    logger: logLevel,
+  });
   logger.log('History indexer process is running');
 
   const shutdown = async (signal: string) => {

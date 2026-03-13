@@ -74,7 +74,7 @@ export class BackgroundWorkerChildProcessService
   }
 
   private resolveEntrypoint(): string {
-    const entrypoint = join(__dirname, '..', '..', 'indexer', 'indexer.main.js');
+    const entrypoint = join(__dirname, '..', '..', 'apps', 'indexer', 'main.js');
     if (existsSync(entrypoint)) {
       return entrypoint;
     }

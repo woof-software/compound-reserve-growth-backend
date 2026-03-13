@@ -51,4 +51,4 @@ import { DatabaseModule } from 'database/database.module';
     CapoBackgroundModule,
   ],
 })
-export class IndexerModule {}
+export class IndexerAppModule {}

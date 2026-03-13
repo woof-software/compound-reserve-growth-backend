@@ -114,4 +114,4 @@ import { ExceptionInterceptor } from 'infrastructure/http/interceptors/exception
     Logger,
   ],
 })
-export class AppModule {}
+export class ApiAppModule {}
