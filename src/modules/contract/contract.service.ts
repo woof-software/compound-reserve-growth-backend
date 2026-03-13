@@ -3,7 +3,7 @@ import { ethers } from 'ethers';
 import { MulticallProvider } from 'ethers-multicall-provider';
 
 import { IncomesEntity, ReserveEntity, SpendsEntity } from 'modules/history/entities';
-import { HistoryService } from 'modules/history/history.service';
+import { HistoryService } from 'modules/history/services/history.service';
 import { SourceEntity } from 'modules/source/source.entity';
 import { PriceService } from 'modules/price/price.service';
 import { MailService } from 'modules/mail/mail.service';

@@ -1,229 +1,318 @@
 # Compound Reserve Growth Backend
 
-> **License:** MIT
->
-> A NestJS service that indexes on-chain reserve growth for Compound-based lending markets (v2 & v3/Comet) across multiple EVM networks, enriches the data with historical token prices, and exposes it via a PostgreSQL database & REST/Swagger API.
+Backend repository for Compound Reserve Growth. The codebase is organized as one domain codebase with two NestJS runtime applications:
 
----
+- API application: serves HTTP endpoints and Swagger
+- Indexer application: runs background synchronization, cron jobs, and queue workers
 
-## Table of Contents
+The two applications share domain modules from `src/modules`, but they have separate composition roots under `src/apps`.
 
-1. [Project Overview](#project-overview)
-2. [Architecture](#architecture)
-3. [Local Development](#local-development)
-   - [Prerequisites](#prerequisites)
-   - [Environment Variables](#environment-variables)
-   - [Quick Start](#quick-start)
-   - [Database Migrations](#database-migrations)
-4. [Production Deployment](#production-deployment)
-5. [Managing Sources & Assets](#managing-sources--assets)
-6. [Historical Data Collection Flow](#historical-data-collection-flow)
-7. [CLI Reference](#cli-reference)
-8. [License](#license)
-
----
-
-## Project Overview
-
-The **Compound Reserve Growth Backend** continuously tracks the growth of protocol reserves for every supported Compound market. It:
-
-- Loads market metadata (assets and sources) from the remote **compound-reserve-sources** repo; run `yarn cli:sources-update` to sync.
-- Stores on-chain reserve balances **per-day** together with USD valuations (from on-chain or CoinGecko) in PostgreSQL.
-- Serves data through a typed REST API (Swagger-documented) & can push alerts by email.
-- Caches expensive blockchain operations in Redis for better performance.
-
-Use cases include treasury dashboards, risk monitoring, and on-chain accounting.
-
----
-
-## Architecture
+## Runtime Overview
 
 ```text
-+-------------+        Cron/NestJS Scheduler        +--------------------+
-|  External   |  +-----------+  reserves  +------+  |  PostgreSQL        |
-|  EVM RPCs   |->  Provider  |----------->  Core |->   history, sources  |
-+-------------+  | Factory   |  prices    |      |  +--------------------+
-                 +-----------+            |      |
-                                          |      |
-             +--------------------+       |      |
-             | Redis (cache)      |<------+      |
-             +--------------------+              |
-                                                 v
-                                         REST API / Swagger
+src/
+  apps/
+    api/          HTTP application bootstrap and root module
+    indexer/      background application bootstrap and root module
+  modules/        domain and feature modules
+  infrastructure/ process, Redis, HTTP, logger, and other technical wiring
+  common/         shared blockchain/network helpers
+  config/         env-backed configuration loaders
+  database/       TypeORM setup and migrations
 ```
 
-Key components:
+## Applications
 
-| Module     | Responsibility                                                       |
-| ---------- | --------------------------------------------------------------------- |
-| **Network**  | RPC providers per network (Alchemy, QuickNode, etc.).                 |
-| **Contract** | Reads state, computes reserve snapshots, handles chain quirks.       |
-| **Price**    | Historical token prices (CoinGecko) with fallback for stablecoins.   |
-| **Source**   | Metadata per market (address, network, algorithm).                    |
-| **History**  | Daily reserve snapshots (quantity, USD value, block).                |
-| **Event**    | One-off protocol announcements (merges, sunsets) for charts.        |
+### API application
 
----
+Location:
+
+- [`src/apps/api/main.ts`](src/apps/api/main.ts)
+- [`src/apps/api/api-app.module.ts`](src/apps/api/api-app.module.ts)
+
+Responsibilities:
+
+- starts the Nest HTTP server
+- sets the global prefix to `api`
+- enables global validation
+- enables CORS from configuration
+- exposes Swagger at `api/docs` when `API_DOCUMENTATION=true`
+- starts the background worker child process through the process infrastructure module
+
+Main imported modules:
+
+- [`HistoryModule`](src/modules/history/history.module.ts)
+- [`CapoModule`](src/modules/capo/capo.module.ts)
+- [`ContractModule`](src/modules/contract/contract.module.ts)
+- [`SourceModule`](src/modules/source/source.module.ts)
+- [`AssetModule`](src/modules/asset/asset.module.ts)
+- [`TreasuryModule`](src/modules/treasury/treasury.module.ts)
+- [`RevenueModule`](src/modules/revenue/revenue.module.ts)
+- [`PriceModule`](src/modules/price/price.module.ts)
+- [`RunwayModule`](src/modules/runway/runway.module.ts)
+- [`EventModule`](src/modules/event/event.module.ts)
+- [`BackgroundWorkerModule`](src/infrastructure/process/background-worker.module.ts)
+
+See also: [`src/apps/api/README.md`](src/apps/api/README.md)
+
+### Indexer application
+
+Location:
+
+- [`src/apps/indexer/main.ts`](src/apps/indexer/main.ts)
+- [`src/apps/indexer/indexer-app.module.ts`](src/apps/indexer/indexer-app.module.ts)
+
+Responsibilities:
+
+- starts a Nest application context without an HTTP server
+- runs scheduled jobs and background processing
+- handles graceful shutdown on `SIGINT` and `SIGTERM`
+
+Main imported modules:
+
+- [`HistoryCronModule`](src/modules/history/history-cron.module.ts)
+- [`OracleDiscoveryModule`](src/modules/oracle/background/oracle-discovery.module.ts)
+- [`CapoBackgroundModule`](src/modules/capo/capo-background.module.ts)
+
+See also: [`src/apps/indexer/README.md`](src/apps/indexer/README.md)
+
+## Process Model
+
+By default, the API application starts the indexer as a child process during API bootstrap.
+
+Process infrastructure:
+
+- [`src/infrastructure/process/background-worker.module.ts`](src/infrastructure/process/background-worker.module.ts)
+- [`src/infrastructure/process/background-worker-child-process.service.ts`](src/infrastructure/process/background-worker-child-process.service.ts)
+
+Current behavior:
+
+1. The API application boots.
+2. [`BackgroundWorkerChildProcessService`](src/infrastructure/process/background-worker-child-process.service.ts) runs during application bootstrap.
+3. If `INDEXER_CHILD_PROCESS_ENABLED` is not set to `false`, the service forks:
+
+```text
+dist/src/apps/indexer/main.js
+```
+
+4. The child process inherits stdio.
+5. The child process receives `INDEXER_CHILD_PROCESS_ENABLED=false` to avoid recursive spawning.
+6. If the child process fails to start or exits unexpectedly, the API process is terminated.
+7. On API shutdown, the child process receives `SIGTERM`.
+
+See also: [`src/infrastructure/process/README.md`](src/infrastructure/process/README.md)
+
+## Execution Flow
+
+```text
+HTTP client
+  -> API application
+     -> controllers / services / repositories
+     -> background worker launcher
+        -> forks indexer application
+           -> cron jobs
+           -> queue workers
+           -> background synchronization flows
+```
+
+This separation keeps user-facing HTTP handling in the API process and background work in the indexer process.
+
+Related runtime documentation:
+
+- API runtime: [`src/apps/api/README.md`](src/apps/api/README.md)
+- Indexer runtime: [`src/apps/indexer/README.md`](src/apps/indexer/README.md)
+- Process launcher: [`src/infrastructure/process/README.md`](src/infrastructure/process/README.md)
+
+## Repository Structure
+
+Top-level source directories:
+
+- [`src/apps`](src/apps) - application entrypoints and root modules
+- [`src/modules`](src/modules) - domain and feature modules
+- [`src/infrastructure`](src/infrastructure) - technical runtime concerns
+- [`src/common`](src/common) - shared blockchain and network helpers
+- [`src/config`](src/config) - configuration loaders
+- [`src/database`](src/database) - TypeORM config and migrations
+- [`src/cli`](src/cli) - CLI entrypoints
+
+Example layout:
+
+```text
+src/
+  apps/
+    api/
+    indexer/
+  modules/
+    admin/
+    asset/
+    capo/
+    contract/
+    event/
+    github/
+    history/
+    mail/
+    oracle/
+    price/
+    revenue/
+    runway/
+    source/
+    sources-update/
+    treasury/
+  infrastructure/
+    http/
+    logger/
+    process/
+    redis/
+```
+
+Module examples:
+
+- [`src/modules/history`](src/modules/history)
+- [`src/modules/capo`](src/modules/capo)
+- [`src/modules/oracle`](src/modules/oracle)
 
 ## Local Development
 
-### Prerequisites
-
-- **Node.js >= 20** (LTS recommended)
-- **PostgreSQL >= 15** (with `uuid-ossp` extension enabled)
-- **Redis >= 7** (optional but recommended)
-- `yarn` or `npm`
-
-### Environment Variables
-
-Copy `.env.example` to `.env` and fill in the blanks:
+### Install dependencies
 
 ```bash
-cp .env.example .env
-```
-
-| Variable                             | Required | Description                                              |
-| ------------------------------------ | -------- | -------------------------------------------------------- |
-| `APP_HOST`, `APP_PORT`               | no       | Host/port the HTTP server binds to.                      |
-| `APP_CORS_ORIGIN`                    | no       | Comma-separated whitelist for CORS.                     |
-| `LOG_LEVEL`                          | no       | `error`, `warn`, `log`, `debug`, `verbose`.              |
-| `API_DOCUMENTATION`                  | no       | Enable Swagger (e.g. `true`).                            |
-| `ADMIN_TOKEN`                       | no       | Token for admin-only endpoints.                          |
-| `DB_*`                               | **yes**  | PostgreSQL connection params.                            |
-| `REDIS_*`                            | yes*     | Redis host, TLS toggle, connection timeout, default TTL. |
-| `ANKR_KEY`, `*_QUICKNODE_KEY`        | **yes**  | RPC keys; see `config/networks.config.ts`.              |
-| `COINGECKO_API_KEY`                  | no       | Higher rate limits for price fetcher.                    |
-| `GOOGLE_SHEETS_*`                    | no       | Optional Google Sheets export.                          |
-| `MAILJET_USER`, `MAILJET_PASS`, `EMAIL_*` | no  | Email notifications (price failures, cron errors).      |
-| `CRON`                              | no       | Cron expression for daily job (default 12:02 UTC).      |
-
-> Note: Anything not provided falls back to sensible defaults (e.g. in-memory cache when Redis is not configured).
-
-### Quick Start
-
-```bash
-# 1. Install deps
 yarn install
+```
 
-# 2. Compile TypeScript
+### Build
+
+```bash
 yarn build
+```
 
-# 3. Run DB migrations
-yarn migration:run
+Scripts reference: [`package.json`](package.json)
 
-# 4. Boot the API in watch mode
+### Run the API application
+
+```bash
+yarn start
+```
+
+Development mode:
+
+```bash
 yarn start:dev
-
-# Swagger: http://localhost:3005/api
 ```
 
-### Database Migrations
-
-Create a new migration after editing entities:
+Debug mode:
 
 ```bash
-yarn migration:generate -- -n add_new_table
+yarn start:debug
 ```
 
-Revert the last migration:
+Production-style API start from compiled output:
 
 ```bash
+yarn start:prod
+```
+
+### Run the indexer application directly
+
+```bash
+yarn start:indexer
+```
+
+This command builds the project and then starts the compiled indexer entrypoint.
+
+## Environment Configuration
+
+Shared application configuration is defined in [`src/config/app.ts`](src/config/app.ts).
+
+Relevant variables used there:
+
+- `APP_HOST` - HTTP bind host for the API application
+- `APP_PORT` - HTTP port for the API application
+- `APP_CORS_ORIGIN` - CORS origin mode or origin list
+- `API_DOCUMENTATION` - enables Swagger when set to `true`
+- `LOG_LEVEL` - comma-separated Nest logger levels
+- `EMAIL_TO` - recipient list used by mail-related flows
+- `CRON` - cron expression used by scheduled history processing
+- `INDEXER_CHILD_PROCESS_ENABLED` - enables or disables child process startup from the API process
+
+Other runtime configuration is loaded from:
+
+- [`src/config/database.ts`](src/config/database.ts)
+- [`src/config/networks.config.ts`](src/config/networks.config.ts)
+- [`src/config/redis.ts`](src/config/redis.ts)
+- [`src/config/google.ts`](src/config/google.ts)
+- [`src/config/admin.ts`](src/config/admin.ts)
+- [`src/config/reserve-sources.config.ts`](src/config/reserve-sources.config.ts)
+- [`src/config/block-timing.config.ts`](src/config/block-timing.config.ts)
+
+The API and indexer applications do not load exactly the same configuration set. Each application only loads the config that its root module imports.
+
+## Build Output
+
+Compiled runtime entrypoints:
+
+- `dist/src/apps/api/main.js`
+- `dist/src/apps/indexer/main.js`
+
+CLI entrypoints are compiled under `dist/src/cli/...`.
+
+## Database Migrations
+
+Migration commands:
+
+```bash
+yarn migration:run
 yarn migration:revert
+yarn migration:show
+yarn migration:create
+yarn migration:generate
 ```
 
----
+TypeORM configuration:
 
-## Production Deployment
+- [`src/database/typeorm.config.ts`](src/database/typeorm.config.ts)
 
-1. **Build** the project into `dist/`:
+Migrations directory:
 
-   ```bash
-   yarn build
-   ```
+- [`src/database/migrations`](src/database/migrations)
 
-2. **Run migrations** automatically on boot or via CI step:
+## CLI Commands
 
-   ```bash
-   yarn migration:run
-   ```
+Available project CLI commands:
 
-3. **Start** the compiled app under a process manager (PM2, systemd):
+```bash
+yarn cli:sources-update
+yarn cli:history-get
+yarn cli:stats:get
+yarn cli:event-fill
+yarn cli:price-preload
+```
 
-   ```bash
-   NODE_ENV=production yarn start:prod
-   ```
+CLI sources:
 
-> **Tip:** Configure `LOG_LEVEL=warn` and point `ConfigModule` to production `.env`.
+- [`src/cli/README.md`](src/cli/README.md)
+- [`src/cli/sources-update`](src/cli/sources-update)
+- [`src/cli/history`](src/cli/history)
+- [`src/cli/event`](src/cli/event)
+- [`src/cli/price`](src/cli/price)
 
----
+CLI entry files:
 
-## Managing Sources & Assets
+- [`src/cli/sources-update/cli-sources-update.ts`](src/cli/sources-update/cli-sources-update.ts)
+- [`src/cli/history/cli-history-get.ts`](src/cli/history/cli-history-get.ts)
+- [`src/cli/history/cli-stats-get.ts`](src/cli/history/cli-stats-get.ts)
+- [`src/cli/event/cli-event-fill.ts`](src/cli/event/cli-event-fill.ts)
+- [`src/cli/price/cli-price-preload.ts`](src/cli/price/cli-price-preload.ts)
 
-| Task             | Command                   | What it does                                                                 |
-| ---------------- | ------------------------- | ----------------------------------------------------------------------------- |
-| **Sources sync** | `yarn cli:sources-update` | Syncs **asset** & **source** tables from remote compound-reserve-sources.  |
-| **Sync events**  | `yarn cli:event-fill`     | Loads protocol events (`modules/event/constants/events.ts`).                |
+## Docker
 
-Adding a brand-new market/network:
-
-1. Update `config/networks.config.ts` with RPC endpoint & avgBlockTime.
-2. Add or update assets/sources in the remote reserve data (see `config/reserve-sources.config.ts` for repo URL), then run `yarn cli:sources-update`.
-
-Assets and sources are created or updated from the remote JSON; manual changes can also be made via SQL or a dedicated admin script.
-
----
-
-## Historical Data Collection Flow
+The current [`Dockerfile`](Dockerfile) starts the API application from compiled output:
 
 ```text
-+----------------------------+
-| Cron (EVERY_DAY_AT_NOON)   |
-+------------+---------------+
-             | (UTC)
-             v
-+----------------------------+   1. Pull all sources
-| HistoryGetCron             |---> `SourceService.listAll()`
-+----------------------------+
-             |
-             v per source
-+----------------------------+   2. For each midnight UTC since startBlock (up to endBlock if set)...
-| ContractService.getHistory |---> `findBlockByTimestamp()` (binary search + cache)
-+----------------------------+   3. Read reserves:
-             |                     - **Market v2:** `totalReserves()`
-             |                     - **Comet (v3):** `getReserves()`
-             |                     - **Fallback:** ERC-20 balance / native ETH
-             v
-+----------------------------+   4. Fetch USD price (PriceService -> CoinGecko)
-| HistoryService.create      |---> Persist reserve row (block, qty, price, value)
-+----------------------------+
-
-Resilience features:
-- **Redis block cache** (30 days) to avoid duplicate RPC calls.
-- **Arbitrum period model** for pre-nitro vs nitro timings.
-- Failed price lookups default to `$1` and are logged + emailed.
-
-> Internally, the persistence step is implemented by `HistoryService.createReservesWithSource`.
+node dist/src/apps/api/main.js
 ```
 
----
+## Related Documentation
 
-## CLI Reference
-
-| Command                      | Shortcut                               | Description                                     |
-| ---------------------------- | -------------------------------------- | ----------------------------------------------- |
-| `nest start --watch`         | `yarn start:dev`                       | Start API with live reload.                      |
-| `nest start`                  | `yarn start`                           | Start compiled API.                             |
-| `nestjs build`                | `yarn build`                           | Transpile TS to JS.                              |
-| `typeorm migration:run`      | `yarn migration:run`                   | Apply DB migrations.                            |
-| `typeorm migration:generate` | `yarn migration:generate -- -n <name>` | Create migration diff.                          |
-| **Sources sync**             | `yarn cli:sources-update`              | Sync assets and sources from remote reserve data. |
-| **Event seed**               | `yarn cli:event-fill`                  | Insert protocol events.                         |
-| **History backfill**         | `yarn cli:history-get`                 | One-off history sync (same code as daily cron).  |
-| **Stats**                    | `yarn cli:stats:get`                   | Stats CLI (uses same history stack).            |
-| **Price preload**            | `yarn cli:price-preload`               | Preload price cache.                             |
-
----
-
-## License
-
-Released under the **MIT License**. See `LICENSE` for details.
+- [`src/apps/api/README.md`](src/apps/api/README.md)
+- [`src/apps/indexer/README.md`](src/apps/indexer/README.md)
+- [`src/infrastructure/process/README.md`](src/infrastructure/process/README.md)

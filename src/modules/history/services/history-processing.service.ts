@@ -3,16 +3,16 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ContractService } from 'modules/contract/contract.service';
 import { SourceService } from 'modules/source/source.service';
 import { PriceService } from 'modules/price/price.service';
-import { StartCollectionResponse } from 'modules/admin/response';
-import { IncomesRepository } from 'modules/history/incomes-repository.service';
-import { SpendsRepository } from 'modules/history/spends-repository.service';
-import { ReservesRepository } from 'modules/history/reserves-repository.service';
+import { HistoryCollectionRequest } from 'modules/history/types/history-collection-request.type';
+import { IncomesRepository } from 'modules/history/repositories/incomes.repository';
+import { SpendsRepository } from 'modules/history/repositories/spends.repository';
+import { ReservesRepository } from 'modules/history/repositories/reserves.repository';
 
 import { Algorithm } from 'common/enum/algorithm.enum';
 
 @Injectable()
-export class GetHistoryService {
-  private readonly logger = new Logger(GetHistoryService.name);
+export class HistoryProcessingService {
+  private readonly logger = new Logger(HistoryProcessingService.name);
   private isProcessing = false;
 
   constructor(
@@ -24,16 +24,10 @@ export class GetHistoryService {
     private readonly reservesRepository: ReservesRepository,
   ) {}
 
-  /**
-   * Checks if any process is currently running
-   */
   public isProcessRunning(): boolean {
     return this.isProcessing;
   }
 
-  /**
-   * Starts a process with automatic lock management
-   */
   private async executeWithLock<T>(
     processName: string,
     processFunction: () => Promise<T>,
@@ -47,12 +41,19 @@ export class GetHistoryService {
     this.logger.log(`Starting ${processName}...`);
 
     try {
-      return await processFunction();
-    } catch (error) {
-      this.logger.error(`An error occurred in ${processName}:`, error);
+      const result = await processFunction();
+      this.logger.log(`Completed ${processName}`);
+      return result;
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        this.logger.error(`An error occurred in ${processName}: ${error.message}`, error.stack);
+        throw error;
+      }
+
+      this.logger.error(`An error occurred in ${processName}: ${String(error)}`);
+      throw new Error(String(error));
     } finally {
       this.isProcessing = false;
-      this.logger.log(`Completed ${processName}`);
     }
   }
 
@@ -70,7 +71,7 @@ export class GetHistoryService {
     });
   }
 
-  async startReservesProcessing(collectionSwitch?: StartCollectionResponse) {
+  async startReservesProcessing(collectionSwitch?: HistoryCollectionRequest) {
     return this.executeWithLock('Reserves Processing', async () => {
       this.logger.log('Starting to process reserves...');
 
@@ -97,7 +98,7 @@ export class GetHistoryService {
 
       let startDate: Date | undefined;
       if (collectionSwitch?.clearData) {
-        const sourceIds = dbSources.map((s) => s.id);
+        const sourceIds = dbSources.map((source) => source.id);
         this.logger.log(`Clearing reserves for ${sourceIds.length} sources...`);
         await this.reservesRepository.deleteBySourceIds(sourceIds);
         this.logger.log('Reserves cleared successfully.');
@@ -105,8 +106,8 @@ export class GetHistoryService {
       }
 
       for (const source of dbSources) {
-        const matchingAlgorithm = source.algorithm.find((alg) =>
-          reservesAlgorithms.includes(alg as Algorithm),
+        const matchingAlgorithm = source.algorithm.find((algorithm) =>
+          reservesAlgorithms.includes(algorithm as Algorithm),
         );
 
         if (matchingAlgorithm) {
@@ -118,7 +119,7 @@ export class GetHistoryService {
     });
   }
 
-  async startStatsProcessing(collectionSwitch?: StartCollectionResponse) {
+  async startStatsProcessing(collectionSwitch?: HistoryCollectionRequest) {
     return this.executeWithLock('Stats Processing', async () => {
       this.logger.log('Starting to process stats...');
       let startDate: Date | undefined;
@@ -135,8 +136,8 @@ export class GetHistoryService {
       this.logger.log(`Found ${dbSources.length} sources for stats processing`);
 
       for (const source of dbSources) {
-        const matchingAlgorithm = source.algorithm.find((alg) =>
-          statsAlgorithms.includes(alg as Algorithm),
+        const matchingAlgorithm = source.algorithm.find((algorithm) =>
+          statsAlgorithms.includes(algorithm as Algorithm),
         );
 
         if (matchingAlgorithm) {
@@ -152,7 +153,6 @@ export class GetHistoryService {
     return this.executeWithLock('Price Comp Update', async () => {
       this.logger.log('Starting to update priceComp for stats...');
 
-      // Get all incomes and spends records with missing priceComp (priceComp = 0)
       const [incomesRecords, spendsRecords] = await Promise.all([
         this.incomesRepository.findAllWithMissingPriceComp(),
         this.spendsRepository.findAllWithMissingPriceComp(),
@@ -160,7 +160,6 @@ export class GetHistoryService {
 
       const assetCompToken = { address: null, symbol: 'COMP', decimals: null };
 
-      // Update incomes records
       let updatedIncomes = 0;
       let failedIncomes = 0;
 
@@ -185,7 +184,6 @@ export class GetHistoryService {
         }
       }
 
-      // Update spends records
       let updatedSpends = 0;
       let failedSpends = 0;
 

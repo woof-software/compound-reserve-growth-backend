@@ -21,7 +21,7 @@ export class Snapshot {
   @Column('decimal', { precision: 78, scale: 0 })
   ratio: string;
 
-  @Column('decimal', { precision: 78, scale: 0 })
+  @Column('decimal', { precision: 78, scale: 8 })
   price: string;
 
   @Column('decimal', { precision: 78, scale: 0 })

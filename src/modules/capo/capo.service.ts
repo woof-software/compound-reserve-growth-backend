@@ -1,23 +1,16 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
 import { Cron, CronExpression } from '@nestjs/schedule';
 
 import { Oracle } from 'modules/oracle/oracle.entity';
 import { OracleService } from 'modules/oracle/oracle.service';
 import { AlertService } from 'modules/alert/alert.service';
-import { SourceEntity } from 'modules/source/source.entity';
-import { OffsetRequest } from 'modules/history/request/offset.request';
 
 import { ProviderFactory } from 'common/chains/network/provider.factory';
 import { BlockService } from 'common/chains/block/block.service';
 
-import { Snapshot } from './snapshot.entity';
-import { DailyAggregation } from './daily.entity';
-import { CapoResponse } from './response/capo.response';
+import { DailyAggregationRepository } from './repositories/daily-aggregation.repository';
+import { SnapshotRepository } from './repositories/snapshot.repository';
 
-import { OffsetDataDto } from '@app/common/dto/offset-data.dto';
-import { Order } from '@app/common/enum/order.enum';
 import { OracleData } from '@/common/types/oracle-data';
 import { CapoValues } from '@/common/types/capo-values';
 
@@ -30,18 +23,12 @@ export class CapoService {
   private isCollecting = false;
 
   constructor(
-    @InjectRepository(Snapshot)
-    private snapshotRepository: Repository<Snapshot>,
-    @InjectRepository(DailyAggregation)
-    private aggregationRepository: Repository<DailyAggregation>,
-    @InjectRepository(Oracle)
-    private oracleRepository: Repository<Oracle>,
-    @InjectRepository(SourceEntity)
-    private sourceRepository: Repository<SourceEntity>,
-    private oracleService: OracleService,
-    private alertService: AlertService,
-    private providerFactory: ProviderFactory,
-    private blockService: BlockService,
+    private readonly snapshotRepository: SnapshotRepository,
+    private readonly aggregationRepository: DailyAggregationRepository,
+    private readonly oracleService: OracleService,
+    private readonly alertService: AlertService,
+    private readonly providerFactory: ProviderFactory,
+    private readonly blockService: BlockService,
   ) {}
 
   @Cron(CronExpression.EVERY_MINUTE)
@@ -55,7 +42,7 @@ export class CapoService {
 
     try {
       this.logger.log('Starting oracle data collection...');
-      const oracles = await this.oracleRepository.find({ where: { isActive: true } });
+      const oracles = await this.oracleService.listActive();
       this.logger.log(`Found ${oracles.length} active oracles to monitor`);
 
       const oraclesByNetwork = this.groupOraclesByNetwork(oracles);
@@ -244,17 +231,15 @@ export class CapoService {
     }
   }
 
-  private async check24hPriceGrowth(oracle: Oracle, currentData: any) {
+  private async check24hPriceGrowth(oracle: Oracle, currentData: OracleData) {
     try {
       const twentyFourHoursAgo = new Date();
       twentyFourHoursAgo.setHours(twentyFourHoursAgo.getHours() - 24);
 
-      const oldSnapshot = await this.snapshotRepository
-        .createQueryBuilder('snapshot')
-        .where('snapshot.oracleAddress = :address', { address: oracle.address })
-        .andWhere('snapshot.timestamp <= :time', { time: twentyFourHoursAgo })
-        .orderBy('snapshot.timestamp', 'DESC')
-        .getOne();
+      const oldSnapshot = await this.snapshotRepository.findLatestBefore(
+        oracle.address,
+        twentyFourHoursAgo,
+      );
 
       if (!oldSnapshot) {
         this.logger.log(`No 24h data available for ${oracle.description}`);
@@ -306,11 +291,7 @@ export class CapoService {
       `System time: ${systemNow.toISOString()}, Chain time: ${chainNow.toISOString()}`,
     );
 
-    const latestSnapshot = await this.snapshotRepository
-      .createQueryBuilder('snapshot')
-      .orderBy('snapshot.timestamp', 'DESC')
-      .limit(1)
-      .getOne();
+    const latestSnapshot = await this.snapshotRepository.findLatest();
 
     if (!latestSnapshot) {
       this.logger.log('No snapshots found to aggregate');
@@ -348,49 +329,23 @@ export class CapoService {
       `Aggregating data for date range: ${startDate.toISOString()} to ${endDate.toISOString()}`,
     );
 
-    const results = await this.snapshotRepository
-      .createQueryBuilder('snapshot')
-      .select([
-        'snapshot.oracleAddress as "oracleAddress"',
-        'snapshot.oracleName as "oracleName"',
-        'snapshot.chainId as "chainId"',
-        'AVG(snapshot.ratio) as "avgRatio"',
-        'MIN(snapshot.ratio) as "minRatio"',
-        'MAX(snapshot.ratio) as "maxRatio"',
-        'AVG(snapshot.price) as "avgPrice"',
-        'MIN(snapshot.price) as "minPrice"',
-        'MAX(snapshot.price) as "maxPrice"',
-        'COUNT(CASE WHEN snapshot.isCapped = true THEN 1 END) as "cappedCount"',
-        'COUNT(*) as "totalCount"',
-      ])
-      .where('snapshot.timestamp >= :startDate', { startDate })
-      .andWhere('snapshot.timestamp < :endDate', { endDate })
-      .andWhere('snapshot.ratio IS NOT NULL')
-      .andWhere('snapshot.price IS NOT NULL')
-      .groupBy('snapshot.oracleAddress')
-      .addGroupBy('snapshot.oracleName')
-      .addGroupBy('snapshot.chainId')
-      .having('COUNT(*) > 0')
-      .orderBy('snapshot.oracleAddress', 'ASC')
-      .getRawMany();
+    const results = await this.aggregationRepository.getStatsForRange(startDate, endDate);
 
     this.logger.log(`Found ${results.length} oracles with data for aggregation`);
 
     for (const row of results) {
       try {
-        const oracle = await this.oracleRepository.findOne({
-          where: { address: row.oracleAddress },
-          relations: ['asset'],
-        });
+        const oracle = await this.oracleService.findByAddressWithAsset(row.oracleAddress);
+        if (!oracle?.asset) {
+          this.logger.warn(`Oracle ${row.oracleAddress} was skipped - asset relation is missing`);
+          continue;
+        }
 
-        const latestOracleSnapshot = await this.snapshotRepository
-          .createQueryBuilder('snapshot')
-          .where('snapshot.oracleAddress = :address', { address: row.oracleAddress })
-          .andWhere('snapshot.timestamp >= :startDate', { startDate })
-          .andWhere('snapshot.timestamp < :endDate', { endDate })
-          .orderBy('snapshot.timestamp', 'DESC')
-          .limit(1)
-          .getOne();
+        const latestOracleSnapshot = await this.snapshotRepository.findLatestForOracleInRange(
+          row.oracleAddress,
+          startDate,
+          endDate,
+        );
 
         let maxCapPrice = null;
         if (latestOracleSnapshot) {
@@ -427,12 +382,10 @@ export class CapoService {
           }
         }
 
-        const existingAggregation = await this.aggregationRepository.findOne({
-          where: {
-            oracleAddress: row.oracleAddress,
-            date: startDate,
-          },
-        });
+        const existingAggregation = await this.aggregationRepository.findByOracleAndDate(
+          row.oracleAddress,
+          startDate,
+        );
 
         let aggregation;
         if (existingAggregation) {
@@ -480,70 +433,5 @@ export class CapoService {
     }
 
     this.logger.log(`Daily aggregation complete. Processed ${results.length} oracles.`);
-  }
-
-  async getAggregations(
-    dto: OffsetRequest & { assetId?: number },
-  ): Promise<OffsetDataDto<CapoResponse>> {
-    const { offset = 0, limit = null, order = Order.DESC, assetId } = dto;
-
-    const qb = this.aggregationRepository.createQueryBuilder('agg').addSelect(
-      (sub) =>
-        sub
-          .select('s.price')
-          .from(Snapshot, 's')
-          .where('s.oracleAddress = agg.oracleAddress')
-          .andWhere('s.chainId = agg.chainId')
-          // Last snapshot for the day
-          .andWhere('s.timestamp >= (agg.date::timestamp)')
-          .andWhere(`s.timestamp <  (agg.date::timestamp + interval '1 day')`)
-          .orderBy('s.timestamp', 'DESC')
-          .limit(1),
-      'lastPrice',
-    );
-
-    if (assetId !== undefined) qb.andWhere('agg.assetId = :assetId', { assetId });
-
-    const total = await qb.getCount();
-
-    qb.orderBy('agg.date', order).offset(offset);
-    if (limit !== null) qb.limit(limit);
-
-    const { entities, raw } = await qb.getRawAndEntities();
-
-    if (entities.length === 0) {
-      this.logger.log('No daily aggregations found for the given parameters');
-      return new OffsetDataDto<CapoResponse>([], limit, offset, 0);
-    }
-
-    return new OffsetDataDto<CapoResponse>(
-      entities.map((e, i) => this.toResponse(e, raw[i]?.lastPrice)),
-      limit,
-      offset,
-      total,
-    );
-  }
-
-  private toResponse(entity: DailyAggregation, lastPrice?: number | string): CapoResponse {
-    /**
-     * @param date
-     * Accepts:
-     *  - Date
-     *  - string: anything that can be passed to Date.parse(...)
-     * @returns Unix timestamp in seconds
-     */
-    const normalizeDate = (date: string | Date) => {
-      const timestamp = date instanceof Date ? date.getTime() : new Date(date).getTime();
-      return Math.floor(timestamp / 1000);
-    };
-
-    return {
-      oa: entity.oracleAddress,
-      on: entity.oracleName,
-      d: normalizeDate(entity.date),
-      cp: entity.cap,
-      lp: String(lastPrice),
-      aId: entity.assetId,
-    };
   }
 }
