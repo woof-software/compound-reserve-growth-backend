@@ -23,7 +23,7 @@ export class CollateralService {
     private readonly collateralAlgorithmService: CollateralAlgorithmService,
   ) {}
 
-  public async searchMarketsV3() {
+  public async searchMarketsV3(): Promise<void> {
     const sources = await this.sourceService.listByAlgorithms([Algorithm.COMET]);
     if (!sources.length) {
       this.logger.warn('No COMET sources found.');
@@ -48,9 +48,9 @@ export class CollateralService {
           );
         } catch (error) {
           this.logger.warn(
-            `Failed to resolve creation block for ${source.network}/${source.address}. Using source.blockNumber=${source.blockNumber}`,
+            `Failed to resolve creation block for ${source.network}/${source.address}. Using source.startBlock=${source.startBlock}`,
           );
-          creationBlock = source.blockNumber;
+          creationBlock = source.startBlock;
         }
 
         const lifecycle = await this.collateralAlgorithmService.cometCollateralLifecycle(
@@ -116,7 +116,7 @@ export class CollateralService {
     return;
   }
 
-  private addNormalizedAddress(set: Set<string>, address: string) {
+  private addNormalizedAddress(set: Set<string>, address: string): void {
     const normalized = this.toChecksum(address);
     if (!normalized) return;
     set.add(normalized.toLowerCase());

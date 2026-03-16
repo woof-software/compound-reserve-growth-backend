@@ -307,6 +307,7 @@ yarn cli:history-get
 yarn cli:stats:get
 yarn cli:event-fill
 yarn cli:price-preload
+yarn cli:collateral-search-markets-v3
 ```
 
 CLI sources:
@@ -316,6 +317,7 @@ CLI sources:
 - [`src/cli/history`](src/cli/history)
 - [`src/cli/event`](src/cli/event)
 - [`src/cli/price`](src/cli/price)
+- [`src/cli/collateral`](src/cli/collateral)
 
 CLI entry files:
 
@@ -324,6 +326,7 @@ CLI entry files:
 - [`src/cli/history/cli-stats-get.ts`](src/cli/history/cli-stats-get.ts)
 - [`src/cli/event/cli-event-fill.ts`](src/cli/event/cli-event-fill.ts)
 - [`src/cli/price/cli-price-preload.ts`](src/cli/price/cli-price-preload.ts)
+- [`src/cli/collateral/cli-collateral-search-markets-v3.ts`](src/cli/collateral/cli-collateral-search-markets-v3.ts)
 
 ## Docker
 

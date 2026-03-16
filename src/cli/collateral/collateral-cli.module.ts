@@ -1,30 +1,25 @@
-import { Module } from '@nestjs/common';
 import { CacheModule } from '@nestjs/cache-manager';
-import { ConfigModule, ConfigService } from '@nestjs/config';
 import { MailerModule } from '@nestjs-modules/mailer';
+import { Module } from '@nestjs/common';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 import { redisStore } from 'cache-manager-ioredis-yet';
 import Redis from 'ioredis';
 
-import { RedisModule, REDIS_CLIENT } from 'modules/redis/redis.module';
-import { SourceModule } from 'modules/source/source.module';
-import { HistoryModule } from 'modules/history/history.module';
-import { PriceModule } from 'modules/price/price.module';
-import { EventModule } from 'modules/event/event.module';
 import { CollateralModule } from 'modules/collateral/collateral.module';
 
-import { DatabaseModule } from 'database/database.module';
+import { REDIS_CLIENT, RedisModule } from 'infrastructure/redis/redis.module';
 import appConfig from 'config/app';
+import blockTimingConfig from 'config/block-timing.config';
 import databaseConfig from 'config/database';
 import networksConfig from 'config/networks.config';
 import redis from 'config/redis';
-import google from 'config/google';
-import admin from 'config/admin';
+import { DatabaseModule } from 'database/database.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      load: [appConfig, databaseConfig, networksConfig, redis, google, admin],
+      load: [appConfig, databaseConfig, networksConfig, redis, blockTimingConfig],
     }),
     CacheModule.registerAsync({
       isGlobal: true,
@@ -47,11 +42,7 @@ import admin from 'config/admin';
       },
     }),
     DatabaseModule,
-    SourceModule,
-    HistoryModule,
-    PriceModule,
-    EventModule,
     CollateralModule,
   ],
 })
-export class CliModule {}
+export class CollateralCliModule {}

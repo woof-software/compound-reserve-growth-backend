@@ -11,7 +11,7 @@ export class CollateralSearchMarketsV3Command extends CommandRunner {
     super();
   }
 
-  async run() {
+  async run(): Promise<void> {
     try {
       this.logger.log('Starting collateral search markets v3 process...');
       await this.collateralService.searchMarketsV3();
@@ -21,6 +21,7 @@ export class CollateralSearchMarketsV3Command extends CommandRunner {
         'An error occurred while running collateral:search-markets-v3 command:',
         error,
       );
+      throw error;
     }
   }
 }

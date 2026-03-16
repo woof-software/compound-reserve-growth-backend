@@ -2,13 +2,14 @@ import { Injectable } from '@nestjs/common';
 import { ethers } from 'ethers';
 
 import CometABI from 'modules/contract/abi/CometABI.json';
-import { ProviderFactory } from 'modules/network/provider.factory';
 import type {
   CollateralLifecycleEntry,
   CollateralLifecycleOutput,
   CometAssetInfo,
   CometContract,
 } from 'modules/collateral/types/collateral.types';
+
+import { ProviderFactory } from 'common/chains/network/provider.factory';
 
 @Injectable()
 export class CollateralAlgorithmService {

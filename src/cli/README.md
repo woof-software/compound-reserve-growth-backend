@@ -30,6 +30,7 @@ Examples:
 - [`sources-update`](sources-update)
 - [`event`](event)
 - [`price`](price)
+- [`collateral`](collateral)
 
 ## Project Pattern
 
@@ -92,6 +93,7 @@ Examples:
 - [`event-fill.command.ts`](../modules/event/cli/event-fill.command.ts)
 - [`price-preload.command.ts`](../modules/price/cli/price-preload.command.ts)
 - [`sources-update.command.ts`](../modules/sources-update/cli/sources-update.command.ts)
+- [`collateral-search-markets-v3.command.ts`](../modules/collateral/cli/collateral-search-markets-v3.command.ts)
 
 ## How To Add A New CLI Command
 
