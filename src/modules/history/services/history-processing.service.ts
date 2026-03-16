@@ -176,10 +176,9 @@ export class HistoryProcessingService {
             );
             failedIncomes++;
           }
-        } catch (error) {
-          this.logger.error(
-            `Failed to update priceComp for income ID ${income.id}: ${error.message}`,
-          );
+        } catch (error: unknown) {
+          const message = error instanceof Error ? error.message : String(error);
+          this.logger.error(`Failed to update priceComp for income ID ${income.id}: ${message}`);
           failedIncomes++;
         }
       }
@@ -200,10 +199,9 @@ export class HistoryProcessingService {
             );
             failedSpends++;
           }
-        } catch (error) {
-          this.logger.error(
-            `Failed to update priceComp for spend ID ${spend.id}: ${error.message}`,
-          );
+        } catch (error: unknown) {
+          const message = error instanceof Error ? error.message : String(error);
+          this.logger.error(`Failed to update priceComp for spend ID ${spend.id}: ${message}`);
           failedSpends++;
         }
       }
