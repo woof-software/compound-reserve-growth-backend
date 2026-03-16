@@ -58,4 +58,9 @@ async function bootstrap() {
   );
 }
 
-bootstrap();
+bootstrap().catch((error: unknown) => {
+  const logger = new Logger();
+  const message = error instanceof Error ? error.message : String(error);
+  logger.error(`Failed to bootstrap API application: ${message}`);
+  process.exit(1);
+});
