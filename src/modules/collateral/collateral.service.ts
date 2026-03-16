@@ -1,6 +1,3 @@
-import { writeFileSync } from 'fs';
-import { resolve } from 'path';
-
 import { Injectable, Logger } from '@nestjs/common';
 import { ethers } from 'ethers';
 
@@ -15,7 +12,6 @@ import { Algorithm } from '@/common/enum/algorithm.enum';
 @Injectable()
 export class CollateralService {
   private readonly logger = new Logger(CollateralService.name);
-  private readonly outputFile = 'collateral-markets-v3.json';
   private readonly assetMetadataCache = new Map<string, { symbol: string; decimals: number }>();
 
   constructor(
@@ -24,11 +20,15 @@ export class CollateralService {
     private readonly collateralAlgorithmService: CollateralAlgorithmService,
   ) {}
 
-  public async searchMarketsV3(): Promise<void> {
+  public async searchMarketsV3(): Promise<CollateralSearchOutput> {
     const sources = await this.sourceService.listByAlgorithms([Algorithm.COMET]);
     if (!sources.length) {
       this.logger.warn('No COMET sources found.');
-      return;
+      return {
+        generatedAt: new Date().toISOString(),
+        sources: [],
+        missingSources: [],
+      };
     }
 
     this.logger.log(`Found ${sources.length} COMET sources. Starting collateral scan...`);
@@ -98,12 +98,13 @@ export class CollateralService {
         });
       } catch (error) {
         const reason = `Failed to scan comet collateral lifecycle for ${source.network}/${source.address}`;
-        this.logger.error(reason, error);
+        const message = error instanceof Error ? error.message : String(error);
+        this.logger.error(`${reason}: ${message}`);
         output.missingSources.push({
           sourceId: source.id,
           network: source.network,
           cometAddress: source.address,
-          reason,
+          reason: `${reason}: ${message}`,
         });
       }
     }
@@ -117,10 +118,7 @@ export class CollateralService {
       return a.cometAddress.localeCompare(b.cometAddress);
     });
 
-    const outputPath = resolve(process.cwd(), this.outputFile);
-    writeFileSync(outputPath, JSON.stringify(output, null, 2), 'utf-8');
-    this.logger.log(`Collateral list saved to ${outputPath}`);
-    return;
+    return output;
   }
 
   private addNormalizedAddress(set: Set<string>, address: string): void {

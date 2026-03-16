@@ -8,11 +8,15 @@ import type {
   CometContract,
 } from 'modules/collateral/types/collateral.types';
 
+import { BlockService } from 'common/chains/block/block.service';
 import { ProviderFactory } from 'common/chains/network/provider.factory';
 
 @Injectable()
 export class CollateralAlgorithmService {
-  constructor(private readonly providerFactory: ProviderFactory) {}
+  constructor(
+    private readonly providerFactory: ProviderFactory,
+    private readonly blockService: BlockService,
+  ) {}
 
   public async cometCollateralLifecycle(
     network: string,
@@ -33,7 +37,8 @@ export class CollateralAlgorithmService {
       provider,
     ) as unknown as CometContract;
 
-    const resolvedToBlock = typeof toBlock === 'number' ? toBlock : await provider.getBlockNumber();
+    const resolvedToBlock =
+      typeof toBlock === 'number' ? toBlock : await this.blockService.getSafeBlockNumber(network);
 
     if (!Number.isFinite(fromBlock) || fromBlock < 0) {
       throw new Error(`Invalid fromBlock: ${fromBlock}`);

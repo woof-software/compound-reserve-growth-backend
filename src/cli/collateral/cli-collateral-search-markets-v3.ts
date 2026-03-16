@@ -9,7 +9,8 @@ async function bootstrap() {
   process.exit(0);
 }
 
-bootstrap().catch((err) => {
-  Logger.error('Error starting CLI:', err);
+bootstrap().catch((err: unknown) => {
+  const message = err instanceof Error ? err.message : String(err);
+  Logger.error(`Error starting CLI: ${message}`);
   process.exit(1);
 });
