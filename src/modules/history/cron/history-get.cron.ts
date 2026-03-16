@@ -80,7 +80,7 @@ export class HistoryGetCron implements OnApplicationBootstrap, OnApplicationShut
       return;
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
-      this.logger.error(`An error occurred while running getting history task: ${message}`);
+      this.logger.error(`An error occurred while running the history task: ${message}`);
       return;
     }
   }

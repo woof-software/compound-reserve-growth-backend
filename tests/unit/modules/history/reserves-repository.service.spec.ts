@@ -1,6 +1,6 @@
 import { ReserveEntity } from '@/modules/history/entities';
 import { OffsetDto } from '@/modules/history/dto/offset.dto';
-import { ReservesRepository } from '@/modules/history/reserves-repository.service';
+import { ReservesRepository } from '@/modules/history/repositories/reserves.repository';
 import { Algorithm } from '@/common/enum/algorithm.enum';
 import { Order } from '@/common/enum/order.enum';
 

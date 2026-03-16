@@ -1,6 +1,6 @@
 import { ethers } from 'ethers';
 
-import { DiscoveryService } from '@/modules/oracle/discovery.service';
+import { DiscoveryService } from '@/modules/oracle/background/discovery.service';
 
 describe('DiscoveryService', () => {
   const makeService = () => {
@@ -17,7 +17,7 @@ describe('DiscoveryService', () => {
       list: jest.fn(),
     };
     const oracleRepository = {
-      upsert: jest.fn(),
+      upsertByAddress: jest.fn(),
     };
 
     const service = new DiscoveryService(
@@ -175,6 +175,6 @@ describe('DiscoveryService', () => {
     expect(cometContract.getAssetInfo).toHaveBeenNthCalledWith(1, 0, { blockTag: 555 });
     expect(cometContract.getAssetInfo).toHaveBeenNthCalledWith(2, 1, { blockTag: 555 });
     expect(checkIfCapoOracleSpy).toHaveBeenCalledTimes(3);
-    expect(oracleRepository.upsert).not.toHaveBeenCalled();
+    expect(oracleRepository.upsertByAddress).not.toHaveBeenCalled();
   });
 });
