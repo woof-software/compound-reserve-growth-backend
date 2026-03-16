@@ -3,7 +3,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { SourceRepository } from 'modules/source/source.repository';
 
 import { TreasuryRepository } from './treasury.repository';
-import { Treasury } from './treasury.entity';
+import { TreasuryEntity } from './treasury.entity';
 import { CreateTreasuryDto } from './dto/create-treasury.dto';
 
 @Injectable()
@@ -13,11 +13,11 @@ export class TreasuryService {
     private readonly sourceRepo: SourceRepository,
   ) {}
 
-  async create(dto: CreateTreasuryDto): Promise<Treasury> {
+  async create(dto: CreateTreasuryDto): Promise<TreasuryEntity> {
     const source = await this.sourceRepo.findById(dto.sourceId);
     if (!source) throw new NotFoundException(`Source ${dto.sourceId} not found`);
 
-    const treasury = new Treasury(
+    const treasury = new TreasuryEntity(
       source,
       dto.blockNumber,
       dto.quantity,
@@ -28,7 +28,9 @@ export class TreasuryService {
     return this.treasuryRepo.save(treasury);
   }
 
-  async findById(id: number): Promise<Treasury> {
-    return this.treasuryRepo.findById(id);
+  async findById(id: number): Promise<TreasuryEntity> {
+    const entity = await this.treasuryRepo.findById(id);
+    if (!entity) throw new NotFoundException(`Treasury ${id} not found`);
+    return entity;
   }
 }

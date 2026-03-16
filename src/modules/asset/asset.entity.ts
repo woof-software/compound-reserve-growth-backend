@@ -1,10 +1,12 @@
 import { Column, Entity, OneToMany, PrimaryGeneratedColumn } from 'typeorm';
 
-import { Source } from 'modules/source/source.entity';
+import { SourceEntity } from 'modules/source/source.entity';
 import { Oracle } from 'modules/oracle/oracle.entity';
 
+import { Asset } from '@/common/types/asset';
+
 @Entity({ name: 'asset' })
-export class Asset {
+export class AssetEntity implements Asset {
   @PrimaryGeneratedColumn()
   public id: number;
 
@@ -26,8 +28,11 @@ export class Asset {
   @Column()
   public createdAt: Date;
 
-  @OneToMany(() => Source, (sources) => sources.asset)
-  public sources: Source[];
+  @Column({ nullable: true })
+  public deletedAt?: Date;
+
+  @OneToMany(() => SourceEntity, (sources) => sources.asset)
+  public sources: SourceEntity[];
 
   @OneToMany(() => Oracle, (oracles) => oracles.asset)
   public oracles: Oracle[];
@@ -39,5 +44,6 @@ export class Asset {
     this.network = network;
     this.type = type;
     this.createdAt = new Date();
+    this.deletedAt = null;
   }
 }

@@ -8,7 +8,8 @@ import {
   Index,
   ManyToOne,
 } from 'typeorm';
-import { Asset } from 'modules/asset/asset.entity';
+
+import { AssetEntity } from 'modules/asset/asset.entity';
 
 @Entity('oracles')
 @Unique(['address'])
@@ -65,6 +66,6 @@ export class Oracle {
   @Column({ nullable: true })
   assetId: number;
 
-  @ManyToOne(() => Asset, (asset) => asset.oracles)
-  public asset: Asset;
+  @ManyToOne(() => AssetEntity, (asset) => asset.oracles)
+  public asset: AssetEntity;
 }

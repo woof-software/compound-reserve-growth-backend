@@ -2,25 +2,27 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 
-import { Asset } from './asset.entity';
+import { AssetEntity } from './asset.entity';
 
 @Injectable()
 export class AssetRepository {
-  constructor(@InjectRepository(Asset) private readonly repository: Repository<Asset>) {}
+  constructor(
+    @InjectRepository(AssetEntity) private readonly repository: Repository<AssetEntity>,
+  ) {}
 
-  async findById(id: number): Promise<Asset> {
-    return this.repository.findOne({ where: { id } });
+  async findById(id: number): Promise<AssetEntity> {
+    return this.repository.findOne({ where: { id, deletedAt: null } });
   }
 
-  async findByAddressAndNetwork(address: string, network: string): Promise<Asset> {
-    return this.repository.findOne({ where: { address, network } });
+  async findByAddressAndNetwork(address: string, network: string): Promise<AssetEntity> {
+    return this.repository.findOne({ where: { address, network, deletedAt: null } });
   }
 
-  async save(asset: Asset): Promise<Asset> {
+  async save(asset: AssetEntity): Promise<AssetEntity> {
     return this.repository.save(asset);
   }
 
-  async list(): Promise<Asset[]> {
-    return this.repository.find({ order: { id: 'ASC' } });
+  async list(): Promise<AssetEntity[]> {
+    return this.repository.find({ where: { deletedAt: null }, order: { id: 'ASC' } });
   }
 }

@@ -1,13 +1,14 @@
 import { Column, Entity, ManyToOne, OneToMany, PrimaryGeneratedColumn } from 'typeorm';
 
-import { Reserve, Incomes, Spends } from 'modules/history/entities';
-import { Revenue } from 'modules/revenue/revenue.entity';
-import { Treasury } from 'modules/treasury/treasury.entity';
-import { Asset } from 'modules/asset/asset.entity';
-import { DailyAggregation } from 'modules/capo/daily.entity';
+import { ReserveEntity, IncomesEntity, SpendsEntity } from 'modules/history/entities';
+import { RevenueEntity } from 'modules/revenue/revenue.entity';
+import { TreasuryEntity } from 'modules/treasury/treasury.entity';
+import { AssetEntity } from 'modules/asset/asset.entity';
+
+import { Source } from '@/common/types/source';
 
 @Entity({ name: 'source' })
-export class Source {
+export class SourceEntity implements Source {
   @PrimaryGeneratedColumn()
   public id: number;
 
@@ -27,7 +28,10 @@ export class Source {
   public algorithm: string[];
 
   @Column()
-  public blockNumber: number;
+  public startBlock: number;
+
+  @Column({ nullable: true })
+  public endBlock: number | null;
 
   @Column()
   public createdAt: Date;
@@ -35,40 +39,46 @@ export class Source {
   @Column({ nullable: true })
   public checkedAt?: Date;
 
-  @ManyToOne(() => Asset, (asset) => asset.sources)
-  public asset: Asset;
+  @Column({ nullable: true })
+  public deletedAt?: Date;
 
-  @OneToMany(() => Reserve, (reserves) => reserves.source)
-  public reserves: Reserve[];
+  @ManyToOne(() => AssetEntity, (asset) => asset.sources)
+  public asset: AssetEntity;
 
-  @OneToMany(() => Treasury, (treasuries) => treasuries.source)
-  public treasuries: Treasury[];
+  @OneToMany(() => ReserveEntity, (reserves) => reserves.source)
+  public reserves: ReserveEntity[];
 
-  @OneToMany(() => Revenue, (revenues) => revenues.source)
-  public revenues: Revenue[];
+  @OneToMany(() => TreasuryEntity, (treasuries) => treasuries.source)
+  public treasuries: TreasuryEntity[];
 
-  @OneToMany(() => Incomes, (incomes) => incomes.source)
-  public incomes: Incomes[];
+  @OneToMany(() => RevenueEntity, (revenues) => revenues.source)
+  public revenues: RevenueEntity[];
 
-  @OneToMany(() => Spends, (spends) => spends.source)
-  public spends: Spends[];
+  @OneToMany(() => IncomesEntity, (incomes) => incomes.source)
+  public incomes: IncomesEntity[];
+
+  @OneToMany(() => SpendsEntity, (spends) => spends.source)
+  public spends: SpendsEntity[];
 
   constructor(
     address: string,
     network: string,
     algorithm: string[],
     type: string,
-    blockNumber: number,
-    asset: Asset,
+    startBlock: number,
+    asset: AssetEntity,
     market?: string,
+    endBlock?: number,
   ) {
     this.address = address;
     this.network = network;
     this.algorithm = algorithm;
     this.type = type;
-    this.blockNumber = blockNumber;
+    this.startBlock = startBlock;
+    this.endBlock = endBlock ?? null;
     this.asset = asset;
     this.market = market;
     this.createdAt = new Date();
+    this.deletedAt = null;
   }
 }

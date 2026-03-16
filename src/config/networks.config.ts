@@ -1,6 +1,6 @@
 import { registerAs } from '@nestjs/config';
 
-import { NetworkConfig } from 'modules/network/network.types';
+import { NetworkConfig } from 'common/chains/network/network.types';
 
 export default registerAs('networks', (): NetworkConfig[] => [
   {
@@ -56,11 +56,13 @@ export default registerAs('networks', (): NetworkConfig[] => [
     network: 'avalanche',
     chainId: 43114,
     url: 'https://api.avax.network/ext/bc/C/rpc',
+    batchMaxCount: 3,
   },
   {
     network: 'fuji',
     chainId: 43113,
     url: 'https://api.avax-test.network/ext/bc/C/rpc',
+    batchMaxCount: 3,
   },
   {
     network: 'scroll',

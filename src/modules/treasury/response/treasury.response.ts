@@ -1,7 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
 
 import { SourceResponse } from 'modules/source/response/source.response';
-import { Treasury } from 'modules/treasury/treasury.entity';
+import { TreasuryEntity } from 'modules/treasury/treasury.entity';
 
 export class TreasuryResponse {
   @ApiProperty({ example: 1 })
@@ -28,7 +28,7 @@ export class TreasuryResponse {
   @ApiProperty({ example: '2025-06-17T12:00:00Z' })
   public createdAt: Date;
 
-  constructor(treasury: Treasury) {
+  constructor(treasury: TreasuryEntity) {
     this.id = treasury.id;
     this.source = new SourceResponse(treasury.source);
     this.blockNumber = treasury.blockNumber;
