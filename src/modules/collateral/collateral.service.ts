@@ -8,7 +8,7 @@ import { ContractService } from 'modules/contract/contract.service';
 import { SourceService } from 'modules/source/source.service';
 
 import { CollateralAlgorithmService } from './collateral-algorithm.service';
-import type { CollateralLifecycleEntry, CollateralSearchOutput } from './types/collateral.types';
+import type { CollateralSearchOutput } from './types/collateral.types';
 
 import { Algorithm } from '@/common/enum/algorithm.enum';
 
@@ -16,6 +16,7 @@ import { Algorithm } from '@/common/enum/algorithm.enum';
 export class CollateralService {
   private readonly logger = new Logger(CollateralService.name);
   private readonly outputFile = 'collateral-markets-v3.json';
+  private readonly assetMetadataCache = new Map<string, { symbol: string; decimals: number }>();
 
   constructor(
     private readonly sourceService: SourceService,
@@ -59,15 +60,21 @@ export class CollateralService {
           creationBlock,
         );
 
-        const collaterals = lifecycle.assets
-          .map((entry): CollateralLifecycleEntry | null => {
-            const normalized = this.toChecksum(entry.asset);
-            if (!normalized) {
-              return null;
-            }
-            return { ...entry, asset: normalized };
-          })
-          .filter((entry): entry is CollateralLifecycleEntry => entry !== null);
+        const collaterals = await Promise.all(
+          lifecycle.assets
+            .map((entry) => {
+              const normalized = this.toChecksum(entry.asset);
+              if (!normalized) {
+                return null;
+              }
+              return { ...entry, asset: normalized };
+            })
+            .filter((entry) => entry !== null)
+            .map(async (entry) => ({
+              ...entry,
+              ...(await this.getCollateralAssetMetadata(source.network, entry.asset)),
+            })),
+        );
 
         const collateralSet = new Set<string>();
         for (const entry of collaterals) {
@@ -131,5 +138,21 @@ export class CollateralService {
   private toChecksum(address: string): string | null {
     if (!ethers.isAddress(address)) return null;
     return ethers.getAddress(address);
+  }
+
+  private async getCollateralAssetMetadata(
+    network: string,
+    assetAddress: string,
+  ): Promise<{ symbol: string; decimals: number }> {
+    const cacheKey = `${network}:${assetAddress.toLowerCase()}`;
+    const cached = this.assetMetadataCache.get(cacheKey);
+    if (cached) {
+      return cached;
+    }
+
+    const metadata = await this.contractService.getTokenMetadata(assetAddress, network);
+
+    this.assetMetadataCache.set(cacheKey, metadata);
+    return metadata;
   }
 }

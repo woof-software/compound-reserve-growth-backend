@@ -3,7 +3,6 @@ import { ethers } from 'ethers';
 
 import CometABI from 'modules/contract/abi/CometABI.json';
 import type {
-  CollateralLifecycleEntry,
   CollateralLifecycleOutput,
   CometAssetInfo,
   CometContract,
@@ -88,7 +87,7 @@ export class CollateralAlgorithmService {
       latestDeactivatedFlags,
     );
 
-    const assets: CollateralLifecycleEntry[] = assetIndices.map((index, position) => ({
+    const assets: CollateralLifecycleOutput['assets'] = assetIndices.map((index, position) => ({
       index,
       asset: latestAssetInfos[position]?.asset ?? '',
       appearanceBlock: appearanceBlocks[position],

@@ -31,6 +31,10 @@ import { calculateTimeRange } from '@/common/utils/calculate-time-range';
 @Injectable()
 export class ContractService {
   private readonly logger = new Logger(ContractService.name);
+  private readonly bytes32Tokens = new Set([
+    '0x89d24A6b4CcB1B6fAA2625fE562bDD9a23260359',
+    '0x9f8F72aA9304c8B593d555F12eF6589cC3A579A2',
+  ]);
 
   constructor(
     private readonly providerFactory: ProviderFactory,
@@ -161,11 +165,7 @@ export class ContractService {
       const cometContract = new ethers.Contract(cometAddress, CometABI, provider) as any;
 
       const tokenAddress = await cometContract.baseToken({ blockTag });
-
-      const tokenContract = new ethers.Contract(tokenAddress, ERC20ABI, provider) as any;
-
-      const symbol = await tokenContract.symbol({ blockTag });
-      const decimals = await tokenContract.decimals({ blockTag });
+      const { symbol, decimals } = await this.getTokenMetadata(tokenAddress, network, blockTag);
 
       return { address: tokenAddress, symbol, decimals };
     } catch (error) {
@@ -194,23 +194,7 @@ export class ContractService {
       const marketContract = new ethers.Contract(marketAddress, MarketV2ABI, provider) as any;
 
       const tokenAddress = await marketContract.underlying({ blockTag });
-
-      const bytes32Tokens = [
-        '0x89d24A6b4CcB1B6fAA2625fE562bDD9a23260359',
-        '0x9f8F72aA9304c8B593d555F12eF6589cC3A579A2',
-      ];
-
-      const tokenABI = bytes32Tokens.includes(tokenAddress) ? Bytes32TokenABI : ERC20ABI;
-
-      const tokenContract = new ethers.Contract(tokenAddress, tokenABI, provider) as any;
-
-      const rawSymbol = await tokenContract.symbol({ blockTag });
-
-      const symbol = bytes32Tokens.includes(tokenAddress)
-        ? ethers.toUtf8String(rawSymbol).replace(/\u0000/g, '')
-        : rawSymbol;
-
-      const decimals = await tokenContract.decimals({ blockTag });
+      const { symbol, decimals } = await this.getTokenMetadata(tokenAddress, network, blockTag);
 
       return { address: tokenAddress, symbol, decimals };
     } catch (error) {
@@ -220,6 +204,33 @@ export class ContractService {
       );
       throw error;
     }
+  }
+
+  async getTokenMetadata(
+    tokenAddress: string,
+    network: string,
+    blockTag?: number,
+  ): Promise<{ symbol: string; decimals: number }> {
+    const provider = this.providerFactory.multicall(network);
+    const resolvedBlockTag =
+      typeof blockTag === 'number' ? blockTag : await this.blockService.getSafeBlockNumber(network);
+    const isBytes32Token = this.bytes32Tokens.has(tokenAddress);
+    const tokenABI = isBytes32Token ? Bytes32TokenABI : ERC20ABI;
+    const tokenContract = new ethers.Contract(tokenAddress, tokenABI, provider);
+
+    const [rawSymbol, decimalsRaw] = await Promise.all([
+      tokenContract.symbol({ blockTag: resolvedBlockTag }),
+      tokenContract.decimals({ blockTag: resolvedBlockTag }),
+    ]);
+
+    const symbol = isBytes32Token
+      ? ethers.toUtf8String(rawSymbol).replace(/\u0000/g, '')
+      : rawSymbol;
+
+    return {
+      symbol,
+      decimals: Number(decimalsRaw),
+    };
   }
 
   async getRewardsCompToken(

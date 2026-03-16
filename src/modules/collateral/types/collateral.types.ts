@@ -1,8 +1,13 @@
-export type CollateralLifecycleEntry = {
+export type RawCollateralLifecycleEntry = {
   index: number;
   asset: string;
   appearanceBlock: number;
   deactivationBlock: number | null;
+};
+
+export type CollateralLifecycleEntry = RawCollateralLifecycleEntry & {
+  symbol: string;
+  decimals: number;
 };
 
 export type CollateralSourceOutput = {
@@ -53,5 +58,5 @@ export type CollateralLifecycleOutput = {
   fromBlock: number;
   toBlock: number;
   generatedAt: string;
-  assets: CollateralLifecycleEntry[];
+  assets: RawCollateralLifecycleEntry[];
 };
