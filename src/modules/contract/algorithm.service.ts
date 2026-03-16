@@ -16,7 +16,7 @@ export class AlgorithmService {
     return contract.getReserves({ blockTag });
   }
 
-  public async comet_collect(
+  public async cometCollect(
     contract: ethers.Contract,
     assetAddress: string,
     blockTag: number,

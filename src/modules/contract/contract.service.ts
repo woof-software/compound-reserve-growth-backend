@@ -410,7 +410,7 @@ export class ContractService {
                 reserves = await this.algorithmService.comet(contract, blockTag);
                 break;
               case Algorithm.COMET_COLLATERAL:
-                reserves = await this.algorithmService.comet_collect(
+                reserves = await this.algorithmService.cometCollect(
                   contract,
                   assetAddress,
                   blockTag,
