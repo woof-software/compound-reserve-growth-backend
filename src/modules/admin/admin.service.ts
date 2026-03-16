@@ -21,8 +21,10 @@ export class AdminService {
       toHistoryCollectionRequest(collectionSwitch),
     );
     if (!wasStarted) {
-      this.logger.warn('Reserves processing was blocked - another process is running');
-      return 'Blocked: Another process is already running';
+      this.logger.warn(
+        'Reserves processing was blocked - the same job is already queued or running',
+      );
+      return 'Blocked: The same job is already queued or running';
     }
 
     this.logger.log('Reserves processing started successfully');
@@ -34,8 +36,8 @@ export class AdminService {
       toHistoryCollectionRequest(collectionSwitch),
     );
     if (!wasStarted) {
-      this.logger.warn('Stats processing was blocked - another process is running');
-      return 'Blocked: Another process is already running';
+      this.logger.warn('Stats processing was blocked - the same job is already queued or running');
+      return 'Blocked: The same job is already queued or running';
     }
 
     this.logger.log('Stats processing started successfully');

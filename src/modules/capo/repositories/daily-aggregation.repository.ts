@@ -5,7 +5,7 @@ import { Repository } from 'typeorm';
 import { DailyAggregation } from 'modules/capo/entities/daily.entity';
 import { Snapshot } from 'modules/capo/entities/snapshot.entity';
 
-import { Order } from '@app/common/enum/order.enum';
+import { Order } from '@/common/enum/order.enum';
 
 export interface DailyAggregationListItem {
   entity: DailyAggregation;

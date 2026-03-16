@@ -21,6 +21,36 @@ This application runs background jobs without starting an HTTP server.
 - [`OracleDiscoveryModule`](../../modules/oracle/background/oracle-discovery.module.ts)
 - [`CapoBackgroundModule`](../../modules/capo/capo-background.module.ts)
 
+## Loaded Configuration
+
+The indexer root module loads only these config loaders:
+
+- [`app.ts`](../../config/app.ts)
+- [`database.ts`](../../config/database.ts)
+- [`networks.config.ts`](../../config/networks.config.ts)
+- [`redis.ts`](../../config/redis.ts)
+- [`block-timing.config.ts`](../../config/block-timing.config.ts)
+
+That means the indexer has access to:
+
+- shared app settings such as cron expression, log level, and child-process flag
+- database connection settings
+- network and RPC configuration
+- Redis settings
+- block timing settings
+
+The indexer root module does not load:
+
+- [`google.ts`](../../config/google.ts)
+- [`admin.ts`](../../config/admin.ts)
+- [`reserve-sources.config.ts`](../../config/reserve-sources.config.ts)
+
+The indexer root module also configures:
+
+- `ScheduleModule.forRoot()`
+- global cache through Redis
+- `MailerModule` using `MAILJET_USER` and `MAILJET_PASS`
+
 ## Start Command
 
 ```bash

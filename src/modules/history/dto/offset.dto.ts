@@ -1,4 +1,4 @@
-import { Order } from 'common/enum/order.enum';
+import { Order } from '@/common/enum/order.enum';
 
 export class OffsetDto {
   constructor(

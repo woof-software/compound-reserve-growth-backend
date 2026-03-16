@@ -74,6 +74,14 @@ Main imported modules:
 - [`OracleDiscoveryModule`](src/modules/oracle/background/oracle-discovery.module.ts)
 - [`CapoBackgroundModule`](src/modules/capo/capo-background.module.ts)
 
+Loaded config modules:
+
+- [`src/config/app.ts`](src/config/app.ts)
+- [`src/config/database.ts`](src/config/database.ts)
+- [`src/config/networks.config.ts`](src/config/networks.config.ts)
+- [`src/config/redis.ts`](src/config/redis.ts)
+- [`src/config/block-timing.config.ts`](src/config/block-timing.config.ts)
+
 See also: [`src/apps/indexer/README.md`](src/apps/indexer/README.md)
 
 ## Process Model
@@ -245,6 +253,20 @@ Other runtime configuration is loaded from:
 - [`src/config/block-timing.config.ts`](src/config/block-timing.config.ts)
 
 The API and indexer applications do not load exactly the same configuration set. Each application only loads the config that its root module imports.
+
+Indexer config set:
+
+- [`src/config/app.ts`](src/config/app.ts)
+- [`src/config/database.ts`](src/config/database.ts)
+- [`src/config/networks.config.ts`](src/config/networks.config.ts)
+- [`src/config/redis.ts`](src/config/redis.ts)
+- [`src/config/block-timing.config.ts`](src/config/block-timing.config.ts)
+
+The indexer root module does not load:
+
+- [`src/config/google.ts`](src/config/google.ts)
+- [`src/config/admin.ts`](src/config/admin.ts)
+- [`src/config/reserve-sources.config.ts`](src/config/reserve-sources.config.ts)
 
 ## Build Output
 

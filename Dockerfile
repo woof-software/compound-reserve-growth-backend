@@ -1,10 +1,10 @@
 FROM node:22.13.1-alpine AS build
 WORKDIR /app
-COPY package.json yarn.lock ./
-RUN yarn install --frozen-lockfile
+COPY package*.json ./
+RUN yarn install --immutable
 COPY ./ ./
 RUN yarn run build
-RUN yarn install --frozen-lockfile --production=true
+RUN yarn install --immutable --prod
 
 FROM node:22.13.1-alpine AS run
 WORKDIR /app
@@ -17,4 +17,4 @@ COPY --from=build --chown=node:node /app/tsconfig.json ./tsconfig.json
 
 USER node
 EXPOSE 3000
-CMD ["node", "dist/src/apps/api/main.js"]
+CMD ["node", "dist/src/main"]

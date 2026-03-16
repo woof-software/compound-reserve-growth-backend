@@ -8,7 +8,7 @@ import { IncomesRepository } from 'modules/history/repositories/incomes.reposito
 import { SpendsRepository } from 'modules/history/repositories/spends.repository';
 import { ReservesRepository } from 'modules/history/repositories/reserves.repository';
 
-import { Algorithm } from 'common/enum/algorithm.enum';
+import { Algorithm } from '@/common/enum/algorithm.enum';
 
 @Injectable()
 export class HistoryProcessingService {

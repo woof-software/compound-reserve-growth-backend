@@ -72,7 +72,9 @@ export class HistoryGetCron implements OnApplicationBootstrap, OnApplicationShut
     try {
       const wasStarted = await this.historyCollectionQueueService.enqueueDailySync();
       if (!wasStarted) {
-        this.logger.warn('History indexing cron was blocked - another collection job is running');
+        this.logger.warn(
+          'History indexing cron was blocked - the same job is already queued or running',
+        );
       }
 
       return;

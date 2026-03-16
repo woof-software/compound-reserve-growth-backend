@@ -3,11 +3,10 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 
 import { OffsetDto } from 'modules/history/dto/offset.dto';
+import { SpendsEntity } from 'modules/history/entities';
 
-import { SpendsEntity } from '../entities';
-
-import { OffsetDataDto } from '@app/common/dto/offset-data.dto';
-import { Algorithm } from '@app/common/enum/algorithm.enum';
+import { OffsetDataDto } from '@/common/dto/offset-data.dto';
+import { Algorithm } from '@/common/enum/algorithm.enum';
 
 @Injectable()
 export class SpendsRepository {

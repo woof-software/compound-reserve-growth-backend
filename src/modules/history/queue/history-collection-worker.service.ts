@@ -10,7 +10,6 @@ import {
   HistoryCollectionJobName,
 } from './history-collection.constants';
 import { createHistoryCollectionConnection } from './history-collection.connection';
-import { HistoryCollectionQueueService } from './history-collection-queue.service';
 import {
   HistoryCollectionJobData,
   HistoryCollectionJobDataMap,
@@ -48,12 +47,9 @@ export class HistoryCollectionWorkerService
   constructor(
     private readonly configService: ConfigService,
     private readonly historyProcessingService: HistoryProcessingService,
-    private readonly historyCollectionQueueService: HistoryCollectionQueueService,
   ) {}
 
   async onApplicationBootstrap(): Promise<void> {
-    await this.historyCollectionQueueService.clearQueue();
-
     this.worker = new Worker<HistoryCollectionJobData, void, HistoryCollectionJobName>(
       HISTORY_COLLECTION_QUEUE_NAME,
       async (job) => {

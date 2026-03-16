@@ -22,7 +22,7 @@ export class StartCollectionResponse {
     required: false,
   })
   @Transform(({ value }) => (value ? new Date(value) : undefined))
-  @ValidateIf((o) => o.enableFlag === true && o.data !== undefined)
+  @ValidateIf((o) => o.clearData === true && o.data !== undefined)
   @IsDate()
   data?: Date;
 }

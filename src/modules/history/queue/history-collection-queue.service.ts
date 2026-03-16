@@ -7,8 +7,8 @@ import { Queue } from 'bullmq';
 import { HistoryCollectionRequest } from 'modules/history/types/history-collection-request.type';
 
 import {
+  HISTORY_COLLECTION_JOB_IDS,
   HISTORY_COLLECTION_QUEUE_NAME,
-  HISTORY_COLLECTION_SINGLETON_JOB_ID,
   HistoryCollectionJobName,
 } from './history-collection.constants';
 import { createHistoryCollectionConnection } from './history-collection.connection';
@@ -110,30 +110,19 @@ export class HistoryCollectionQueueService implements OnModuleDestroy {
     jobName: Name,
     jobData: HistoryCollectionJobDataMap[Name],
   ): Promise<boolean> {
-    const counts = await this.queue.getJobCounts(
-      'active',
-      'waiting',
-      'delayed',
-      'prioritized',
-      'paused',
-      'waiting-children',
-    );
-
-    const hasBlockingJobs = Object.values(counts).some((value) => value > 0);
-    if (hasBlockingJobs) {
-      this.logger.warn(`History collection job ${jobName} was blocked - another job is running`);
-      return false;
-    }
-
     const job = await this.queue.add(jobName, jobData, {
-      jobId: HISTORY_COLLECTION_SINGLETON_JOB_ID,
+      jobId: HISTORY_COLLECTION_JOB_IDS[jobName],
     });
 
     const wasEnqueuedByCurrentRequest = job.data.requestId === jobData.requestId;
     if (!wasEnqueuedByCurrentRequest) {
-      this.logger.warn(`History collection job ${jobName} was blocked by a concurrent enqueue`);
+      this.logger.warn(
+        `History collection job ${jobName} was blocked - the same job is already queued or running`,
+      );
+      return false;
     }
 
-    return wasEnqueuedByCurrentRequest;
+    this.logger.log(`History collection job ${jobName} was enqueued`);
+    return true;
   }
 }

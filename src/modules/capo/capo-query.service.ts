@@ -6,8 +6,8 @@ import { DailyAggregation } from './entities/daily.entity';
 import { DailyAggregationRepository } from './repositories/daily-aggregation.repository';
 import { CapoResponse } from './response/capo.response';
 
-import { Order } from '@app/common/enum/order.enum';
-import { OffsetDataDto } from '@app/common/dto/offset-data.dto';
+import { Order } from '@/common/enum/order.enum';
+import { OffsetDataDto } from '@/common/dto/offset-data.dto';
 
 @Injectable()
 export class CapoQueryService {

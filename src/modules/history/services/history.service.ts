@@ -2,23 +2,21 @@ import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 
 import { SourceRepository } from 'modules/source/source.repository';
 import { SourceEntity } from 'modules/source/source.entity';
-
-import { ReservesRepository } from '../repositories/reserves.repository';
-import { IncomesRepository } from '../repositories/incomes.repository';
-import { SpendsRepository } from '../repositories/spends.repository';
-import { CreateHistoryDto } from '../dto/create-history.dto';
+import { CreateHistoryDto } from 'modules/history/dto/create-history.dto';
+import { OffsetDto } from 'modules/history/dto/offset.dto';
+import { PaginationDto } from 'modules/history/dto/pagination.dto';
 import {
-  ReserveEntity,
+  IncentivesHistory,
   IncomesEntity,
+  ReserveEntity,
   SpendsEntity,
   StatsHistory,
-  IncentivesHistory,
-} from '../entities';
-import { PaginationDto } from '../dto/pagination.dto';
-import { OffsetDto } from '../dto/offset.dto';
-
-import { PaginatedDataDto } from '@app/common/dto/paginated-data.dto';
-import { OffsetDataDto } from '@app/common/dto/offset-data.dto';
+} from 'modules/history/entities';
+import { IncomesRepository } from 'modules/history/repositories/incomes.repository';
+import { ReservesRepository } from 'modules/history/repositories/reserves.repository';
+import { SpendsRepository } from 'modules/history/repositories/spends.repository';
+import { OffsetDataDto } from '@/common/dto/offset-data.dto';
+import { PaginatedDataDto } from '@/common/dto/paginated-data.dto';
 import { Algorithm } from '@/common/enum/algorithm.enum';
 import { Order } from '@/common/enum/order.enum';
 import { generateDailyKey } from '@/common/utils/generate-daily-key';

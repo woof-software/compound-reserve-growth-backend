@@ -7,9 +7,9 @@ import { IncentivesHistory, ReserveEntity } from 'modules/history/entities';
 import { PaginationDto } from 'modules/history/dto/pagination.dto';
 import { OffsetDto } from 'modules/history/dto/offset.dto';
 
-import { Algorithm } from '@app/common/enum/algorithm.enum';
-import { PaginatedDataDto } from '@app/common/dto/paginated-data.dto';
-import { OffsetDataDto } from '@app/common/dto/offset-data.dto';
+import { Algorithm } from '@/common/enum/algorithm.enum';
+import { PaginatedDataDto } from '@/common/dto/paginated-data.dto';
+import { OffsetDataDto } from '@/common/dto/offset-data.dto';
 import { Order } from '@/common/enum/order.enum';
 
 type IncentivesHistoryRaw = {

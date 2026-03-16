@@ -24,7 +24,7 @@ import {
   MINUTE_IN_SEC,
   SAFE_BLOCK_LAG_TIME_IN_SEC,
   SEC_IN_MS,
-} from '@app/common/constants';
+} from '@/common/constants';
 
 @Injectable()
 export class BlockService implements OnModuleInit {

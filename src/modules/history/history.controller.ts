@@ -17,13 +17,13 @@ import { OffsetRequest } from './request/offset.request';
 import { OffsetDto } from './dto/offset.dto';
 
 import { REDIS_CLIENT } from 'infrastructure/redis/redis.module';
-import { ApiPaginatedResponse } from '@app/common/swagger/api-paginated-response.decorator';
-import { PaginatedDataResponse } from '@app/common/response/paginated-data.response';
-import { PaginationMetaResponse } from '@app/common/response/pagination-meta.response';
-import { OffsetDataResponse } from '@app/common/response/offset-data.response';
-import { OffsetMetaResponse } from '@app/common/response/offset-meta.response';
-import { ApiOffsetResponse } from '@app/common/swagger/api-offset-response.decorator';
-import { HOUR_IN_SEC } from '@app/common/constants';
+import { ApiPaginatedResponse } from '@/common/swagger/api-paginated-response.decorator';
+import { PaginatedDataResponse } from '@/common/response/paginated-data.response';
+import { PaginationMetaResponse } from '@/common/response/pagination-meta.response';
+import { OffsetDataResponse } from '@/common/response/offset-data.response';
+import { OffsetMetaResponse } from '@/common/response/offset-meta.response';
+import { ApiOffsetResponse } from '@/common/swagger/api-offset-response.decorator';
+import { HOUR_IN_SEC } from '@/common/constants';
 
 @Injectable()
 @Controller('history')
