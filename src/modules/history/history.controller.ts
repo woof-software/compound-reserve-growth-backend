@@ -13,7 +13,6 @@ import { RevenueHistoryResponse } from './response/revenue-history.response';
 import { RevenueHistoryFullResponse } from './response/revenue-history-full.response';
 import { StatsHistoryResponse } from './response/stats-history.response';
 import { ReserveFullResponse } from './response/reserve-full.response';
-import { OffsetRequest } from './request/offset.request';
 import { OffsetDto } from './dto/offset.dto';
 
 import { REDIS_CLIENT } from 'infrastructure/redis/redis.module';
@@ -24,6 +23,7 @@ import { OffsetDataResponse } from '@/common/response/offset-data.response';
 import { OffsetMetaResponse } from '@/common/response/offset-meta.response';
 import { ApiOffsetResponse } from '@/common/swagger/api-offset-response.decorator';
 import { HOUR_IN_SEC } from '@/common/constants';
+import { OffsetRequest } from '@/common/request/offset.request';
 
 @Injectable()
 @Controller('history')

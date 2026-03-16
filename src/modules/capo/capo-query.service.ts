@@ -1,13 +1,12 @@
 import { Injectable, Logger } from '@nestjs/common';
 
-import { OffsetRequest } from 'modules/history/request/offset.request';
-
 import { DailyAggregation } from './entities/daily.entity';
 import { DailyAggregationRepository } from './repositories/daily-aggregation.repository';
 import { CapoResponse } from './response/capo.response';
 
 import { Order } from '@/common/enum/order.enum';
 import { OffsetDataDto } from '@/common/dto/offset-data.dto';
+import { OffsetRequest } from '@/common/request/offset.request';
 
 @Injectable()
 export class CapoQueryService {

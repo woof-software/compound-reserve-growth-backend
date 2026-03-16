@@ -2,9 +2,9 @@ import { ApiProperty } from '@nestjs/swagger';
 import { IsBoolean, IsDate, IsOptional, ValidateIf } from 'class-validator';
 import { Transform } from 'class-transformer';
 
-export class StartCollectionResponse {
+export class StartCollectionRequest {
   @ApiProperty({
-    description: 'flag for clearing data from databases ',
+    description: 'Flag for clearing data from databases',
     example: false,
     type: 'boolean',
     required: false,
@@ -15,7 +15,7 @@ export class StartCollectionResponse {
   clearData?: boolean = false;
 
   @ApiProperty({
-    description: 'collection start date',
+    description: 'Collection start date',
     example: '2025-05-01',
     type: 'string',
     format: 'date-time',
