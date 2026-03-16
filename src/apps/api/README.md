@@ -17,6 +17,7 @@ This application starts the HTTP API.
 - Enables global validation with `ValidationPipe`
 - Enables CORS from `app.cors`
 - Starts Swagger at `api/docs` only when `app.apiDocumentation` is enabled
+- Starts the indexer as a child process by default through the process infrastructure layer
 
 ## Main Imported Modules
 
@@ -35,6 +36,16 @@ yarn start:dev
 yarn start:debug
 yarn start:prod
 ```
+
+By default, these commands also start the indexer as a child process.
+
+If you want to run the indexer separately, start the API process with:
+
+```bash
+INDEXER_CHILD_PROCESS_ENABLED=false yarn start
+```
+
+In that mode, the API process will not fork the indexer.
 
 ## Build Output
 

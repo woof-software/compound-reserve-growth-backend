@@ -108,6 +108,39 @@ dist/src/apps/indexer/main.js
 6. If the child process fails to start or exits unexpectedly, the API process is terminated.
 7. On API shutdown, the child process receives `SIGTERM`.
 
+## Supported Runtime Modes
+
+There are two supported ways to run the applications:
+
+### 1. Run only the API application
+
+In this mode, the API process starts the indexer automatically as a child process.
+
+Requirements:
+
+- Keep `INDEXER_CHILD_PROCESS_ENABLED` enabled or unset
+- Start the API normally with `yarn start`, `yarn start:dev`, `yarn start:debug`, or `yarn start:prod`
+
+Effect:
+
+- One API process runs
+- One child indexer process is forked by the API process
+
+### 2. Run the API application and the indexer application separately
+
+In this mode, the indexer is started manually as its own process.
+
+Requirements:
+
+- Set `INDEXER_CHILD_PROCESS_ENABLED=false` for the API process
+- Start the API process
+- Start the indexer process separately with `yarn start:indexer`
+
+Important:
+
+- If you run `yarn start:indexer` separately and do not disable `INDEXER_CHILD_PROCESS_ENABLED` for the API process, the API process will still fork another indexer child process
+- That results in two indexer processes running at the same time
+
 See also: [`src/infrastructure/process/README.md`](src/infrastructure/process/README.md)
 
 ## Execution Flow
@@ -201,6 +234,8 @@ Scripts reference: [`package.json`](package.json)
 yarn start
 ```
 
+By default, this also starts the indexer as a child process.
+
 Development mode:
 
 ```bash
@@ -226,6 +261,8 @@ yarn start:indexer
 ```
 
 This command builds the project and then starts the compiled indexer entrypoint.
+
+If you run the indexer separately from the API process, set `INDEXER_CHILD_PROCESS_ENABLED=false` for the API process first. Otherwise the API process will fork an additional child indexer.
 
 ## Environment Configuration
 

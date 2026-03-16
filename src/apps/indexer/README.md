@@ -57,6 +57,10 @@ The indexer root module also configures:
 yarn start:indexer
 ```
 
+This command is intended for the standalone indexer mode.
+
+If the API application is running separately and `INDEXER_CHILD_PROCESS_ENABLED` is not set to `false` for the API process, the API process will still fork its own child indexer. That would leave two indexer processes running at the same time.
+
 ## Build Output
 
 Compiled entrypoint:
