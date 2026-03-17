@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { ethers } from 'ethers';
 
 import CometABI from 'modules/contract/abi/CometABI.json';
@@ -6,6 +6,7 @@ import type {
   CollateralLifecycleOutput,
   CometAssetInfo,
   CometContract,
+  CometContractReaders,
 } from 'modules/collateral/types/collateral.types';
 
 import { BlockService } from 'common/chains/block/block.service';
@@ -13,6 +14,10 @@ import { ProviderFactory } from 'common/chains/network/provider.factory';
 
 @Injectable()
 export class CollateralAlgorithmService {
+  private readonly logger = new Logger(CollateralAlgorithmService.name);
+  private readonly READABLE_BLOCK_SEARCH_MAX_ITERATIONS = 30;
+  private readonly DEACTIVATED_SUPPLY_CAP = 0n;
+
   constructor(
     private readonly providerFactory: ProviderFactory,
     private readonly blockService: BlockService,
@@ -24,38 +29,18 @@ export class CollateralAlgorithmService {
     fromBlock: number,
     toBlock?: number,
   ): Promise<CollateralLifecycleOutput> {
-    const provider = this.providerFactory.get(network);
-    const multicallProvider = this.providerFactory.multicall(network);
-    const contract = new ethers.Contract(
-      cometAddress,
-      CometABI,
-      multicallProvider,
-    ) as unknown as CometContract;
-    const directContract = new ethers.Contract(
-      cometAddress,
-      CometABI,
-      provider,
-    ) as unknown as CometContract;
-
-    const resolvedToBlock =
-      typeof toBlock === 'number' ? toBlock : await this.blockService.getSafeBlockNumber(network);
-
-    if (!Number.isFinite(fromBlock) || fromBlock < 0) {
-      throw new Error(`Invalid fromBlock: ${fromBlock}`);
-    }
-    if (!Number.isFinite(resolvedToBlock) || resolvedToBlock < fromBlock) {
-      throw new Error(`Invalid toBlock: ${resolvedToBlock}`);
-    }
+    const { contract, directContract } = this.createCometContractReaders(network, cometAddress);
+    const resolvedToBlock = await this.resolveToBlock(network, toBlock);
+    this.validateBlockRange(fromBlock, resolvedToBlock);
 
     const readableFromBlock = await this.findFirstReadableBlock(
       directContract,
       fromBlock,
       resolvedToBlock,
     );
-    const numAssetsRaw = await directContract.numAssets({ blockTag: resolvedToBlock });
-    const numAssets = Number(numAssetsRaw);
+    const numAssets = await this.getNumAssetsAtBlock(contract, directContract, resolvedToBlock);
 
-    if (!Number.isFinite(numAssets) || numAssets <= 0) {
+    if (numAssets <= 0) {
       return {
         network,
         cometAddress,
@@ -66,7 +51,7 @@ export class CollateralAlgorithmService {
       };
     }
 
-    const assetIndices = Array.from({ length: numAssets }, (_, index) => index);
+    const assetIndices = this.createAssetIndices(numAssets);
     const latestAssetInfos = await this.loadAssetInfos(
       contract,
       directContract,
@@ -115,19 +100,15 @@ export class CollateralAlgorithmService {
     indices: number[],
     blockTag: number,
   ): Promise<CometAssetInfo[]> {
-    const calls = indices.map((index) => contract.getAssetInfo(index, { blockTag }));
-    try {
-      return await Promise.all(calls);
-    } catch {
-      const fallbackCalls = indices.map((index) =>
-        directContract.getAssetInfo(index, { blockTag }),
-      );
-      return Promise.all(fallbackCalls);
-    }
+    return this.loadWithDirectFallback(
+      'getAssetInfo',
+      indices.map((index) => contract.getAssetInfo(index, { blockTag })),
+      () => indices.map((index) => directContract.getAssetInfo(index, { blockTag })),
+    );
   }
 
   private isDeactivated(assetInfo: CometAssetInfo): boolean {
-    return assetInfo.supplyCap === 0n;
+    return assetInfo.supplyCap === this.DEACTIVATED_SUPPLY_CAP;
   }
 
   private groupPositionsByMid(
@@ -239,15 +220,11 @@ export class CollateralAlgorithmService {
       }
 
       if (calls.length > 0) {
-        let results: CometAssetInfo[];
-        try {
-          results = await Promise.all(calls);
-        } catch {
-          const fallbackCalls = callMetadata.map(({ index, blockTag }) =>
+        const results = await this.loadWithDirectFallback('getAssetInfo', calls, () =>
+          callMetadata.map(({ index, blockTag }) =>
             directContract.getAssetInfo(index, { blockTag }),
-          );
-          results = await Promise.all(fallbackCalls);
-        }
+          ),
+        );
         for (let i = 0; i < results.length; i += 1) {
           const { key } = callMetadata[i];
           assetInfoCache.set(key, results[i]);
@@ -287,21 +264,14 @@ export class CollateralAlgorithmService {
     directContract: CometContract,
     blockTags: number[],
   ): Promise<Map<number, number>> {
-    const calls = blockTags.map((blockTag) => contract.numAssets({ blockTag }));
-    let results: bigint[];
-    try {
-      results = await Promise.all(calls);
-    } catch {
-      const fallbackCalls = blockTags.map((blockTag) => directContract.numAssets({ blockTag }));
-      results = await Promise.all(fallbackCalls);
-    }
+    const results = await this.loadWithDirectFallback(
+      'numAssets',
+      blockTags.map((blockTag) => contract.numAssets({ blockTag })),
+      () => blockTags.map((blockTag) => directContract.numAssets({ blockTag })),
+    );
     const map = new Map<number, number>();
     for (let i = 0; i < blockTags.length; i += 1) {
-      const value = Number(results[i]);
-      if (!Number.isFinite(value)) {
-        throw new Error(`Invalid numAssets at block ${blockTags[i]}`);
-      }
-      map.set(blockTags[i], value);
+      map.set(blockTags[i], this.toFiniteNumber(results[i], `numAssets at block ${blockTags[i]}`));
     }
     return map;
   }
@@ -316,7 +286,7 @@ export class CollateralAlgorithmService {
     let result = toBlock;
     let iterations = 0;
 
-    while (left <= right && iterations < 30) {
+    while (left <= right && iterations < this.READABLE_BLOCK_SEARCH_MAX_ITERATIONS) {
       iterations += 1;
       const mid = Math.floor((left + right) / 2);
       const readable = await this.canReadNumAssets(directContract, mid);
@@ -342,10 +312,85 @@ export class CollateralAlgorithmService {
   ): Promise<boolean> {
     try {
       const value = await directContract.numAssets({ blockTag });
-      const numAssets = Number(value);
+      const numAssets = this.toFiniteNumber(value, `numAssets at block ${blockTag}`);
       return Number.isFinite(numAssets);
     } catch {
       return false;
     }
+  }
+
+  private createCometContractReaders(network: string, cometAddress: string): CometContractReaders {
+    const provider = this.providerFactory.get(network);
+    const multicallProvider = this.providerFactory.multicall(network);
+
+    return {
+      contract: new ethers.Contract(
+        cometAddress,
+        CometABI,
+        multicallProvider,
+      ) as unknown as CometContract,
+      directContract: new ethers.Contract(
+        cometAddress,
+        CometABI,
+        provider,
+      ) as unknown as CometContract,
+    };
+  }
+
+  private async resolveToBlock(network: string, toBlock?: number): Promise<number> {
+    return typeof toBlock === 'number' ? toBlock : this.blockService.getSafeBlockNumber(network);
+  }
+
+  private validateBlockRange(fromBlock: number, toBlock: number): void {
+    if (!Number.isFinite(fromBlock) || fromBlock < 0) {
+      throw new Error(`Invalid fromBlock: ${fromBlock}`);
+    }
+
+    if (!Number.isFinite(toBlock) || toBlock < fromBlock) {
+      throw new Error(`Invalid toBlock: ${toBlock}`);
+    }
+  }
+
+  private createAssetIndices(numAssets: number): number[] {
+    return Array.from({ length: numAssets }, (_, index) => index);
+  }
+
+  private async getNumAssetsAtBlock(
+    contract: CometContract,
+    directContract: CometContract,
+    blockTag: number,
+  ): Promise<number> {
+    const numAssetsByBlock = await this.loadNumAssets(contract, directContract, [blockTag]);
+    const numAssets = numAssetsByBlock.get(blockTag);
+
+    if (typeof numAssets !== 'number') {
+      throw new Error(`Missing numAssets for block ${blockTag}`);
+    }
+
+    return numAssets;
+  }
+
+  private async loadWithDirectFallback<T>(
+    operationName: string,
+    primaryCalls: Array<Promise<T>>,
+    fallbackCallsFactory: () => Array<Promise<T>>,
+  ): Promise<T[]> {
+    try {
+      return await Promise.all(primaryCalls);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.warn(
+        `Multicall ${operationName} failed. Falling back to direct RPC calls. Error: ${message}`,
+      );
+      return Promise.all(fallbackCallsFactory());
+    }
+  }
+
+  private toFiniteNumber(value: bigint, context: string): number {
+    const normalized = Number(value);
+    if (!Number.isFinite(normalized)) {
+      throw new Error(`Invalid ${context}`);
+    }
+    return normalized;
   }
 }

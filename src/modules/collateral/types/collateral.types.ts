@@ -52,6 +52,11 @@ export type CometContract = {
   getAssetInfo(index: number, overrides?: BlockTagOverride): Promise<CometAssetInfo>;
 };
 
+export type CometContractReaders = {
+  contract: CometContract;
+  directContract: CometContract;
+};
+
 export type CollateralLifecycleOutput = {
   network: string;
   cometAddress: string;
