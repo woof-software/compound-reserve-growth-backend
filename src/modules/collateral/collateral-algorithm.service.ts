@@ -17,6 +17,7 @@ export class CollateralAlgorithmService {
   private readonly logger = new Logger(CollateralAlgorithmService.name);
   private readonly READABLE_BLOCK_SEARCH_MAX_ITERATIONS = 30;
   private readonly DEACTIVATED_SUPPLY_CAP = 0n;
+  private readonly EMPTY_COLLATERAL_RESERVES = 0n;
 
   constructor(
     private readonly providerFactory: ProviderFactory,
@@ -58,7 +59,15 @@ export class CollateralAlgorithmService {
       assetIndices,
       resolvedToBlock,
     );
-    const latestDeactivatedFlags = latestAssetInfos.map((info) => this.isDeactivated(info));
+    const latestCollateralReserves = await this.loadCollateralReserves(
+      contract,
+      directContract,
+      latestAssetInfos.map((info) => info.asset),
+      resolvedToBlock,
+    );
+    const latestDeactivatedFlags = latestAssetInfos.map((info, position) =>
+      this.isDeactivated(info, latestCollateralReserves[position]),
+    );
 
     const appearanceBlocks = await this.findAppearanceBlocks(
       contract,
@@ -72,6 +81,7 @@ export class CollateralAlgorithmService {
       contract,
       directContract,
       assetIndices,
+      latestAssetInfos.map((info) => info.asset),
       appearanceBlocks,
       resolvedToBlock,
       latestDeactivatedFlags,
@@ -107,8 +117,29 @@ export class CollateralAlgorithmService {
     );
   }
 
-  private isDeactivated(assetInfo: CometAssetInfo): boolean {
-    return assetInfo.supplyCap === this.DEACTIVATED_SUPPLY_CAP;
+  private async loadCollateralReserves(
+    contract: CometContract,
+    directContract: CometContract,
+    assetAddresses: string[],
+    blockTag: number,
+  ): Promise<bigint[]> {
+    return this.loadWithDirectFallback(
+      'getCollateralReserves',
+      assetAddresses.map((assetAddress) =>
+        contract.getCollateralReserves(assetAddress, { blockTag }),
+      ),
+      () =>
+        assetAddresses.map((assetAddress) =>
+          directContract.getCollateralReserves(assetAddress, { blockTag }),
+        ),
+    );
+  }
+
+  private isDeactivated(assetInfo: CometAssetInfo, collateralReserves: bigint): boolean {
+    return (
+      assetInfo.supplyCap === this.DEACTIVATED_SUPPLY_CAP &&
+      collateralReserves === this.EMPTY_COLLATERAL_RESERVES
+    );
   }
 
   private groupPositionsByMid(
@@ -185,6 +216,7 @@ export class CollateralAlgorithmService {
     contract: CometContract,
     directContract: CometContract,
     indices: number[],
+    assetAddresses: string[],
     appearanceBlocks: number[],
     toBlock: number,
     latestDeactivatedFlags: boolean[],
@@ -194,6 +226,7 @@ export class CollateralAlgorithmService {
     const right = indices.map(() => toBlock);
     const pendingPositions = new Set<number>();
     const assetInfoCache = new Map<string, CometAssetInfo>();
+    const collateralReservesCache = new Map<string, bigint>();
 
     for (let position = 0; position < indices.length; position += 1) {
       if (latestDeactivatedFlags[position]) {
@@ -204,30 +237,60 @@ export class CollateralAlgorithmService {
     while (pendingPositions.size > 0) {
       const midToPositions = this.groupPositionsByMid(pendingPositions, left, right);
 
-      const calls: Array<Promise<CometAssetInfo>> = [];
-      const callMetadata: Array<{ key: string; index: number; blockTag: number }> = [];
+      const assetInfoCalls: Array<Promise<CometAssetInfo>> = [];
+      const assetInfoCallMetadata: Array<{ key: string; index: number; blockTag: number }> = [];
+      const collateralReserveCalls: Array<Promise<bigint>> = [];
+      const collateralReserveCallMetadata: Array<{
+        key: string;
+        assetAddress: string;
+        blockTag: number;
+      }> = [];
 
       for (const [mid, positions] of midToPositions) {
         for (const position of positions) {
           const index = indices[position];
           const key = `${mid}:${index}`;
-          if (assetInfoCache.has(key)) {
-            continue;
+          if (!assetInfoCache.has(key)) {
+            assetInfoCalls.push(contract.getAssetInfo(index, { blockTag: mid }));
+            assetInfoCallMetadata.push({ key, index, blockTag: mid });
           }
-          calls.push(contract.getAssetInfo(index, { blockTag: mid }));
-          callMetadata.push({ key, index, blockTag: mid });
+          if (!collateralReservesCache.has(key)) {
+            collateralReserveCalls.push(
+              contract.getCollateralReserves(assetAddresses[position], { blockTag: mid }),
+            );
+            collateralReserveCallMetadata.push({
+              key,
+              assetAddress: assetAddresses[position],
+              blockTag: mid,
+            });
+          }
         }
       }
 
-      if (calls.length > 0) {
-        const results = await this.loadWithDirectFallback('getAssetInfo', calls, () =>
-          callMetadata.map(({ index, blockTag }) =>
+      if (assetInfoCalls.length > 0) {
+        const results = await this.loadWithDirectFallback('getAssetInfo', assetInfoCalls, () =>
+          assetInfoCallMetadata.map(({ index, blockTag }) =>
             directContract.getAssetInfo(index, { blockTag }),
           ),
         );
         for (let i = 0; i < results.length; i += 1) {
-          const { key } = callMetadata[i];
+          const { key } = assetInfoCallMetadata[i];
           assetInfoCache.set(key, results[i]);
+        }
+      }
+
+      if (collateralReserveCalls.length > 0) {
+        const results = await this.loadWithDirectFallback(
+          'getCollateralReserves',
+          collateralReserveCalls,
+          () =>
+            collateralReserveCallMetadata.map(({ assetAddress, blockTag }) =>
+              directContract.getCollateralReserves(assetAddress, { blockTag }),
+            ),
+        );
+        for (let i = 0; i < results.length; i += 1) {
+          const { key } = collateralReserveCallMetadata[i];
+          collateralReservesCache.set(key, results[i]);
         }
       }
 
@@ -239,8 +302,12 @@ export class CollateralAlgorithmService {
           if (!assetInfo) {
             throw new Error(`Missing asset info for index ${index} at block ${mid}`);
           }
+          const collateralReserves = collateralReservesCache.get(key);
+          if (typeof collateralReserves === 'undefined') {
+            throw new Error(`Missing collateral reserves for index ${index} at block ${mid}`);
+          }
 
-          const isDeactivated = this.isDeactivated(assetInfo);
+          const isDeactivated = this.isDeactivated(assetInfo, collateralReserves);
 
           if (isDeactivated) {
             right[position] = mid;

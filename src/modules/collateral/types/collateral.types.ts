@@ -50,6 +50,7 @@ export type BlockTagOverride = {
 export type CometContract = {
   numAssets(overrides?: BlockTagOverride): Promise<bigint>;
   getAssetInfo(index: number, overrides?: BlockTagOverride): Promise<CometAssetInfo>;
+  getCollateralReserves(asset: string, overrides?: BlockTagOverride): Promise<bigint>;
 };
 
 export type CometContractReaders = {
