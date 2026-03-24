@@ -31,6 +31,19 @@ export class OracleRepository {
     });
   }
 
+  async findByAddressesWithAsset(addresses: string[]): Promise<Oracle[]> {
+    if (addresses.length === 0) {
+      return [];
+    }
+
+    return this.repository
+      .createQueryBuilder('oracle')
+      .leftJoinAndSelect('oracle.asset', 'asset')
+      .where('oracle.address IN (:...addresses)', { addresses })
+      .orderBy('oracle.id', 'ASC')
+      .getMany();
+  }
+
   async upsertByAddress(oracle: Partial<Oracle> | Array<Partial<Oracle>>): Promise<void> {
     await this.repository.upsert(oracle, ['address']);
   }
