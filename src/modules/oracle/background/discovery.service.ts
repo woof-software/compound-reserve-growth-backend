@@ -1,19 +1,16 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
 import { ethers } from 'ethers';
 import { Cron, CronExpression } from '@nestjs/schedule';
 
 import { SourceRepository } from 'modules/source/source.repository';
 import CometABI from 'modules/contract/abi/CometABI.json';
 import CapoABI from 'modules/capo/abi/ERC4626CorrelatedAssetsPriceOracle.json';
+import { OracleRepository } from 'modules/oracle/repositories/oracle.repository';
 
 import { ProviderFactory } from 'common/chains/network/provider.factory';
 import { NetworkService } from 'common/chains/network/network.service';
 import { BlockService } from 'common/chains/block/block.service';
 import { Algorithm } from 'common/enum/algorithm.enum';
-
-import { Oracle } from './oracle.entity';
 
 interface CapoOracleInfo {
   address: string;
@@ -40,10 +37,10 @@ export class DiscoveryService implements OnModuleInit {
     private readonly networkService: NetworkService,
     private readonly blockService: BlockService,
     private readonly sourceRepository: SourceRepository,
-    @InjectRepository(Oracle) private readonly oracleRepository: Repository<Oracle>,
+    private readonly oracleRepository: OracleRepository,
   ) {}
 
-  async onModuleInit() {
+  async onModuleInit(): Promise<void> {
     // if (process.env.MOCK_CAPO === 'true') {
     //   await this.oracleRepository.upsert(
     //     {
@@ -82,7 +79,7 @@ export class DiscoveryService implements OnModuleInit {
 
     //   if (oracleRow && (!oracleRow.snapshotRatio || !oracleRow.decimals)) {
     //     try {
-    //       const provider = this.providerFactory.get('mainnet');
+    //       const provider = this.providerFactory.multicall('mainnet');
     //       const oracleContract = new ethers.Contract(standaloneOracleAddress, CapoABI, provider);
     //       const [
     //         snapshotRatioBn,
@@ -127,9 +124,10 @@ export class DiscoveryService implements OnModuleInit {
     await this.syncFromSources();
     this.logger.log('Initial discovery completed');
   }
+
   async syncFromSources(): Promise<CapoOracleInfo[]> {
     const sources = await this.sourceRepository.list();
-    const comets = sources.filter((s) => s.algorithm.includes(Algorithm.COMET));
+    const comets = sources.filter((source) => source.algorithm.includes(Algorithm.COMET));
 
     this.logger.log(`Found ${comets.length} COMET sources for discovery`);
 
@@ -138,12 +136,12 @@ export class DiscoveryService implements OnModuleInit {
       return [];
     }
 
-    const cometDescriptors = comets.map((c) => {
-      const netCfg = this.networkService.byName(c.network);
+    const cometDescriptors = comets.map((source) => {
+      const netCfg = this.networkService.byName(source.network);
       return {
-        address: c.address,
+        address: source.address,
         chainId: netCfg?.chainId ?? 0,
-        network: c.network,
+        network: source.network,
       };
     });
 
@@ -152,7 +150,7 @@ export class DiscoveryService implements OnModuleInit {
   }
 
   @Cron(CronExpression.EVERY_4_HOURS)
-  async scheduledSync() {
+  async scheduledSync(): Promise<void> {
     await this.syncFromSources();
   }
 
@@ -175,12 +173,24 @@ export class DiscoveryService implements OnModuleInit {
           continue;
         }
 
-        const provider = this.providerFactory.get(comet.network);
+        const provider = this.providerFactory.multicall(comet.network);
         const cometContract = new ethers.Contract(comet.address, CometABI, provider);
         const blockTag = safeBlockNumber;
 
-        const baseTokenPriceFeed = await cometContract.baseTokenPriceFeed({ blockTag });
+        const [baseTokenPriceFeed, numAssetsRaw] = await Promise.all([
+          cometContract.baseTokenPriceFeed({ blockTag }),
+          cometContract.numAssets({ blockTag }),
+        ]);
+
         this.logger.log(`Base token price feed: ${baseTokenPriceFeed}`);
+
+        const assetInfos = await this.loadCometAssetInfos(
+          comet.address,
+          comet.network,
+          cometContract,
+          blockTag,
+          numAssetsRaw,
+        );
 
         if (!checkedAddresses.has(baseTokenPriceFeed.toLowerCase())) {
           checkedAddresses.add(baseTokenPriceFeed.toLowerCase());
@@ -196,7 +206,7 @@ export class DiscoveryService implements OnModuleInit {
             this.logger.log(
               `Oracle info address=${oracleInfo.address} network=${oracleInfo.network} chainId=${oracleInfo.chainId} maxYearlyRatioGrowthPercent=${oracleInfo.maxYearlyRatioGrowthPercent}`,
             );
-            await this.oracleRepository.upsert(oracleInfo, ['address']);
+            await this.oracleRepository.upsertByAddress(oracleInfo);
             discoveredOracles.push(oracleInfo);
             this.logger.log(
               `Found CAPO oracle at ${baseTokenPriceFeed}: ${oracleInfo.description}`,
@@ -204,10 +214,7 @@ export class DiscoveryService implements OnModuleInit {
           }
         }
 
-        const numAssets = await cometContract.numAssets({ blockTag });
-
-        for (let i = 0; i < numAssets; i++) {
-          const assetInfo = await cometContract.getAssetInfo(i, { blockTag });
+        for (const assetInfo of assetInfos) {
           const priceFeed = assetInfo.priceFeed;
 
           if (!checkedAddresses.has(priceFeed.toLowerCase())) {
@@ -221,7 +228,7 @@ export class DiscoveryService implements OnModuleInit {
             );
 
             if (oracleInfo) {
-              await this.oracleRepository.upsert(oracleInfo, ['address']);
+              await this.oracleRepository.upsertByAddress(oracleInfo);
               discoveredOracles.push(oracleInfo);
               this.logger.log(`Found CAPO oracle at ${priceFeed}: ${oracleInfo.description}`);
             }
@@ -236,6 +243,34 @@ export class DiscoveryService implements OnModuleInit {
     return discoveredOracles;
   }
 
+  private async loadCometAssetInfos(
+    cometAddress: string,
+    network: string,
+    cometContract: ethers.Contract,
+    blockTag: number,
+    numAssetsRaw: unknown,
+  ): Promise<Array<{ priceFeed: string }>> {
+    const numAssets = Number(numAssetsRaw);
+    if (!Number.isSafeInteger(numAssets) || numAssets < 0) {
+      throw new Error(`Invalid numAssets value for comet ${cometAddress}: ${numAssetsRaw}`);
+    }
+
+    const assetInfos: Array<{ priceFeed: string }> =
+      numAssets > 0
+        ? ((await Promise.all(
+            Array.from({ length: numAssets }, (_, index) =>
+              cometContract.getAssetInfo(index, { blockTag }),
+            ),
+          )) as Array<{ priceFeed: string }>)
+        : [];
+
+    this.logger.debug(
+      `Comet discovery read via multicall comet=${cometAddress} network=${network} block=${blockTag} batchedCalls=${numAssets + 2}`,
+    );
+
+    return assetInfos;
+  }
+
   private async checkIfCapoOracle(
     oracleAddress: string,
     chainId: number,
@@ -243,29 +278,45 @@ export class DiscoveryService implements OnModuleInit {
     blockTag: number,
   ): Promise<CapoOracleInfo | null> {
     try {
-      const provider = this.providerFactory.get(network);
+      const provider = this.providerFactory.multicall(network);
       const oracleContract = new ethers.Contract(oracleAddress, CapoABI, provider);
 
       let maxYearlyRatioGrowthPercent: number;
       try {
-        maxYearlyRatioGrowthPercent = await oracleContract.maxYearlyRatioGrowthPercent({
-          blockTag,
-        });
-      } catch {
+        maxYearlyRatioGrowthPercent = Number(
+          await oracleContract.maxYearlyRatioGrowthPercent({
+            blockTag,
+          }),
+        );
+      } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : String(error);
+        this.logger.warn(
+          `Oracle does not expose CAPO growth data address=${oracleAddress} network=${network} blockTag=${blockTag} error=${message}`,
+        );
         return null;
       }
 
-      // Sequential RPC calls to avoid excessive parallel requests
-      const description = await oracleContract.description({ blockTag });
-      const ratioProvider = await oracleContract.ratioProvider({ blockTag });
-      const baseAggregator = await oracleContract.assetToBaseAggregator({ blockTag });
-      const manager = await oracleContract.manager({ blockTag });
-      const snapshotRatio = await oracleContract.snapshotRatio({ blockTag });
-      const snapshotTimestamp = await oracleContract.snapshotTimestamp({ blockTag });
-      const minimumSnapshotDelay = await oracleContract.minimumSnapshotDelay({ blockTag });
-      const decimals = await oracleContract.decimals({ blockTag });
+      const [
+        description,
+        ratioProvider,
+        baseAggregator,
+        manager,
+        snapshotRatio,
+        snapshotTimestamp,
+        minimumSnapshotDelay,
+        decimals,
+      ] = await Promise.all([
+        oracleContract.description({ blockTag }),
+        oracleContract.ratioProvider({ blockTag }),
+        oracleContract.assetToBaseAggregator({ blockTag }),
+        oracleContract.manager({ blockTag }),
+        oracleContract.snapshotRatio({ blockTag }),
+        oracleContract.snapshotTimestamp({ blockTag }),
+        oracleContract.minimumSnapshotDelay({ blockTag }),
+        oracleContract.decimals({ blockTag }),
+      ]);
 
-      const oracleInfo: CapoOracleInfo = {
+      return {
         address: oracleAddress,
         chainId,
         network,
@@ -280,8 +331,6 @@ export class DiscoveryService implements OnModuleInit {
         manager,
         isActive: true,
       };
-
-      return oracleInfo;
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       this.logger.error(
@@ -291,10 +340,6 @@ export class DiscoveryService implements OnModuleInit {
     }
   }
 
-  /**
-   * Returns a lagged block number for the given network, caching the result per discovery run.
-   * If the latest block cannot be fetched, returns null without poisoning cache.
-   */
   private async getSafeBlockNumber(
     network: string,
     cache: Map<string, number | null>,

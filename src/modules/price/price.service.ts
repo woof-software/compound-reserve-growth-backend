@@ -11,7 +11,7 @@ import { Price } from './price.entity';
 import { PriceRepository } from './price.repository';
 
 import { REDIS_CLIENT } from 'infrastructure/redis/redis.module';
-import { DAY_IN_MS, DAY_IN_SEC, HOUR_IN_SEC, SEC_IN_MS } from '@app/common/constants';
+import { DAY_IN_MS, DAY_IN_SEC, HOUR_IN_SEC, SEC_IN_MS } from '@/common/constants';
 
 @Injectable()
 export class PriceService implements OnModuleInit {

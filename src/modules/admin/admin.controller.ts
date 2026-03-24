@@ -2,7 +2,7 @@ import { Controller, Get, Post, Query, SerializeOptions } from '@nestjs/common';
 import { ApiOperation, ApiResponse } from '@nestjs/swagger';
 
 import { AdminService } from 'modules/admin/admin.service';
-import { StartCollectionResponse } from 'modules/admin/response';
+import { StartCollectionRequest } from 'modules/admin/request';
 
 import { AdminEndpoint } from '@/common/decorators';
 
@@ -25,32 +25,32 @@ export class AdminController {
   @Post('/reserves/collect')
   @AdminEndpoint()
   @ApiOperation({
-    summary: 'Start reserves processing',
+    summary: 'Queue reserves processing',
     description:
-      'Returns the process status response.\n' +
-      '  - If the `clearData` field is set to true in the request, existing data in the database will be cleared before the new collection starts.\n' +
+      'Queues a reserves processing job and returns the queue status response.\n' +
+      '  - If the `clearData` field is set to true in the request, existing data in the database will be cleared before the queued collection starts.\n' +
       '  - The `data` field specifies the time (in ISO format) at which data collection should start.\n' +
-      '  - When `clearData` is enabled and `data` is not specified, the start of the report is considered to be the create of the contract',
+      '  - When `clearData` is enabled and `data` is not specified, the start of the report is considered to be the contract creation date',
   })
   @ApiResponse({ status: 200, type: String })
   @SerializeOptions({ type: String })
-  async startReserves(@Query() request: StartCollectionResponse): Promise<string> {
+  async startReserves(@Query() request: StartCollectionRequest): Promise<string> {
     return this.admin.startReserves(request);
   }
 
   @Post('/stats/collect')
   @AdminEndpoint()
   @ApiOperation({
-    summary: 'Start stats processing',
+    summary: 'Queue stats processing',
     description:
-      'Returns the process status response.\n' +
-      '  - If the `clearData` field is set to true in the request, existing data in the database will be cleared before the new collection starts.\n' +
+      'Queues a stats processing job and returns the queue status response.\n' +
+      '  - If the `clearData` field is set to true in the request, existing data in the database will be cleared before the queued collection starts.\n' +
       '  - The `data` field specifies the time (in ISO format) at which data collection should start.\n' +
-      '  - When `clearData` is enabled and `data` is not specified, the start of the report is considered to be the create of the contract',
+      '  - When `clearData` is enabled and `data` is not specified, the start of the report is considered to be the contract creation date',
   })
   @ApiResponse({ status: 200, type: String })
   @SerializeOptions({ type: String })
-  async startStats(@Query() request: StartCollectionResponse): Promise<string> {
+  async startStats(@Query() request: StartCollectionRequest): Promise<string> {
     return this.admin.startStats(request);
   }
 }

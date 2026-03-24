@@ -18,6 +18,7 @@ export default registerAs('networks', (): NetworkConfig[] => [
     network: 'ronin',
     chainId: 2020,
     url: 'https://ronin.drpc.org',
+    batchMaxCount: 3,
   },
   {
     network: 'polygon',
@@ -39,6 +40,7 @@ export default registerAs('networks', (): NetworkConfig[] => [
     chainId: 130,
     url: `https://unichain.drpc.org`,
     // url: `https://multi-boldest-patina.unichain-mainnet.quiknode.pro/${process.env.UNICHAIN_QUICKNODE_KEY}`,
+    batchMaxCount: 3,
   },
   {
     network: 'base',
@@ -54,11 +56,13 @@ export default registerAs('networks', (): NetworkConfig[] => [
     network: 'avalanche',
     chainId: 43114,
     url: 'https://api.avax.network/ext/bc/C/rpc',
+    batchMaxCount: 3,
   },
   {
     network: 'fuji',
     chainId: 43113,
     url: 'https://api.avax-test.network/ext/bc/C/rpc',
+    batchMaxCount: 3,
   },
   {
     network: 'scroll',

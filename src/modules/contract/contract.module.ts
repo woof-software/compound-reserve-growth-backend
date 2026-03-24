@@ -14,7 +14,7 @@ import { ContractService } from './contract.service';
   imports: [
     NetworkModule,
     // Circular dependency: ContractService -> HistoryService (this module needs HistoryModule),
-    // and HistoryModule's GetHistoryService -> ContractService (history/cron/history-get.service.ts).
+    // and HistoryModule's HistoryProcessingService -> ContractService.
     // forwardRef is required; HistoryModule also uses forwardRef(() => ContractModule).
     forwardRef(() => HistoryModule),
     PriceModule,

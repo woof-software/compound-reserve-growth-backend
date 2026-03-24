@@ -1,8 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ethers } from 'ethers';
+import { MulticallProvider } from 'ethers-multicall-provider';
 
 import { IncomesEntity, ReserveEntity, SpendsEntity } from 'modules/history/entities';
-import { HistoryService } from 'modules/history/history.service';
+import { HistoryService } from 'modules/history/services/history.service';
 import { SourceEntity } from 'modules/source/source.entity';
 import { PriceService } from 'modules/price/price.service';
 import { MailService } from 'modules/mail/mail.service';
@@ -23,8 +24,8 @@ import Bytes32TokenABI from './abi/Bytes32TokenABI.json';
 import { MarketData, RootJson } from './contract.type';
 import { ResponseStatsAlgorithm } from './interface';
 
-import { SEC_IN_MS } from '@app/common/constants';
-import { Algorithm } from '@app/common/enum/algorithm.enum';
+import { SEC_IN_MS } from '@/common/constants';
+import { Algorithm } from '@/common/enum/algorithm.enum';
 import { calculateTimeRange } from '@/common/utils/calculate-time-range';
 
 @Injectable()
@@ -49,9 +50,9 @@ export class ContractService {
       throw new Error(`Invalid networkPath format: '${root.networkPath}'`);
     }
 
-    let provider: ethers.JsonRpcProvider;
+    let provider: MulticallProvider<ethers.JsonRpcProvider>;
     try {
-      provider = this.providerFactory.get(networkKey);
+      provider = this.providerFactory.multicall(networkKey);
     } catch (e) {
       this.logger.error(
         `Unsupported network in path network: ${networkKey} path: ${root.networkPath}`,
@@ -154,7 +155,7 @@ export class ContractService {
 
   async getCometBaseToken(cometAddress: string, network: string) {
     try {
-      const provider = this.providerFactory.get(network);
+      const provider = this.providerFactory.multicall(network);
       const blockTag = await this.blockService.getSafeBlockNumber(network);
 
       const cometContract = new ethers.Contract(cometAddress, CometABI, provider) as any;
@@ -187,7 +188,7 @@ export class ContractService {
         };
       }
 
-      const provider = this.providerFactory.get(network);
+      const provider = this.providerFactory.multicall(network);
       const blockTag = await this.blockService.getSafeBlockNumber(network);
 
       const marketContract = new ethers.Contract(marketAddress, MarketV2ABI, provider) as any;
@@ -225,7 +226,7 @@ export class ContractService {
     rewardsAddress: string,
     cometAddress: string,
     network: string,
-    provider: ethers.JsonRpcProvider,
+    provider: MulticallProvider<ethers.JsonRpcProvider>,
     blockTag: number,
   ): Promise<string> {
     const legacyNetworks = ['mainnet', 'polygon'];
@@ -273,7 +274,7 @@ export class ContractService {
     );
 
     try {
-      const provider = this.providerFactory.get(network);
+      const provider = this.providerFactory.multicall(network);
 
       let lastBlock: number;
 
@@ -531,7 +532,7 @@ export class ContractService {
     );
 
     try {
-      const provider = this.providerFactory.get(network);
+      const provider = this.providerFactory.multicall(network);
 
       let lastBlock: number | undefined;
 

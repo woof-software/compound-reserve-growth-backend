@@ -6,6 +6,7 @@ import CapoABI from 'modules/capo/abi/ERC4626CorrelatedAssetsPriceOracle.json';
 import { ProviderFactory } from 'common/chains/network/provider.factory';
 
 import { Oracle } from './oracle.entity';
+import { OracleRepository } from './repositories/oracle.repository';
 
 import { OracleData } from '@/common/types/oracle-data';
 import { CapoValues } from '@/common/types/capo-values';
@@ -14,7 +15,18 @@ import { CapoValues } from '@/common/types/capo-values';
 export class OracleService {
   private readonly logger = new Logger(OracleService.name);
 
-  constructor(private readonly providerFactory: ProviderFactory) {}
+  constructor(
+    private readonly providerFactory: ProviderFactory,
+    private readonly oracleRepository: OracleRepository,
+  ) {}
+
+  async listActive(): Promise<Oracle[]> {
+    return this.oracleRepository.listActive();
+  }
+
+  async findByAddressWithAsset(address: string): Promise<Oracle | null> {
+    return this.oracleRepository.findByAddressWithAsset(address);
+  }
 
   /**
    * Reads oracle state at a specific block so all fields are consistent and less sensitive to reorgs.
@@ -22,7 +34,7 @@ export class OracleService {
    */
   async getOracleData(oracle: Oracle, blockNumber: number): Promise<OracleData> {
     try {
-      const provider = this.providerFactory.get(oracle.network);
+      const provider = this.providerFactory.multicall(oracle.network);
       const oracleContract = new ethers.Contract(oracle.address, CapoABI, provider);
       const blockTag = blockNumber;
 
@@ -31,13 +43,27 @@ export class OracleService {
         throw new Error(`Block ${blockNumber} not found`);
       }
 
-      const latestRoundData = await oracleContract.latestRoundData({ blockTag });
-      const ratio = await oracleContract.getRatio({ blockTag });
-      const isCapped = await oracleContract.isCapped({ blockTag });
-      const decimals = await oracleContract.decimals({ blockTag });
-      const snapshotRatio = await oracleContract.snapshotRatio({ blockTag });
-      const snapshotTimestamp = await oracleContract.snapshotTimestamp({ blockTag });
-      const maxYearlyGrowthPercent = await oracleContract.maxYearlyRatioGrowthPercent({ blockTag });
+      const [
+        latestRoundData,
+        ratio,
+        isCapped,
+        decimals,
+        snapshotRatio,
+        snapshotTimestamp,
+        maxYearlyGrowthPercent,
+      ] = await Promise.all([
+        oracleContract.latestRoundData({ blockTag }),
+        oracleContract.getRatio({ blockTag }),
+        oracleContract.isCapped({ blockTag }),
+        oracleContract.decimals({ blockTag }),
+        oracleContract.snapshotRatio({ blockTag }),
+        oracleContract.snapshotTimestamp({ blockTag }),
+        oracleContract.maxYearlyRatioGrowthPercent({ blockTag }),
+      ]);
+
+      this.logger.debug(
+        `Oracle data read via multicall oracle=${oracle.address} network=${oracle.network} block=${blockTag} batchedCalls=7`,
+      );
 
       const price = latestRoundData.answer;
       return {

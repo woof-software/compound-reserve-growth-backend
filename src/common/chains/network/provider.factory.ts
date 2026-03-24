@@ -1,11 +1,14 @@
 import { Injectable } from '@nestjs/common';
 import { ethers } from 'ethers';
+import { MulticallProvider, MulticallWrapper } from 'ethers-multicall-provider';
 
 import { NetworkService } from './network.service';
 
 @Injectable()
 export class ProviderFactory {
   private cache = new Map<number, ethers.JsonRpcProvider>();
+  private readonly timeoutPatchedProviders = new WeakSet<ethers.JsonRpcProvider>();
+  private readonly RPC_TIMEOUT_MS = 30_000;
 
   constructor(private readonly networkService: NetworkService) {}
 
@@ -20,17 +23,12 @@ export class ProviderFactory {
     }
 
     if (!this.cache.has(config.chainId)) {
-      const provider = new ethers.JsonRpcProvider(config.url, config.chainId);
-
-      const originalGetConnection = provider._getConnection.bind(provider);
-      provider._getConnection = () => {
-        const connection = originalGetConnection();
-        if (connection && typeof connection === 'object') {
-          (connection as any).timeout = 30000; // 30 seconds timeout
-        }
-        return connection;
-      };
-
+      const provider = new ethers.JsonRpcProvider(
+        config.url,
+        config.chainId,
+        config.batchMaxCount ? { batchMaxCount: config.batchMaxCount } : {},
+      );
+      this.applyRpcTimeout(provider);
       this.cache.set(config.chainId, provider);
     }
 
@@ -39,5 +37,36 @@ export class ProviderFactory {
       throw new Error(`Failed to create provider for chainId: ${config.chainId}`);
     }
     return provider;
+  }
+
+  multicall(
+    identifier: string | number,
+    maxMulticallDataLength = 400_000,
+  ): MulticallProvider<ethers.JsonRpcProvider> {
+    const provider = this.get(identifier);
+
+    if (MulticallWrapper.isMulticallProvider(provider)) {
+      provider.maxMulticallDataLength = maxMulticallDataLength;
+      return provider;
+    }
+
+    const multicallProvider = MulticallWrapper.wrap(provider, maxMulticallDataLength);
+    this.applyRpcTimeout(multicallProvider);
+    return multicallProvider;
+  }
+
+  private applyRpcTimeout(provider: ethers.JsonRpcProvider): void {
+    if (this.timeoutPatchedProviders.has(provider)) {
+      return;
+    }
+
+    const originalGetConnection = provider._getConnection.bind(provider);
+    provider._getConnection = () => {
+      const connection = originalGetConnection();
+      connection.timeout = this.RPC_TIMEOUT_MS;
+      return connection;
+    };
+
+    this.timeoutPatchedProviders.add(provider);
   }
 }
