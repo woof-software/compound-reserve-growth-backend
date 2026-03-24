@@ -17,6 +17,7 @@ import { DAY_IN_MS, DAY_IN_SEC, HOUR_IN_SEC, SEC_IN_MS } from '@/common/constant
 export class PriceService implements OnModuleInit {
   private readonly logger = new Logger(PriceService.name);
   private readonly providers: Map<string, PriceProviderInterface> = new Map();
+  private readonly batchSize = 100;
 
   constructor(
     @Inject(CACHE_MANAGER) private cacheManager: Cache,
@@ -247,11 +248,8 @@ export class PriceService implements OnModuleInit {
         return;
       }
 
-      // Check which dates we already have in the database to avoid duplicates
-      const existingPrices = await this.priceRepository.findBySymbol(symbol);
-      const existingDates = new Set(existingPrices.map((p) => p.date.toISOString().slice(0, 10)));
-
-      const priceBatch: Price[] = [];
+      const pendingBatch: Price[] = [];
+      let processedCount = 0;
       let earliestDate: string | null = null;
       let latestDate: string | null = null;
 
@@ -260,11 +258,6 @@ export class PriceService implements OnModuleInit {
         date.setUTCHours(0, 0, 0, 0);
         const dateStr = date.toISOString().slice(0, 10);
 
-        // Skip if we already have this date
-        if (existingDates.has(dateStr)) {
-          continue;
-        }
-
         if (!earliestDate || dateStr < earliestDate) {
           earliestDate = dateStr;
         }
@@ -272,33 +265,24 @@ export class PriceService implements OnModuleInit {
           latestDate = dateStr;
         }
 
-        const priceEntity = new Price(symbol, price, date);
-        priceBatch.push(priceEntity);
+        pendingBatch.push(new Price(symbol, price, date));
+
+        if (pendingBatch.length >= this.batchSize) {
+          await this.saveBatchToDatabase(pendingBatch);
+          processedCount += pendingBatch.length;
+          pendingBatch.length = 0;
+        }
       }
 
-      // Save in batches for better performance
-      if (priceBatch.length > 0) {
-        const batchSize = 100;
-        let savedCount = 0;
+      if (pendingBatch.length > 0) {
+        await this.saveBatchToDatabase(pendingBatch);
+        processedCount += pendingBatch.length;
+      }
 
-        for (let i = 0; i < priceBatch.length; i += batchSize) {
-          const batch = priceBatch.slice(i, i + batchSize);
-          await this.saveBatchToDatabase(batch);
-          savedCount += batch.length;
+      this.logger.log(`Preloaded and processed ${processedCount} price records for ${symbol}`);
 
-          // Small delay between batches to avoid overwhelming the database
-          if (i + batchSize < priceBatch.length) {
-            await new Promise((resolve) => setTimeout(resolve, 100));
-          }
-        }
-
-        this.logger.log(`Preloaded and saved ${savedCount} new price records for ${symbol}`);
-
-        if (earliestDate && latestDate) {
-          this.logger.log(`Date range: ${earliestDate} to ${latestDate}`);
-        }
-      } else {
-        this.logger.log(`All price data for ${symbol} already exists in database`);
+      if (earliestDate && latestDate) {
+        this.logger.log(`Date range: ${earliestDate} to ${latestDate}`);
       }
     } catch (error) {
       this.logger.warn(`Failed to preload historical prices for ${coinId}: ${error.message}`);
