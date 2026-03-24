@@ -10,6 +10,7 @@ import { CollateralModule } from 'modules/collateral/collateral.module';
 import { REDIS_CLIENT, RedisModule } from 'infrastructure/redis/redis.module';
 import appConfig from 'config/app';
 import blockTimingConfig from 'config/block-timing.config';
+import contractConfig from 'config/contract';
 import databaseConfig from 'config/database';
 import networksConfig from 'config/networks.config';
 import redis from 'config/redis';
@@ -19,7 +20,7 @@ import { DatabaseModule } from 'database/database.module';
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      load: [appConfig, databaseConfig, networksConfig, redis, blockTimingConfig],
+      load: [appConfig, databaseConfig, networksConfig, redis, contractConfig, blockTimingConfig],
     }),
     CacheModule.registerAsync({
       isGlobal: true,

@@ -33,6 +33,7 @@ import networksConfig from 'config/networks.config';
 import redis from 'config/redis';
 import google from 'config/google';
 import admin from 'config/admin';
+import contractConfig from 'config/contract';
 import reserveSourcesConfig from 'config/reserve-sources.config';
 import blockTimingConfig from 'config/block-timing.config';
 import { DatabaseModule } from 'database/database.module';
@@ -51,6 +52,7 @@ import { ExceptionInterceptor } from 'infrastructure/http/interceptors/exception
         redis,
         google,
         admin,
+        contractConfig,
         reserveSourcesConfig,
         blockTimingConfig,
       ],

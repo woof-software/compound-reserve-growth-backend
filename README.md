@@ -347,6 +347,34 @@ yarn cli:price-preload
 yarn cli:collateral-search-markets-v3
 ```
 
+### Local-only collateral discovery command
+
+`yarn cli:collateral-search-markets-v3` is a local-only utility command.
+
+Its purpose is to help a developer or operator manually inspect Compound v3 collateral market discovery results outside the normal application runtime.
+
+Intended use cases:
+
+- local investigation during development
+- one-off export of discovery output for review
+- manual comparison of collateral scan results while changing collateral logic
+
+This command is not part of the supported production execution flow:
+
+- it is not started by the API application
+- it is not started by the indexer application
+- it is not a cron-driven background job
+- it should not be used as a CI/CD step
+- it should not be treated as a persistent project dataset generator
+
+Current behavior:
+
+- it runs the compiled CLI entrypoint
+- it executes the `collateral:search-markets-v3` command
+- it writes the generated artifact to `collateral-markets-v3.json` in the current working directory
+
+The generated file is a local workspace artifact and is intentionally ignored by Git.
+
 CLI sources:
 
 - [`src/cli/README.md`](src/cli/README.md)

@@ -32,6 +32,36 @@ Examples:
 - [`price`](price)
 - [`collateral`](collateral)
 
+## Local-Only Commands
+
+Some CLI commands exist only to support local operator workflows and ad hoc investigation.
+
+Current local-only command:
+
+- `yarn cli:collateral-search-markets-v3`
+
+This command is intended only for manual local execution by a developer or operator who needs to inspect Compound v3 collateral market discovery output.
+
+Use it when you need to:
+
+- inspect the current collateral scan output during development
+- export a local snapshot for manual review
+- compare discovery results while adjusting collateral-related logic
+
+Do not treat this command as part of the normal backend runtime contract:
+
+- it is not used by the HTTP API
+- it is not used by the indexer process
+- it is not a scheduled production job
+- it is not intended for CI/CD pipelines
+- its generated artifacts are local workspace outputs, not source-of-truth project data
+
+The command currently writes a JSON artifact to the repository working directory:
+
+- `collateral-markets-v3.json`
+
+That file is intentionally ignored by Git because it is a local export artifact.
+
 ## Project Pattern
 
 Each CLI command is split into three layers:

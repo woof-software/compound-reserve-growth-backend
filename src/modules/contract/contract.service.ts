@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { ethers } from 'ethers';
 import { MulticallProvider } from 'ethers-multicall-provider';
 
@@ -24,6 +25,7 @@ import Bytes32TokenABI from './abi/Bytes32TokenABI.json';
 import { MarketData, RootJson } from './contract.type';
 import { ResponseStatsAlgorithm } from './interface';
 
+import type { ContractConfig } from 'config/contract';
 import { SEC_IN_MS } from '@/common/constants';
 import { Algorithm } from '@/common/enum/algorithm.enum';
 import { calculateTimeRange } from '@/common/utils/calculate-time-range';
@@ -31,19 +33,36 @@ import { calculateTimeRange } from '@/common/utils/calculate-time-range';
 @Injectable()
 export class ContractService {
   private readonly logger = new Logger(ContractService.name);
-  private readonly bytes32Tokens = new Set([
-    '0x89d24A6b4CcB1B6fAA2625fE562bDD9a23260359',
-    '0x9f8F72aA9304c8B593d555F12eF6589cC3A579A2',
-  ]);
+  private readonly bytes32Tokens: Set<string>;
+  private readonly cEthMarketAddress: string;
+  private readonly nativeTokenAddress: string;
 
   constructor(
+    private readonly configService: ConfigService,
     private readonly providerFactory: ProviderFactory,
     private readonly blockService: BlockService,
     private readonly historyService: HistoryService,
     private readonly priceService: PriceService,
     private readonly algorithmService: AlgorithmService,
     private readonly mailService: MailService,
-  ) {}
+  ) {
+    const config = this.getConfig();
+    this.bytes32Tokens = new Set(config.bytes32Tokens);
+    this.cEthMarketAddress = config.cEthMarketAddress;
+    this.nativeTokenAddress = config.nativeTokenAddress;
+  }
+
+  private getConfig(): ContractConfig {
+    const bytes32Tokens = this.configService.getOrThrow<string[]>('contract.bytes32Tokens');
+    const cEthMarketAddress = this.configService.getOrThrow<string>('contract.cEthMarketAddress');
+    const nativeTokenAddress = this.configService.getOrThrow<string>('contract.nativeTokenAddress');
+
+    return {
+      bytes32Tokens,
+      cEthMarketAddress,
+      nativeTokenAddress,
+    };
+  }
 
   async readMarketData(root: RootJson, networkPath: string): Promise<MarketData> {
     const [networkKey] = networkPath.split('/');
@@ -179,10 +198,10 @@ export class ContractService {
 
   async getMarketV2UnderlyingToken(marketAddress: string, network: string) {
     try {
-      if (marketAddress === '0x4Ddc2D193948926D02f9B1fE9e1daa0718270ED5') {
+      if (marketAddress === this.cEthMarketAddress) {
         // NATIVE ETH
         return {
-          address: '0x0000000000000000000000000000000000000000',
+          address: this.nativeTokenAddress,
           symbol: 'ETH',
           decimals: 18,
         };
