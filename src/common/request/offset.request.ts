@@ -2,7 +2,7 @@ import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import { IsEnum, IsInt, IsOptional, IsString, Min } from 'class-validator';
 
-import { Order } from 'common/enum/order.enum';
+import { Order } from '@/common/enum/order.enum';
 
 export abstract class OffsetRequest {
   @ApiPropertyOptional({

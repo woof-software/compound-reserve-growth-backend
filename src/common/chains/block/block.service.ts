@@ -1,9 +1,10 @@
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Inject, Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { JsonRpcProvider } from 'ethers';
+import { ethers } from 'ethers';
 import type { Cache } from 'cache-manager';
 import type { Redis } from 'ioredis';
+import { MulticallProvider } from 'ethers-multicall-provider';
 
 import { ProviderFactory } from 'common/chains/network/provider.factory';
 import { NetworkService } from 'common/chains/network/network.service';
@@ -23,7 +24,7 @@ import {
   MINUTE_IN_SEC,
   SAFE_BLOCK_LAG_TIME_IN_SEC,
   SEC_IN_MS,
-} from '@app/common/constants';
+} from '@/common/constants';
 
 @Injectable()
 export class BlockService implements OnModuleInit {
@@ -81,7 +82,7 @@ export class BlockService implements OnModuleInit {
 
   async getCachedBlock(
     network: string,
-    provider: JsonRpcProvider,
+    provider: MulticallProvider<ethers.JsonRpcProvider>,
     blockNumber: number,
   ): Promise<{ blockNumber: number; timestamp: number; hash: string }> {
     const cachedBlock = await this.getBlockFromCache(network, blockNumber);
@@ -105,7 +106,7 @@ export class BlockService implements OnModuleInit {
 
   async findBlockByTimestamp(
     network: string,
-    provider: JsonRpcProvider,
+    provider: MulticallProvider<ethers.JsonRpcProvider>,
     targetTs: number,
     fromBlock = 0,
     toBlock?: number,
@@ -262,7 +263,7 @@ export class BlockService implements OnModuleInit {
 
   private async binarySearchWithCache(
     network: string,
-    provider: JsonRpcProvider,
+    provider: MulticallProvider<ethers.JsonRpcProvider>,
     targetTs: number,
     fromBlock: number,
     toBlock: number,
@@ -296,7 +297,7 @@ export class BlockService implements OnModuleInit {
   }
 
   private async findArbitrumBlockByTimestamp(
-    provider: JsonRpcProvider,
+    provider: MulticallProvider<ethers.JsonRpcProvider>,
     targetTs: number,
     fromBlock: number,
     toBlock: number,
@@ -352,7 +353,7 @@ export class BlockService implements OnModuleInit {
   }
 
   private async findScrollBlockByTimestamp(
-    provider: JsonRpcProvider,
+    provider: MulticallProvider<ethers.JsonRpcProvider>,
     targetTs: number,
     fromBlock: number,
     toBlock: number,
