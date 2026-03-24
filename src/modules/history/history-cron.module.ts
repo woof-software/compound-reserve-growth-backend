@@ -1,11 +1,11 @@
 import { Module } from '@nestjs/common';
-import { ScheduleModule } from '@nestjs/schedule';
 
 import { HistoryModule } from './history.module';
 import { HistoryGetCron } from './cron/history-get.cron';
+import { HistoryCollectionWorkerService } from './queue/history-collection-worker.service';
 
 @Module({
-  imports: [ScheduleModule.forRoot(), HistoryModule],
-  providers: [HistoryGetCron],
+  imports: [HistoryModule],
+  providers: [HistoryGetCron, HistoryCollectionWorkerService],
 })
 export class HistoryCronModule {}

@@ -20,6 +20,12 @@ export class SourceFullResponse {
   @ApiProperty({ example: 'cUSDCv3', nullable: true })
   public market: string;
 
+  @ApiProperty({ example: 18216242 })
+  public startBlock: number;
+
+  @ApiProperty({ example: 21246747, nullable: true })
+  public endBlock: number | null;
+
   @ApiProperty({ type: AssetResponse })
   public asset: AssetResponse;
 
@@ -29,6 +35,8 @@ export class SourceFullResponse {
     this.network = source.network;
     this.type = source.type;
     this.market = source.market;
+    this.startBlock = source.startBlock;
+    this.endBlock = source.endBlock ?? null;
     this.asset = new AssetResponse(source.asset);
   }
 }

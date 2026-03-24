@@ -1,6 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 
-import { Reserve } from 'modules/history/entities';
+import { ReserveEntity } from 'modules/history/entities';
 
 export class RevenueHistoryResponse {
   @ApiProperty({ example: 1 })
@@ -18,7 +18,7 @@ export class RevenueHistoryResponse {
   })
   public sId: number;
 
-  constructor(reserve: Reserve) {
+  constructor(reserve: ReserveEntity) {
     this.id = reserve.id;
     this.v = reserve.value;
     this.d = new Date(reserve.date).getTime() / 1000;

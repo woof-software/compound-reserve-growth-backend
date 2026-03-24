@@ -3,7 +3,7 @@ import { Column, Entity, ManyToOne, PrimaryGeneratedColumn } from 'typeorm';
 import { SourceEntity } from 'modules/source/source.entity';
 
 @Entity({ name: 'spends' })
-export class Spends {
+export class SpendsEntity {
   @PrimaryGeneratedColumn()
   public id: number;
 

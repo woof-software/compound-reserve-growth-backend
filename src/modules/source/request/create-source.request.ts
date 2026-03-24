@@ -3,7 +3,7 @@ import { IsNotEmpty, IsString, IsOptional, IsNumber, IsInt, IsEnum } from 'class
 
 import { SourceType } from 'modules/source/enum/source-type.enum';
 
-import { Algorithm } from '@app/common/enum/algorithm.enum';
+import { Algorithm } from '@/common/enum/algorithm.enum';
 
 export class CreateSourceRequest {
   @ApiProperty({ example: '0xabc123', description: 'Source address' })
@@ -34,7 +34,15 @@ export class CreateSourceRequest {
   @ApiProperty({ example: 19876543, description: 'Start block number' })
   @IsNotEmpty()
   @IsNumber()
-  public blockNumber: number;
+  public startBlock: number;
+
+  @ApiPropertyOptional({
+    example: 21246747,
+    description: 'End block number (optional)',
+  })
+  @IsOptional()
+  @IsNumber()
+  public endBlock?: number;
 
   @ApiPropertyOptional({ example: 'cUSDCv3', description: 'Market name' })
   @IsOptional()

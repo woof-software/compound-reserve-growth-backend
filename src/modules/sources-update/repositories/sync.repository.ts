@@ -32,7 +32,16 @@ export class SyncRepository {
     }
   }
 
+  /** Only active assets (deletedAt IS NULL). Use for read paths that must hide soft-deleted. */
   public async listAllAssets(manager: EntityManager): Promise<AssetEntity[]> {
+    return manager.getRepository(AssetEntity).find({
+      where: { deletedAt: null },
+      order: { id: 'ASC' },
+    });
+  }
+
+  /** All assets including soft-deleted. Use only in sync to match remote id and allow restore. */
+  public async listAllAssetsIncludingDeleted(manager: EntityManager): Promise<AssetEntity[]> {
     return manager.getRepository(AssetEntity).find({ order: { id: 'ASC' } });
   }
 
@@ -42,10 +51,28 @@ export class SyncRepository {
 
   public async deleteAssetsByIds(ids: number[], manager: EntityManager): Promise<void> {
     if (!ids.length) return;
-    await manager.getRepository(AssetEntity).delete(ids);
+
+    await manager
+      .getRepository(AssetEntity)
+      .createQueryBuilder()
+      .update()
+      .set({ deletedAt: () => 'NOW()' })
+      .where('id IN (:...ids)', { ids })
+      .andWhere('deletedAt IS NULL')
+      .execute();
   }
 
+  /** Only active sources (deletedAt IS NULL). Use for read paths that must hide soft-deleted. */
   public async listAllSources(manager: EntityManager): Promise<SourceEntity[]> {
+    return manager.getRepository(SourceEntity).find({
+      where: { deletedAt: null },
+      relations: { asset: true },
+      order: { id: 'ASC' },
+    });
+  }
+
+  /** All sources including soft-deleted. Use only in sync to match remote id and allow restore. */
+  public async listAllSourcesIncludingDeleted(manager: EntityManager): Promise<SourceEntity[]> {
     return manager.getRepository(SourceEntity).find({
       relations: { asset: true },
       order: { id: 'ASC' },
@@ -61,6 +88,14 @@ export class SyncRepository {
 
   public async deleteSourcesByIds(ids: number[], manager: EntityManager): Promise<void> {
     if (!ids.length) return;
-    await manager.getRepository(SourceEntity).delete(ids);
+
+    await manager
+      .getRepository(SourceEntity)
+      .createQueryBuilder()
+      .update()
+      .set({ deletedAt: () => 'NOW()' })
+      .where('id IN (:...ids)', { ids })
+      .andWhere('deletedAt IS NULL')
+      .execute();
   }
 }

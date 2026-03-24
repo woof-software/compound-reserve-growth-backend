@@ -11,11 +11,11 @@ export class AssetRepository {
   ) {}
 
   async findById(id: number): Promise<AssetEntity> {
-    return this.repository.findOne({ where: { id } });
+    return this.repository.findOne({ where: { id, deletedAt: null } });
   }
 
   async findByAddressAndNetwork(address: string, network: string): Promise<AssetEntity> {
-    return this.repository.findOne({ where: { address, network } });
+    return this.repository.findOne({ where: { address, network, deletedAt: null } });
   }
 
   async save(asset: AssetEntity): Promise<AssetEntity> {
@@ -23,6 +23,6 @@ export class AssetRepository {
   }
 
   async list(): Promise<AssetEntity[]> {
-    return this.repository.find({ order: { id: 'ASC' } });
+    return this.repository.find({ where: { deletedAt: null }, order: { id: 'ASC' } });
   }
 }

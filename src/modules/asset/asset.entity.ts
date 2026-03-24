@@ -28,6 +28,9 @@ export class AssetEntity implements Asset {
   @Column()
   public createdAt: Date;
 
+  @Column({ nullable: true })
+  public deletedAt?: Date;
+
   @OneToMany(() => SourceEntity, (sources) => sources.asset)
   public sources: SourceEntity[];
 
@@ -41,5 +44,6 @@ export class AssetEntity implements Asset {
     this.network = network;
     this.type = type;
     this.createdAt = new Date();
+    this.deletedAt = null;
   }
 }

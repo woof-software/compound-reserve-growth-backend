@@ -5,7 +5,6 @@ import { Repository } from 'typeorm';
 import { Algorithm } from 'common/enum/algorithm.enum';
 
 import { SourceEntity } from './source.entity';
-import { FindSourceDto } from './dto/find-source.dto';
 
 @Injectable()
 export class SourceRepository {
@@ -15,32 +14,18 @@ export class SourceRepository {
   ) {}
 
   async findById(id: number): Promise<SourceEntity> {
-    return this.sourceRepository.findOne({ where: { id }, relations: { asset: true } });
-  }
-
-  async findByAddress(address: string): Promise<SourceEntity> {
-    return this.sourceRepository.findOne({ where: { address } });
-  }
-  async findByAddressNetworkAndType(dto: FindSourceDto): Promise<SourceEntity> {
     return this.sourceRepository.findOne({
-      where: { address: dto.address, network: dto.network, type: dto.type },
+      where: { id, deletedAt: null },
+      relations: { asset: true },
     });
   }
 
   async list(): Promise<SourceEntity[]> {
     return this.sourceRepository.find({
+      where: { deletedAt: null },
       relations: { asset: true },
       order: { id: 'ASC' },
     });
-  }
-
-  async save(source: SourceEntity): Promise<SourceEntity> {
-    return this.sourceRepository.save(source);
-  }
-
-  async update(source: SourceEntity): Promise<SourceEntity> {
-    source.checkedAt = new Date();
-    return this.sourceRepository.save(source);
   }
 
   async listByAlgorithms(algorithms: Algorithm[]): Promise<SourceEntity[]> {
@@ -49,7 +34,8 @@ export class SourceRepository {
     return this.sourceRepository
       .createQueryBuilder('source')
       .leftJoinAndSelect('source.asset', 'asset')
-      .where('source.algorithm && :algorithms::text[]', {
+      .where('source.deletedAt IS NULL')
+      .andWhere('source.algorithm && :algorithms::text[]', {
         algorithms: algorithmsArrayLiteral,
       })
       .orderBy('source.id', 'ASC')

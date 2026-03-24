@@ -3,7 +3,8 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 
 import { AssetEntity } from 'modules/asset/asset.entity';
 import { SourceEntity } from 'modules/source/source.entity';
-import { NetworkModule } from 'modules/network/network.module';
+
+import { NetworkModule } from 'common/chains/network/network.module';
 
 import { SyncRepository } from './repositories/sync.repository';
 import { SourcesUpdateService } from './sources-update.service';
