@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { ethers } from 'ethers';
 import { MulticallProvider } from 'ethers-multicall-provider';
 
@@ -24,6 +25,7 @@ import Bytes32TokenABI from './abi/Bytes32TokenABI.json';
 import { MarketData, RootJson } from './contract.type';
 import { ResponseStatsAlgorithm } from './interface';
 
+import type { ContractConfig } from 'config/contract';
 import { SEC_IN_MS } from '@/common/constants';
 import { Algorithm } from '@/common/enum/algorithm.enum';
 import { calculateTimeRange } from '@/common/utils/calculate-time-range';
@@ -31,15 +33,36 @@ import { calculateTimeRange } from '@/common/utils/calculate-time-range';
 @Injectable()
 export class ContractService {
   private readonly logger = new Logger(ContractService.name);
+  private readonly bytes32Tokens: Set<string>;
+  private readonly cEthMarketAddress: string;
+  private readonly nativeTokenAddress: string;
 
   constructor(
+    private readonly configService: ConfigService,
     private readonly providerFactory: ProviderFactory,
     private readonly blockService: BlockService,
     private readonly historyService: HistoryService,
     private readonly priceService: PriceService,
     private readonly algorithmService: AlgorithmService,
     private readonly mailService: MailService,
-  ) {}
+  ) {
+    const config = this.getConfig();
+    this.bytes32Tokens = new Set(config.bytes32Tokens);
+    this.cEthMarketAddress = config.cEthMarketAddress;
+    this.nativeTokenAddress = config.nativeTokenAddress;
+  }
+
+  private getConfig(): ContractConfig {
+    const bytes32Tokens = this.configService.getOrThrow<string[]>('contract.bytes32Tokens');
+    const cEthMarketAddress = this.configService.getOrThrow<string>('contract.cEthMarketAddress');
+    const nativeTokenAddress = this.configService.getOrThrow<string>('contract.nativeTokenAddress');
+
+    return {
+      bytes32Tokens,
+      cEthMarketAddress,
+      nativeTokenAddress,
+    };
+  }
 
   async readMarketData(root: RootJson, networkPath: string): Promise<MarketData> {
     const [networkKey] = networkPath.split('/');
@@ -161,11 +184,7 @@ export class ContractService {
       const cometContract = new ethers.Contract(cometAddress, CometABI, provider) as any;
 
       const tokenAddress = await cometContract.baseToken({ blockTag });
-
-      const tokenContract = new ethers.Contract(tokenAddress, ERC20ABI, provider) as any;
-
-      const symbol = await tokenContract.symbol({ blockTag });
-      const decimals = await tokenContract.decimals({ blockTag });
+      const { symbol, decimals } = await this.getTokenMetadata(tokenAddress, network, blockTag);
 
       return { address: tokenAddress, symbol, decimals };
     } catch (error) {
@@ -179,10 +198,10 @@ export class ContractService {
 
   async getMarketV2UnderlyingToken(marketAddress: string, network: string) {
     try {
-      if (marketAddress === '0x4Ddc2D193948926D02f9B1fE9e1daa0718270ED5') {
+      if (marketAddress === this.cEthMarketAddress) {
         // NATIVE ETH
         return {
-          address: '0x0000000000000000000000000000000000000000',
+          address: this.nativeTokenAddress,
           symbol: 'ETH',
           decimals: 18,
         };
@@ -194,23 +213,7 @@ export class ContractService {
       const marketContract = new ethers.Contract(marketAddress, MarketV2ABI, provider) as any;
 
       const tokenAddress = await marketContract.underlying({ blockTag });
-
-      const bytes32Tokens = [
-        '0x89d24A6b4CcB1B6fAA2625fE562bDD9a23260359',
-        '0x9f8F72aA9304c8B593d555F12eF6589cC3A579A2',
-      ];
-
-      const tokenABI = bytes32Tokens.includes(tokenAddress) ? Bytes32TokenABI : ERC20ABI;
-
-      const tokenContract = new ethers.Contract(tokenAddress, tokenABI, provider) as any;
-
-      const rawSymbol = await tokenContract.symbol({ blockTag });
-
-      const symbol = bytes32Tokens.includes(tokenAddress)
-        ? ethers.toUtf8String(rawSymbol).replace(/\u0000/g, '')
-        : rawSymbol;
-
-      const decimals = await tokenContract.decimals({ blockTag });
+      const { symbol, decimals } = await this.getTokenMetadata(tokenAddress, network, blockTag);
 
       return { address: tokenAddress, symbol, decimals };
     } catch (error) {
@@ -220,6 +223,33 @@ export class ContractService {
       );
       throw error;
     }
+  }
+
+  async getTokenMetadata(
+    tokenAddress: string,
+    network: string,
+    blockTag?: number,
+  ): Promise<{ symbol: string; decimals: number }> {
+    const provider = this.providerFactory.multicall(network);
+    const resolvedBlockTag =
+      typeof blockTag === 'number' ? blockTag : await this.blockService.getSafeBlockNumber(network);
+    const isBytes32Token = this.bytes32Tokens.has(tokenAddress);
+    const tokenABI = isBytes32Token ? Bytes32TokenABI : ERC20ABI;
+    const tokenContract = new ethers.Contract(tokenAddress, tokenABI, provider);
+
+    const [rawSymbol, decimalsRaw] = await Promise.all([
+      tokenContract.symbol({ blockTag: resolvedBlockTag }),
+      tokenContract.decimals({ blockTag: resolvedBlockTag }),
+    ]);
+
+    const symbol = isBytes32Token
+      ? ethers.toUtf8String(rawSymbol).replace(/\u0000/g, '')
+      : rawSymbol;
+
+    return {
+      symbol,
+      decimals: Number(decimalsRaw),
+    };
   }
 
   async getRewardsCompToken(
@@ -244,6 +274,9 @@ export class ContractService {
     for (const alg of algorithm) {
       switch (alg) {
         case Algorithm.COMET:
+          await this.saveReserves(source, alg);
+          break;
+        case Algorithm.COMET_COLLATERAL:
           await this.saveReserves(source, alg);
           break;
         case Algorithm.MARKET_V2:
@@ -369,7 +402,10 @@ export class ContractService {
       let processedCount = 0;
       let skippedCount = 0;
 
-      const ABI = algorithm === Algorithm.COMET ? CometABI : MarketV2ABI;
+      const ABI =
+        algorithm === Algorithm.COMET || algorithm === Algorithm.COMET_COLLATERAL
+          ? CometABI
+          : MarketV2ABI;
 
       const contract = new ethers.Contract(contractAddress, ABI, provider) as any;
       const assetContract = new ethers.Contract(assetAddress, ERC20ABI, provider) as any;
@@ -391,6 +427,13 @@ export class ContractService {
             switch (algorithm) {
               case Algorithm.COMET:
                 reserves = await this.algorithmService.comet(contract, blockTag);
+                break;
+              case Algorithm.COMET_COLLATERAL:
+                reserves = await this.algorithmService.cometCollect(
+                  contract,
+                  assetAddress,
+                  blockTag,
+                );
                 break;
               case Algorithm.MARKET_V2:
                 reserves = await this.algorithmService.marketV2(contract, blockTag);
