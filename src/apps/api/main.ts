@@ -4,16 +4,18 @@ import { LogLevel, ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 
-import { AppModule } from './app.module';
-import { TAppConfig } from './config/app';
-import { Logger } from './infrastructure/logger';
+import { ApiAppModule } from './api-app.module';
+
+import { TAppConfig } from 'config/app';
+import { Logger } from 'infrastructure/logger';
 
 async function bootstrap() {
   const logLevel = (process.env.LOG_LEVEL?.split(',') || ['error']) as LogLevel[];
   const logger = new Logger();
   logger.setLogLevels(logLevel);
 
-  const app = await NestFactory.create(AppModule, { logger });
+  const app = await NestFactory.create(ApiAppModule, { logger });
+  app.enableShutdownHooks();
   const configService = app.get(ConfigService);
   const appConfig = configService.get<TAppConfig>('app');
 
@@ -30,9 +32,7 @@ async function bootstrap() {
       .build();
 
     const document = SwaggerModule.createDocument(app, config);
-    SwaggerModule.setup('api/docs', app, document);
 
-    // Middleware to prevent caching
     app.use('/api/docs', (req, res, next) => {
       res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
       res.setHeader('Pragma', 'no-cache');
@@ -49,7 +49,6 @@ async function bootstrap() {
   }
 
   app.useGlobalPipes(new ValidationPipe({ transform: true }));
-
   app.enableCors(appConfig.cors);
 
   await app.listen(appConfig.port, appConfig.host);
@@ -59,4 +58,9 @@ async function bootstrap() {
   );
 }
 
-bootstrap();
+bootstrap().catch((error: unknown) => {
+  const logger = new Logger();
+  const message = error instanceof Error ? error.message : String(error);
+  logger.error(`Failed to bootstrap API application: ${message}`);
+  process.exit(1);
+});

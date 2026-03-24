@@ -3,7 +3,7 @@ import { IsNotEmpty, IsString, IsOptional, IsNumber, IsInt, IsEnum } from 'class
 
 import { SourceType } from 'modules/source/enum/source-type.enum';
 
-import { Algorithm } from '@app/common/enum/algorithm.enum';
+import { Algorithm } from '@/common/enum/algorithm.enum';
 
 export class CreateSourceRequest {
   @ApiProperty({ example: '0xabc123', description: 'Source address' })

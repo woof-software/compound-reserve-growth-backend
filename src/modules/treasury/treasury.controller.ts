@@ -2,8 +2,8 @@ import { ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { Controller, Injectable, HttpStatus, HttpCode, Get } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 
-import { HistoryService } from 'modules/history/history.service';
 import { ReserveResponse } from 'modules/history/response/reserve.response';
+import { HistoryService } from 'modules/history/services/history.service';
 
 @Injectable()
 @Controller('treasury')

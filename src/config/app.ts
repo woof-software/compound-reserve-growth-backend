@@ -13,6 +13,7 @@ export type TAppConfig = {
   logLevel: string;
   emailTo: string;
   cron: string;
+  indexerChildProcessEnabled: boolean;
 };
 
 export default (): { app: TAppConfig } => {
@@ -36,6 +37,7 @@ export default (): { app: TAppConfig } => {
         process.env.EMAIL_TO ||
         'dmitriy@woof.software,stas.b@woof.software,stanislav.k@woof.software',
       cron: process.env.CRON || '2 12 * * *', // Every day at 12:02 UTC
+      indexerChildProcessEnabled: process.env.INDEXER_CHILD_PROCESS_ENABLED !== 'false',
     },
   };
 };

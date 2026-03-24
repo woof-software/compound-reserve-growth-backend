@@ -3,7 +3,7 @@ import { ethers } from 'ethers';
 import { MulticallProvider } from 'ethers-multicall-provider';
 
 import { IncomesEntity, ReserveEntity, SpendsEntity } from 'modules/history/entities';
-import { HistoryService } from 'modules/history/history.service';
+import { HistoryService } from 'modules/history/services/history.service';
 import { SourceEntity } from 'modules/source/source.entity';
 import { PriceService } from 'modules/price/price.service';
 import { MailService } from 'modules/mail/mail.service';
@@ -24,8 +24,8 @@ import Bytes32TokenABI from './abi/Bytes32TokenABI.json';
 import { MarketData, RootJson } from './contract.type';
 import { ResponseStatsAlgorithm } from './interface';
 
-import { SEC_IN_MS } from '@app/common/constants';
-import { Algorithm } from '@app/common/enum/algorithm.enum';
+import { SEC_IN_MS } from '@/common/constants';
+import { Algorithm } from '@/common/enum/algorithm.enum';
 import { calculateTimeRange } from '@/common/utils/calculate-time-range';
 
 @Injectable()

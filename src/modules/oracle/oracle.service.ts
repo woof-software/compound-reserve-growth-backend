@@ -6,6 +6,7 @@ import CapoABI from 'modules/capo/abi/ERC4626CorrelatedAssetsPriceOracle.json';
 import { ProviderFactory } from 'common/chains/network/provider.factory';
 
 import { Oracle } from './oracle.entity';
+import { OracleRepository } from './repositories/oracle.repository';
 
 import { OracleData } from '@/common/types/oracle-data';
 import { CapoValues } from '@/common/types/capo-values';
@@ -14,7 +15,18 @@ import { CapoValues } from '@/common/types/capo-values';
 export class OracleService {
   private readonly logger = new Logger(OracleService.name);
 
-  constructor(private readonly providerFactory: ProviderFactory) {}
+  constructor(
+    private readonly providerFactory: ProviderFactory,
+    private readonly oracleRepository: OracleRepository,
+  ) {}
+
+  async listActive(): Promise<Oracle[]> {
+    return this.oracleRepository.listActive();
+  }
+
+  async findByAddressWithAsset(address: string): Promise<Oracle | null> {
+    return this.oracleRepository.findByAddressWithAsset(address);
+  }
 
   /**
    * Reads oracle state at a specific block so all fields are consistent and less sensitive to reorgs.
