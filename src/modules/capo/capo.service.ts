@@ -110,8 +110,10 @@ export class CapoService {
       });
 
       await this.snapshotRepository.save(snapshot);
-      await this.checkAlerts(oracle, data, capoValues);
-      await this.check24hPriceGrowth(oracle, data);
+      await Promise.all([
+        this.checkAlerts(oracle, data, capoValues),
+        this.check24hPriceGrowth(oracle, data),
+      ]);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       this.logger.error(

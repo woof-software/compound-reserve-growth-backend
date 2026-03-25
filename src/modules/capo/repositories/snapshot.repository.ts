@@ -30,9 +30,11 @@ export class SnapshotRepository {
   async findLatestBefore(oracleAddress: string, time: Date): Promise<Snapshot | null> {
     return this.repository
       .createQueryBuilder('snapshot')
+      .select(['snapshot.id', 'snapshot.price', 'snapshot.timestamp'])
       .where('snapshot.oracleAddress = :address', { address: oracleAddress })
       .andWhere('snapshot.timestamp <= :time', { time })
       .orderBy('snapshot.timestamp', 'DESC')
+      .limit(1)
       .getOne();
   }
 }
