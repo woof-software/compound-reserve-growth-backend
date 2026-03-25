@@ -279,7 +279,7 @@ export class CapoService {
     }
   }
 
-  @Cron('0 */3 * * * *')
+  @Cron('0 */15 * * * *')
   async aggregateDailyData() {
     if (this.isAggregating) {
       this.logger.warn('Daily aggregation is already in progress, skipping this run');
