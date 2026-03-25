@@ -21,6 +21,7 @@ export class CapoService {
   private readonly logger = new Logger(CapoService.name);
 
   private isCollecting = false;
+  private isAggregating = false;
 
   constructor(
     private readonly snapshotRepository: SnapshotRepository,
@@ -278,160 +279,85 @@ export class CapoService {
     }
   }
 
-  @Cron('0 */3 * * * *')
+  @Cron('0 */15 * * * *')
   async aggregateDailyData() {
-    this.logger.log('Starting daily aggregation...');
-
-    const provider = this.providerFactory.get('mainnet');
-    const latestBlock = await provider.getBlock('latest');
-    const chainNow = new Date(latestBlock.timestamp * 1000);
-    const systemNow = new Date();
-
-    this.logger.log(
-      `System time: ${systemNow.toISOString()}, Chain time: ${chainNow.toISOString()}`,
-    );
-
-    const latestSnapshot = await this.snapshotRepository.findLatest();
-
-    if (!latestSnapshot) {
-      this.logger.log('No snapshots found to aggregate');
+    if (this.isAggregating) {
+      this.logger.warn('Daily aggregation is already in progress, skipping this run');
       return;
     }
 
-    const latestSnapshotDate = new Date(latestSnapshot.timestamp);
-    this.logger.log(`Latest snapshot date: ${latestSnapshotDate.toISOString()}`);
+    this.isAggregating = true;
 
-    const startDate = new Date(
-      Date.UTC(
-        latestSnapshotDate.getUTCFullYear(),
-        latestSnapshotDate.getUTCMonth(),
-        latestSnapshotDate.getUTCDate(),
-        0,
-        0,
-        0,
-        0,
-      ),
-    );
+    try {
+      this.logger.log('Starting daily aggregation...');
 
-    const endDate = new Date(
-      Date.UTC(
-        latestSnapshotDate.getUTCFullYear(),
-        latestSnapshotDate.getUTCMonth(),
-        latestSnapshotDate.getUTCDate() + 1,
-        0,
-        0,
-        0,
-        0,
-      ),
-    );
+      const provider = this.providerFactory.get('mainnet');
+      const [latestBlock, latestSnapshot] = await Promise.all([
+        provider.getBlock('latest'),
+        this.snapshotRepository.findLatest(),
+      ]);
 
-    this.logger.log(
-      `Aggregating data for date range: ${startDate.toISOString()} to ${endDate.toISOString()}`,
-    );
-
-    const results = await this.aggregationRepository.getStatsForRange(startDate, endDate);
-
-    this.logger.log(`Found ${results.length} oracles with data for aggregation`);
-
-    for (const row of results) {
-      try {
-        const oracle = await this.oracleService.findByAddressWithAsset(row.oracleAddress);
-        if (!oracle?.asset) {
-          this.logger.warn(`Oracle ${row.oracleAddress} was skipped - asset relation is missing`);
-          continue;
-        }
-
-        const latestOracleSnapshot = await this.snapshotRepository.findLatestForOracleInRange(
-          row.oracleAddress,
-          startDate,
-          endDate,
-        );
-
-        let maxCapPrice = null;
-        if (latestOracleSnapshot) {
-          try {
-            const currentTimestamp = Math.floor(chainNow.getTime() / 1000);
-            const timeDiff = Math.max(
-              0,
-              currentTimestamp - Number(latestOracleSnapshot.snapshotTimestamp),
-            );
-
-            const maxRatio = this.oracleService.calculateMaxRatio(
-              latestOracleSnapshot.snapshotRatio,
-              Number(latestOracleSnapshot.maxYearlyGrowthPercent),
-              timeDiff,
-            );
-
-            const currentRatio = BigInt(latestOracleSnapshot.ratio);
-            const currentPriceNum = parseFloat(latestOracleSnapshot.price);
-
-            if (currentRatio > 0n && currentPriceNum > 0) {
-              const maxCapPriceCalculated =
-                (Number(maxRatio) / Number(currentRatio)) * currentPriceNum;
-              maxCapPrice = maxCapPriceCalculated.toString();
-
-              this.logger.log(
-                `Oracle ${row.oracleAddress}: Max cap price calculated as ${maxCapPriceCalculated.toFixed(6)}`,
-              );
-            }
-          } catch (error) {
-            this.logger.error(
-              `Failed to calculate max cap price for oracle ${row.oracleAddress}:`,
-              error,
-            );
-          }
-        }
-
-        const existingAggregation = await this.aggregationRepository.findByOracleAndDate(
-          row.oracleAddress,
-          startDate,
-        );
-
-        let aggregation;
-        if (existingAggregation) {
-          Object.assign(existingAggregation, {
-            avgRatio: row.avgRatio,
-            minRatio: row.minRatio,
-            maxRatio: row.maxRatio,
-            avgPrice: row.avgPrice,
-            minPrice: row.minPrice,
-            maxPrice: row.maxPrice,
-            cap: maxCapPrice,
-            cappedCount: Number(row.cappedCount ?? 0),
-            totalCount: Number(row.totalCount ?? 0),
-            assetId: oracle.asset.id,
-          });
-          aggregation = existingAggregation;
-          this.logger.log(`Updating existing aggregation for oracle ${row.oracleAddress}`);
-        } else {
-          aggregation = this.aggregationRepository.create({
-            oracleAddress: row.oracleAddress,
-            oracleName: row.oracleName,
-            chainId: row.chainId,
-            date: startDate,
-            avgRatio: row.avgRatio,
-            minRatio: row.minRatio,
-            maxRatio: row.maxRatio,
-            avgPrice: row.avgPrice,
-            minPrice: row.minPrice,
-            maxPrice: row.maxPrice,
-            cap: maxCapPrice,
-            cappedCount: Number(row.cappedCount ?? 0),
-            totalCount: Number(row.totalCount ?? 0),
-            assetId: oracle.asset.id,
-          });
-          this.logger.log(`Creating new aggregation for oracle ${row.oracleAddress}`);
-        }
-
-        await this.aggregationRepository.save(aggregation);
-        this.logger.log(
-          `Saved aggregation for oracle ${row.oracleAddress} for date ${startDate.toISOString().split('T')[0]}`,
-        );
-      } catch (error) {
-        this.logger.error(`Failed to save aggregation for oracle ${row.oracleAddress}:`, error);
+      if (!latestBlock) {
+        this.logger.error('Latest block was not found for daily aggregation');
+        return;
       }
-    }
 
-    this.logger.log(`Daily aggregation complete. Processed ${results.length} oracles.`);
+      const chainNow = new Date(latestBlock.timestamp * 1000);
+      const systemNow = new Date();
+
+      this.logger.log(
+        `System time: ${systemNow.toISOString()}, Chain time: ${chainNow.toISOString()}`,
+      );
+
+      if (!latestSnapshot) {
+        this.logger.log('No snapshots found to aggregate');
+        return;
+      }
+
+      const latestSnapshotDate = new Date(latestSnapshot.timestamp);
+      const { startDate, endDate } = this.createAggregationDateRange(latestSnapshotDate);
+
+      this.logger.log(`Latest snapshot date: ${latestSnapshotDate.toISOString()}`);
+      this.logger.log(
+        `Aggregating data for date range: ${startDate.toISOString()} to ${endDate.toISOString()}`,
+      );
+
+      const result = await this.aggregationRepository.replaceForRange({
+        startDate,
+        endDate,
+        currentTimestamp: latestBlock.timestamp,
+      });
+
+      if (result.candidateCount === 0) {
+        this.logger.log('No daily aggregation rows found for the selected date range');
+        return;
+      }
+
+      if (result.skippedMissingAssetCount > 0) {
+        this.logger.warn(
+          `Skipped ${result.skippedMissingAssetCount} oracles because the asset relation is missing`,
+        );
+      }
+
+      this.logger.log(
+        `Daily aggregation complete. Processed ${result.candidateCount} oracles, saved ${result.savedCount}, skipped ${result.skippedMissingAssetCount}.`,
+      );
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.error(`Failed to complete daily aggregation: ${message}`);
+    } finally {
+      this.isAggregating = false;
+    }
+  }
+
+  private createAggregationDateRange(date: Date): { startDate: Date; endDate: Date } {
+    const startDate = new Date(
+      Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate(), 0, 0, 0, 0),
+    );
+    const endDate = new Date(
+      Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate() + 1, 0, 0, 0, 0),
+    );
+
+    return { startDate, endDate };
   }
 }

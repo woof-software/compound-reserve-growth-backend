@@ -21,6 +21,13 @@ This application runs background jobs without starting an HTTP server.
 - [`OracleDiscoveryModule`](../../modules/oracle/background/oracle-discovery.module.ts)
 - [`CapoBackgroundModule`](../../modules/capo/capo-background.module.ts)
 
+## Built-in Schedules
+
+- History processing uses the `CRON` environment variable.
+- Oracle discovery runs every 12 hours.
+- CAPO oracle data collection runs every minute.
+- CAPO daily aggregation runs every 15 minutes.
+
 ## Loaded Configuration
 
 The indexer root module loads only these config loaders:

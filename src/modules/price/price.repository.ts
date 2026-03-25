@@ -78,6 +78,23 @@ export class PriceRepository {
       .getMany();
   }
 
+  async findDateKeysBySymbolInDateRange(
+    symbol: string,
+    startDate: Date,
+    endDate: Date,
+  ): Promise<string[]> {
+    const rows = await this.priceRepository
+      .createQueryBuilder('price')
+      .select('price.date', 'date')
+      .where('price.symbol = :symbol', { symbol })
+      .andWhere('price.date >= :startDate', { startDate })
+      .andWhere('price.date <= :endDate', { endDate })
+      .orderBy('price.date', 'ASC')
+      .getRawMany<{ date: Date | string }>();
+
+    return rows.map((row) => new Date(row.date).toISOString().slice(0, 10));
+  }
+
   async findEarliestBySymbol(symbol: string): Promise<Price | null> {
     return this.priceRepository.findOne({
       where: { symbol },

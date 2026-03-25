@@ -149,7 +149,7 @@ export class DiscoveryService implements OnModuleInit {
     return this.discoverCapoOracles(cometDescriptors);
   }
 
-  @Cron(CronExpression.EVERY_4_HOURS)
+  @Cron(CronExpression.EVERY_12_HOURS)
   async scheduledSync(): Promise<void> {
     await this.syncFromSources();
   }

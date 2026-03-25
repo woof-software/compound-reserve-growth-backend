@@ -27,21 +27,6 @@ export class SnapshotRepository {
       .getOne();
   }
 
-  async findLatestForOracleInRange(
-    oracleAddress: string,
-    startDate: Date,
-    endDate: Date,
-  ): Promise<Snapshot | null> {
-    return this.repository
-      .createQueryBuilder('snapshot')
-      .where('snapshot.oracleAddress = :address', { address: oracleAddress })
-      .andWhere('snapshot.timestamp >= :startDate', { startDate })
-      .andWhere('snapshot.timestamp < :endDate', { endDate })
-      .orderBy('snapshot.timestamp', 'DESC')
-      .limit(1)
-      .getOne();
-  }
-
   async findLatestBefore(oracleAddress: string, time: Date): Promise<Snapshot | null> {
     return this.repository
       .createQueryBuilder('snapshot')

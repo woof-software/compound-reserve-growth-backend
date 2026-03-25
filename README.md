@@ -74,6 +74,13 @@ Main imported modules:
 - [`OracleDiscoveryModule`](src/modules/oracle/background/oracle-discovery.module.ts)
 - [`CapoBackgroundModule`](src/modules/capo/capo-background.module.ts)
 
+Built-in schedules in the indexer:
+
+- history processing uses the `CRON` environment variable
+- oracle discovery runs every 12 hours
+- CAPO oracle data collection runs every minute
+- CAPO daily aggregation runs every 15 minutes
+
 Loaded config modules:
 
 - [`src/config/app.ts`](src/config/app.ts)
