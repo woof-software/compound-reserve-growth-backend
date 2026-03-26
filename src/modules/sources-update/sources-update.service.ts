@@ -54,6 +54,12 @@ export class SourcesUpdateService {
         await this.persistAssetUpserts(assetPlan, dbState.assetById, manager);
         await this.persistSourceChanges(sourcePlan, manager);
         await this.persistAssetDeletes(assetPlan, manager);
+        if (assetPlan.inserts.length) {
+          await this.syncRepo.alignAssetIdSequence(manager);
+        }
+        if (sourcePlan.inserts.length) {
+          await this.syncRepo.alignSourceIdSequence(manager);
+        }
       });
       this.logger.log('Sources update completed.');
     } catch (err) {
@@ -160,7 +166,7 @@ export class SourcesUpdateService {
       this.logger.log(
         `Inserting ${toInsert.length} asset(s): ${this.formatAssetBatchLog(toInsert)}`,
       );
-      const saved = await this.syncRepo.saveAssets(toInsert, manager);
+      const saved = await this.syncRepo.insertAssetsWithIds(toInsert, manager);
       for (let i = 0; i < saved.length; i++) {
         assetPlan.remoteIdToAsset.set(assetPlan.inserts[i].remoteId, saved[i]);
         assetById.set(saved[i].id, saved[i]);
@@ -275,7 +281,7 @@ export class SourcesUpdateService {
       this.logger.log(
         `Inserting ${sourcePlan.inserts.length} source(s): ${this.formatSourceBatchLog(sourcePlan.inserts)}`,
       );
-      await this.syncRepo.saveSources(sourcePlan.inserts, manager);
+      await this.syncRepo.insertSourcesWithIds(sourcePlan.inserts, manager);
       this.logger.log(`Inserted ${sourcePlan.inserts.length} source(s)`);
     }
 

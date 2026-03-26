@@ -49,6 +49,48 @@ export class SyncRepository {
     return manager.getRepository(AssetEntity).save(assets);
   }
 
+  public async insertAssetsWithIds(
+    assets: AssetEntity[],
+    manager: EntityManager,
+  ): Promise<AssetEntity[]> {
+    if (!assets.length) return [];
+
+    return (await manager.query(
+      `
+        INSERT INTO "asset" (
+          "id",
+          "address",
+          "decimals",
+          "symbol",
+          "network",
+          "type",
+          "createdAt",
+          "deletedAt"
+        )
+        VALUES ${this.buildValuesClause(assets.length, 8)}
+        RETURNING
+          "id",
+          "address",
+          "decimals",
+          "symbol",
+          "network",
+          "type",
+          "createdAt",
+          "deletedAt"
+      `,
+      assets.flatMap((asset) => [
+        asset.id,
+        asset.address,
+        asset.decimals,
+        asset.symbol,
+        asset.network,
+        asset.type ?? null,
+        asset.createdAt,
+        asset.deletedAt ?? null,
+      ]),
+    )) as AssetEntity[];
+  }
+
   public async deleteAssetsByIds(ids: number[], manager: EntityManager): Promise<void> {
     if (!ids.length) return;
 
@@ -86,6 +128,46 @@ export class SyncRepository {
     return manager.getRepository(SourceEntity).save(sources);
   }
 
+  public async insertSourcesWithIds(
+    sources: SourceEntity[],
+    manager: EntityManager,
+  ): Promise<void> {
+    await manager.query(
+      `
+        INSERT INTO "source" (
+          "id",
+          "address",
+          "network",
+          "market",
+          "type",
+          "algorithm",
+          "startBlock",
+          "endBlock",
+          "createdAt",
+          "checkedAt",
+          "deletedAt",
+          "assetId"
+        )
+        VALUES ${this.buildValuesClause(sources.length, 12)}
+        RETURNING "id"
+      `,
+      sources.flatMap((source) => [
+        source.id,
+        source.address,
+        source.network,
+        source.market ?? null,
+        source.type ?? null,
+        source.algorithm,
+        source.startBlock,
+        source.endBlock ?? null,
+        source.createdAt,
+        source.checkedAt ?? null,
+        source.deletedAt ?? null,
+        source.asset.id,
+      ]),
+    );
+  }
+
   public async deleteSourcesByIds(ids: number[], manager: EntityManager): Promise<void> {
     if (!ids.length) return;
 
@@ -97,5 +179,38 @@ export class SyncRepository {
       .where('id IN (:...ids)', { ids })
       .andWhere('deletedAt IS NULL')
       .execute();
+  }
+
+  public async alignAssetIdSequence(manager: EntityManager): Promise<void> {
+    await this.alignSequence('asset', manager);
+  }
+
+  public async alignSourceIdSequence(manager: EntityManager): Promise<void> {
+    await this.alignSequence('source', manager);
+  }
+
+  private async alignSequence(tableName: string, manager: EntityManager): Promise<void> {
+    await manager.query(
+      `
+        SELECT setval(
+          pg_get_serial_sequence($1, 'id'),
+          COALESCE((SELECT MAX(id) FROM "${tableName}"), 0),
+          COALESCE((SELECT MAX(id) IS NOT NULL FROM "${tableName}"), false)
+        )
+      `,
+      [tableName],
+    );
+  }
+
+  private buildValuesClause(rowCount: number, columnCount: number): string {
+    return Array.from({ length: rowCount }, (_, rowIndex) => {
+      const start = rowIndex * columnCount;
+      const placeholders = Array.from(
+        { length: columnCount },
+        (_, columnIndex) => `$${start + columnIndex + 1}`,
+      );
+
+      return `(${placeholders.join(', ')})`;
+    }).join(', ');
   }
 }
