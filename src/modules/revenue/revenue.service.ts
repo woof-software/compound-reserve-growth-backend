@@ -20,12 +20,13 @@ export class RevenueService {
     @Inject(REDIS_CLIENT) private readonly redisClient: Redis,
   ) {}
 
-  async rebuildHistory(): Promise<void> {
-    const rebuiltCount = await this.revenueRepository.rebuildAll();
-    const invalidatedCacheKeys = await this.clearHistoryCache();
+  async rebuildHistory(clearData = false): Promise<void> {
+    const { deletedCount, insertedCount } = await this.revenueRepository.syncHistory(clearData);
+    const invalidatedCacheKeys =
+      deletedCount > 0 || insertedCount > 0 ? await this.clearHistoryCache() : 0;
 
     this.logger.log(
-      `Revenue history rebuild completed rows=${rebuiltCount} invalidatedCacheKeys=${invalidatedCacheKeys}`,
+      `Revenue history sync completed deletedRows=${deletedCount} insertedRows=${insertedCount} invalidatedCacheKeys=${invalidatedCacheKeys}`,
     );
   }
 

@@ -121,7 +121,7 @@ export class HistoryProcessingService {
         }
       }
 
-      await this.revenueService.rebuildHistory();
+      await this.revenueService.rebuildHistory(collectionSwitch?.clearData);
       this.logger.log('Reserves processing completed.');
     });
   }
