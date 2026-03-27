@@ -289,9 +289,8 @@ export class DiscoveryService implements OnModuleInit {
           }),
         );
       } catch (error: unknown) {
-        const message = error instanceof Error ? error.message : String(error);
-        this.logger.warn(
-          `Oracle does not expose CAPO growth data address=${oracleAddress} network=${network} blockTag=${blockTag} error=${message}`,
+        this.logger.debug(
+          `Address is not a CAPO oracle address=${oracleAddress} network=${network} blockTag=${blockTag}`,
         );
         return null;
       }
