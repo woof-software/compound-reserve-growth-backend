@@ -49,6 +49,11 @@ export class SyncRepository {
     return manager.getRepository(AssetEntity).save(assets);
   }
 
+  /**
+   * Added for source sync because remote asset ids are authoritative.
+   * TypeORM `save()` skips explicit values for generated primary keys on insert,
+   * so we insert raw SQL with `id` included to keep DB ids aligned with remote ids.
+   */
   public async insertAssetsWithIds(
     assets: AssetEntity[],
     manager: EntityManager,
@@ -128,6 +133,11 @@ export class SyncRepository {
     return manager.getRepository(SourceEntity).save(sources);
   }
 
+  /**
+   * Added for source sync for the same reason as assets:
+   * new sources must keep remote ids, otherwise later syncs cannot match
+   * remote records back to the local DB by id.
+   */
   public async insertSourcesWithIds(
     sources: SourceEntity[],
     manager: EntityManager,
@@ -181,10 +191,18 @@ export class SyncRepository {
       .execute();
   }
 
+  /**
+   * Added to repair PostgreSQL sequence drift after explicit-id inserts.
+   * Without this, later auto-generated inserts can reuse an existing primary key.
+   */
   public async alignAssetIdSequence(manager: EntityManager): Promise<void> {
     await this.alignSequence('asset', manager);
   }
 
+  /**
+   * Added to repair PostgreSQL sequence drift after explicit-id inserts.
+   * Without this, later auto-generated inserts can reuse an existing primary key.
+   */
   public async alignSourceIdSequence(manager: EntityManager): Promise<void> {
     await this.alignSequence('source', manager);
   }
