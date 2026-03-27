@@ -77,12 +77,16 @@ export class RevenueRepository {
     ].join(',')}}`;
 
     return this.inTransaction(async (manager) => {
-      const deletedCount = clearData
+      const staleDeletedCount = clearData
         ? await this.clearAll(manager)
         : await this.deleteStaleHistory(revenueAlgorithms, manager);
-      const insertedCount = await this.insertMissingHistory(revenueAlgorithms, manager);
+      const { deletedCount: rebuiltTailDeletedCount, insertedCount } =
+        await this.insertMissingHistory(revenueAlgorithms, manager);
 
-      return { deletedCount, insertedCount };
+      return {
+        deletedCount: staleDeletedCount + rebuiltTailDeletedCount,
+        insertedCount,
+      };
     });
   }
 
@@ -148,8 +152,11 @@ export class RevenueRepository {
   private async insertMissingHistory(
     algorithmsArrayLiteral: string,
     manager: EntityManager,
-  ): Promise<number> {
-    const insertedRows = (await manager.query(
+  ): Promise<{
+    deletedCount: number;
+    insertedCount: number;
+  }> {
+    const result = (await manager.query(
       `
         WITH "filtered_sources" AS (
           SELECT s."id", s."assetId"
@@ -160,7 +167,6 @@ export class RevenueRepository {
         "source_checkpoints" AS (
           SELECT DISTINCT ON (r."sourceId")
             r."sourceId" AS "sourceId",
-            r."reserveId" AS "checkpointReserveId",
             r."date" AS "checkpointDate"
           FROM "revenue" r
           INNER JOIN "filtered_sources" fs ON fs."id" = r."sourceId"
@@ -169,29 +175,74 @@ export class RevenueRepository {
             r."date" DESC,
             r."reserveId" DESC
         ),
-        "candidate_reserves" AS (
-          SELECT
+        "deleted_rows" AS (
+          DELETE FROM "revenue" rv
+          USING "source_checkpoints" sc
+          WHERE rv."sourceId" = sc."sourceId"
+            AND rv."date" >= sc."checkpointDate"
+          RETURNING rv."id"
+        ),
+        "daily_reserves" AS (
+          SELECT DISTINCT ON (r."sourceId", r."date")
             r."id" AS "reserveId",
             r."sourceId" AS "sourceId",
             r."blockNumber" AS "blockNumber",
             r."date" AS "date",
             r."price" AS "price",
             r."quantity"::numeric AS "quantity",
-            a."decimals" AS "decimals",
-            sc."checkpointReserveId" AS "checkpointReserveId"
+            a."decimals" AS "decimals"
           FROM "reserves" r
           INNER JOIN "filtered_sources" fs ON fs."id" = r."sourceId"
           INNER JOIN "asset" a ON a."id" = fs."assetId"
-          LEFT JOIN "source_checkpoints" sc ON sc."sourceId" = r."sourceId"
-          WHERE sc."checkpointReserveId" IS NULL
-            OR r."id" = sc."checkpointReserveId"
-            OR (
-              sc."checkpointDate" IS NOT NULL
-              AND (
-                r."date" > sc."checkpointDate"
-                OR (r."date" = sc."checkpointDate" AND r."id" > sc."checkpointReserveId")
-              )
-            )
+          ORDER BY
+            r."sourceId" ASC,
+            r."date" ASC,
+            r."blockNumber" DESC,
+            r."id" DESC
+        ),
+        "lookback_reserves" AS (
+          SELECT DISTINCT ON (dr."sourceId")
+            dr."reserveId",
+            dr."sourceId",
+            dr."blockNumber",
+            dr."date",
+            dr."price",
+            dr."quantity",
+            dr."decimals",
+            TRUE AS "isLookback"
+          FROM "daily_reserves" dr
+          INNER JOIN "source_checkpoints" sc ON sc."sourceId" = dr."sourceId"
+          WHERE dr."date" < sc."checkpointDate"
+          ORDER BY
+            dr."sourceId" ASC,
+            dr."date" DESC,
+            dr."reserveId" DESC
+        ),
+        "candidate_reserves" AS (
+          SELECT
+            dr."reserveId",
+            dr."sourceId",
+            dr."blockNumber",
+            dr."date",
+            dr."price",
+            dr."quantity",
+            dr."decimals",
+            FALSE AS "isLookback"
+          FROM "daily_reserves" dr
+          LEFT JOIN "source_checkpoints" sc ON sc."sourceId" = dr."sourceId"
+          WHERE sc."checkpointDate" IS NULL
+            OR dr."date" >= sc."checkpointDate"
+          UNION ALL
+          SELECT
+            lr."reserveId",
+            lr."sourceId",
+            lr."blockNumber",
+            lr."date",
+            lr."price",
+            lr."quantity",
+            lr."decimals",
+            lr."isLookback"
+          FROM "lookback_reserves" lr
         ),
         "reserve_rows" AS (
           SELECT
@@ -202,7 +253,7 @@ export class RevenueRepository {
             cr."price",
             cr."quantity",
             cr."decimals",
-            cr."checkpointReserveId",
+            cr."isLookback",
             LAG(cr."quantity") OVER (
               PARTITION BY cr."sourceId"
               ORDER BY cr."date" ASC, cr."reserveId" ASC
@@ -225,42 +276,49 @@ export class RevenueRepository {
             ) AS "value",
             rr."date"
           FROM "reserve_rows" rr
-          WHERE rr."checkpointReserveId" IS NULL
-            OR rr."reserveId" <> rr."checkpointReserveId"
-        )
-        INSERT INTO "revenue" (
-          "reserveId",
-          "sourceId",
-          "blockNumber",
-          "quantityDelta",
-          "price",
-          "value",
-          "date",
-          "createdAt",
-          "updatedAt"
+          WHERE rr."isLookback" = FALSE
+        ),
+        "inserted_rows" AS (
+          INSERT INTO "revenue" (
+            "reserveId",
+            "sourceId",
+            "blockNumber",
+            "quantityDelta",
+            "price",
+            "value",
+            "date",
+            "createdAt",
+            "updatedAt"
+          )
+          SELECT
+            ir."reserveId",
+            ir."sourceId",
+            ir."blockNumber",
+            ir."quantityDelta",
+            ir."price",
+            ir."value",
+            ir."date",
+            NOW(),
+            NOW()
+          FROM "insert_rows" ir
+          ORDER BY
+            ir."date" ASC,
+            ir."sourceId" ASC,
+            ir."reserveId" ASC
+          ON CONFLICT ("reserveId") DO NOTHING
+          RETURNING "id"
         )
         SELECT
-          ir."reserveId",
-          ir."sourceId",
-          ir."blockNumber",
-          ir."quantityDelta",
-          ir."price",
-          ir."value",
-          ir."date",
-          NOW(),
-          NOW()
-        FROM "insert_rows" ir
-        ORDER BY
-          ir."date" ASC,
-          ir."sourceId" ASC,
-          ir."reserveId" ASC
-        ON CONFLICT ("reserveId") DO NOTHING
-        RETURNING "id"
+          COALESCE((SELECT COUNT(*)::int FROM "deleted_rows"), 0) AS "deletedCount",
+          COALESCE((SELECT COUNT(*)::int FROM "inserted_rows"), 0) AS "insertedCount"
       `,
       [algorithmsArrayLiteral],
-    )) as Array<{ id: number }>;
+    )) as Array<{ deletedCount: number; insertedCount: number }>;
 
-    return insertedRows.length;
+    return {
+      deletedCount: Number(result[0]?.deletedCount ?? 0),
+      insertedCount: Number(result[0]?.insertedCount ?? 0),
+    };
   }
 
   private createRevenueQuery(withAsset: boolean): SelectQueryBuilder<RevenueEntity> {
