@@ -193,4 +193,20 @@ describe('SyncRepository', () => {
     expect(sourceRepo.createQueryBuilder).not.toHaveBeenCalled();
     expect(assetRepo.createQueryBuilder).not.toHaveBeenCalled();
   });
+
+  it('skips source insert query when sources list is empty', async () => {
+    const manager = {
+      query: jest.fn(),
+    };
+
+    const dataSource = {
+      createQueryRunner: jest.fn(),
+    } as unknown as DataSource;
+
+    const repo = new SyncRepository(dataSource);
+
+    await expect(repo.insertSourcesWithIds([], manager as never)).resolves.toBeUndefined();
+
+    expect(manager.query).not.toHaveBeenCalled();
+  });
 });
