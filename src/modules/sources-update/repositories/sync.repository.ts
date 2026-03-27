@@ -142,6 +142,8 @@ export class SyncRepository {
     sources: SourceEntity[],
     manager: EntityManager,
   ): Promise<void> {
+    if (!sources.length) return;
+
     await manager.query(
       `
         INSERT INTO "source" (

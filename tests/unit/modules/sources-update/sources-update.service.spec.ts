@@ -85,10 +85,14 @@ describe('SourcesUpdateService', () => {
       listAllAssetsIncludingDeleted: jest.fn(),
       listAllSources: jest.fn(),
       listAllSourcesIncludingDeleted: jest.fn(),
+      insertAssetsWithIds: jest.fn(),
+      insertSourcesWithIds: jest.fn(),
       saveAssets: jest.fn(),
       saveSources: jest.fn(),
       deleteSourcesByIds: jest.fn(),
       deleteAssetsByIds: jest.fn(),
+      alignAssetIdSequence: jest.fn(),
+      alignSourceIdSequence: jest.fn(),
     };
 
     const validationService = {
@@ -204,7 +208,11 @@ describe('SourcesUpdateService', () => {
       decimals: 8,
     });
 
-    syncRepo.saveAssets.mockResolvedValueOnce([insertedAsset]).mockResolvedValueOnce([dbAssetKeep]);
+    syncRepo.insertAssetsWithIds.mockResolvedValue([insertedAsset]);
+    syncRepo.insertSourcesWithIds.mockResolvedValue(undefined);
+    syncRepo.alignAssetIdSequence.mockResolvedValue(undefined);
+    syncRepo.alignSourceIdSequence.mockResolvedValue(undefined);
+    syncRepo.saveAssets.mockResolvedValue([dbAssetKeep]);
     syncRepo.saveSources.mockResolvedValue([]);
     syncRepo.deleteSourcesByIds.mockResolvedValue(undefined);
     syncRepo.deleteAssetsByIds.mockResolvedValue(undefined);
@@ -216,17 +224,21 @@ describe('SourcesUpdateService', () => {
       sourcesRaw: { raw: 'sources' },
     });
 
-    expect(syncRepo.saveAssets).toHaveBeenCalledTimes(2);
-    expect(syncRepo.saveSources).toHaveBeenCalledTimes(2);
+    expect(syncRepo.insertAssetsWithIds).toHaveBeenCalledTimes(1);
+    expect(syncRepo.saveAssets).toHaveBeenCalledTimes(1);
+    expect(syncRepo.insertSourcesWithIds).toHaveBeenCalledTimes(1);
+    expect(syncRepo.saveSources).toHaveBeenCalledTimes(1);
+    expect(syncRepo.alignAssetIdSequence).toHaveBeenCalledTimes(1);
+    expect(syncRepo.alignSourceIdSequence).toHaveBeenCalledTimes(1);
     expect(syncRepo.deleteSourcesByIds).toHaveBeenCalledWith([202], expect.anything());
     expect(syncRepo.deleteAssetsByIds).toHaveBeenCalledWith([102], expect.anything());
 
-    const insertedSources = syncRepo.saveSources.mock.calls[0][0] as SourceEntity[];
+    const insertedSources = syncRepo.insertSourcesWithIds.mock.calls[0][0] as SourceEntity[];
     expect(insertedSources).toHaveLength(1);
     expect(insertedSources[0].id).toBe(11);
     expect(insertedSources[0].asset.id).toBe(3);
 
-    const updatedSources = syncRepo.saveSources.mock.calls[1][0] as SourceEntity[];
+    const updatedSources = syncRepo.saveSources.mock.calls[0][0] as SourceEntity[];
     expect(updatedSources[0].id).toBe(10);
     expect(updatedSources[0].startBlock).toBe(12);
     expect(updatedSources[0].algorithm).toEqual([Algorithm.COMET_STATS, Algorithm.COMET]);
@@ -304,10 +316,10 @@ describe('SourcesUpdateService', () => {
     });
     syncRepo.listAllAssetsIncludingDeleted.mockResolvedValue([dbAsset]);
     syncRepo.listAllSourcesIncludingDeleted.mockResolvedValue([]);
-    syncRepo.saveAssets.mockResolvedValue([]);
+    syncRepo.insertAssetsWithIds.mockResolvedValue([]);
 
     const txError = new Error('saveSources failed');
-    syncRepo.saveSources.mockRejectedValue(txError);
+    syncRepo.insertSourcesWithIds.mockRejectedValue(txError);
 
     await expect(service.run()).rejects.toThrow('saveSources failed');
 
@@ -407,6 +419,8 @@ describe('SourcesUpdateService', () => {
     });
     syncRepo.listAllAssetsIncludingDeleted.mockResolvedValue([dbAssetStale]);
     syncRepo.listAllSourcesIncludingDeleted.mockResolvedValue([dbSourceStale]);
+    syncRepo.insertAssetsWithIds.mockResolvedValue([]);
+    syncRepo.insertSourcesWithIds.mockResolvedValue(undefined);
     syncRepo.saveAssets.mockResolvedValue([]);
     syncRepo.saveSources.mockResolvedValue([]);
     syncRepo.deleteSourcesByIds.mockResolvedValue(undefined);
