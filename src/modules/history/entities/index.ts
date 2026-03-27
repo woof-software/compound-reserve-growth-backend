@@ -2,4 +2,3 @@ export * from './reserve.entity';
 export * from './incomes.entity';
 export * from './spends.entity';
 export * from './stats-history';
-export * from './incentives-history';

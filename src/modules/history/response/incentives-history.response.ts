@@ -2,7 +2,7 @@ import { ApiProperty } from '@nestjs/swagger';
 import { Exclude, Expose } from 'class-transformer';
 import { IsInt, IsPositive } from 'class-validator';
 
-import { type IncentivesHistory } from 'modules/history/entities';
+import { IncentiveEntity } from 'modules/incentives/incentive.entity';
 
 @Exclude()
 export class IncentiveHistoryResponse {
@@ -34,12 +34,12 @@ export class IncentiveHistoryResponse {
   @ApiProperty({ example: 1750809600, description: 'd - date, timestamp in seconds' })
   d: number;
 
-  constructor(ih: IncentivesHistory) {
-    this.i = ih.incomes;
-    this.rs = ih.rewardsSupply;
-    this.rb = ih.rewardsBorrow;
-    this.sid = ih.sourceId;
-    this.pc = ih.priceComp;
-    this.d = Math.floor(ih.date.getTime() / 1000);
+  constructor(incentive: IncentiveEntity) {
+    this.i = incentive.incomes;
+    this.rs = incentive.rewardsSupply;
+    this.rb = incentive.rewardsBorrow;
+    this.sid = incentive.source.id;
+    this.pc = incentive.priceComp;
+    this.d = Math.floor(incentive.date.getTime() / 1000);
   }
 }

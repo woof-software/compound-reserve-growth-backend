@@ -1,39 +1,32 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 
 import { SourceRepository } from 'modules/source/source.repository';
 import { SourceEntity } from 'modules/source/source.entity';
+import { IncentiveEntity } from 'modules/incentives/incentive.entity';
+import { IncentivesQueryService } from 'modules/incentives/incentives-query.service';
 import { RevenueEntity } from 'modules/revenue/revenue.entity';
 import { RevenueService } from 'modules/revenue/revenue.service';
 import { CreateHistoryDto } from 'modules/history/dto/create-history.dto';
 import { OffsetDto } from 'modules/history/dto/offset.dto';
 import { PaginationDto } from 'modules/history/dto/pagination.dto';
-import {
-  IncentivesHistory,
-  IncomesEntity,
-  ReserveEntity,
-  SpendsEntity,
-  StatsHistory,
-} from 'modules/history/entities';
+import { IncomesEntity, ReserveEntity, SpendsEntity, StatsHistory } from 'modules/history/entities';
 import { IncomesRepository } from 'modules/history/repositories/incomes.repository';
 import { ReservesRepository } from 'modules/history/repositories/reserves.repository';
 import { SpendsRepository } from 'modules/history/repositories/spends.repository';
 
 import { OffsetDataDto } from '@/common/dto/offset-data.dto';
 import { PaginatedDataDto } from '@/common/dto/paginated-data.dto';
-import { Algorithm } from '@/common/enum/algorithm.enum';
-import { Order } from '@/common/enum/order.enum';
 import { generateDailyKey } from '@/common/utils/generate-daily-key';
 
 @Injectable()
 export class HistoryService {
-  private readonly logger = new Logger(HistoryService.name);
-
   constructor(
     private readonly reservesRepo: ReservesRepository,
     private readonly incomesRepo: IncomesRepository,
     private readonly spendsRepo: SpendsRepository,
     private readonly sourceRepo: SourceRepository,
     private readonly revenueService: RevenueService,
+    private readonly incentivesQueryService: IncentivesQueryService,
   ) {}
 
   async create(dto: CreateHistoryDto): Promise<ReserveEntity> {
@@ -194,57 +187,7 @@ export class HistoryService {
     );
   }
 
-  async getIncentiveHistory(dto: OffsetDto): Promise<OffsetDataDto<IncentivesHistory>> {
-    const allAlgorithms = [
-      Algorithm.COMET_STATS,
-      Algorithm.MARKET_V2,
-      Algorithm.AERA_COMPOUND_RESERVES,
-    ];
-
-    if (!dto.order) {
-      dto.order = Order.ASC;
-    }
-
-    const incentivesData = await this.reservesRepo.getOffsetIncentivesHistory(dto, allAlgorithms);
-
-    if (incentivesData.data.length === 0) {
-      return new OffsetDataDto<IncentivesHistory>(
-        [],
-        incentivesData.limit,
-        incentivesData.offset,
-        incentivesData.total,
-      );
-    }
-
-    const indexesWithoutPrice: number[] = [];
-    let firstPrice = 0;
-    let previousPrice = 0;
-    const data: IncentivesHistory[] = incentivesData.data.map((item, index) => {
-      if (!item.priceComp) {
-        this.logger.warn(`incentives -> priceComp not found for ${item.date}`, item);
-        if (previousPrice) {
-          item.priceComp = previousPrice;
-        } else {
-          indexesWithoutPrice.push(index);
-        }
-      } else {
-        firstPrice = firstPrice || item.priceComp;
-        previousPrice = item.priceComp;
-      }
-      return item;
-    });
-
-    if (firstPrice) {
-      indexesWithoutPrice.forEach((index) => {
-        data[index].priceComp = firstPrice;
-      });
-    }
-
-    return new OffsetDataDto<IncentivesHistory>(
-      data,
-      incentivesData.limit,
-      incentivesData.offset,
-      incentivesData.total,
-    );
+  async getIncentiveHistory(dto: OffsetDto): Promise<OffsetDataDto<IncentiveEntity>> {
+    return this.incentivesQueryService.getOffsetHistory(dto);
   }
 }

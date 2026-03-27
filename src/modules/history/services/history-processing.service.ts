@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 
 import { ContractService } from 'modules/contract/contract.service';
+import { IncentivesService } from 'modules/incentives/incentives.service';
 import { SourceService } from 'modules/source/source.service';
 import { PriceService } from 'modules/price/price.service';
 import { RevenueService } from 'modules/revenue/revenue.service';
@@ -24,6 +25,7 @@ export class HistoryProcessingService {
     private readonly spendsRepository: SpendsRepository,
     private readonly reservesRepository: ReservesRepository,
     private readonly revenueService: RevenueService,
+    private readonly incentivesService: IncentivesService,
   ) {}
 
   public isProcessRunning(): boolean {
@@ -70,6 +72,7 @@ export class HistoryProcessingService {
       }
 
       await this.revenueService.rebuildHistory();
+      await this.incentivesService.rebuildHistory();
       this.logger.log('Getting history data completed.');
     });
   }
@@ -149,6 +152,7 @@ export class HistoryProcessingService {
         }
       }
 
+      await this.incentivesService.rebuildHistory();
       this.logger.log('Stats processing completed.');
     });
   }
@@ -214,6 +218,7 @@ export class HistoryProcessingService {
         `Price Comp update completed: ${updatedIncomes} incomes and ${updatedSpends} spends updated successfully`,
       );
       this.logger.log(`Failed updates: ${failedIncomes} incomes and ${failedSpends} spends`);
+      await this.incentivesService.rebuildHistory();
     });
   }
 }

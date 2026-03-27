@@ -1,6 +1,7 @@
 import { Column, Entity, ManyToOne, OneToMany, PrimaryGeneratedColumn } from 'typeorm';
 
 import { ReserveEntity, IncomesEntity, SpendsEntity } from 'modules/history/entities';
+import { IncentiveEntity } from 'modules/incentives/incentive.entity';
 import { RevenueEntity } from 'modules/revenue/revenue.entity';
 import { TreasuryEntity } from 'modules/treasury/treasury.entity';
 import { AssetEntity } from 'modules/asset/asset.entity';
@@ -59,6 +60,9 @@ export class SourceEntity implements Source {
 
   @OneToMany(() => SpendsEntity, (spends) => spends.source)
   public spends: SpendsEntity[];
+
+  @OneToMany(() => IncentiveEntity, (incentives) => incentives.source)
+  public incentives: IncentiveEntity[];
 
   constructor(
     address: string,
