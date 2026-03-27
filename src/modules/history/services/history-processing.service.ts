@@ -3,6 +3,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ContractService } from 'modules/contract/contract.service';
 import { SourceService } from 'modules/source/source.service';
 import { PriceService } from 'modules/price/price.service';
+import { RevenueService } from 'modules/revenue/revenue.service';
 import { HistoryCollectionRequest } from 'modules/history/types/history-collection-request.type';
 import { IncomesRepository } from 'modules/history/repositories/incomes.repository';
 import { SpendsRepository } from 'modules/history/repositories/spends.repository';
@@ -22,6 +23,7 @@ export class HistoryProcessingService {
     private readonly incomesRepository: IncomesRepository,
     private readonly spendsRepository: SpendsRepository,
     private readonly reservesRepository: ReservesRepository,
+    private readonly revenueService: RevenueService,
   ) {}
 
   public isProcessRunning(): boolean {
@@ -67,6 +69,7 @@ export class HistoryProcessingService {
         await this.contractService.getHistory(source);
       }
 
+      await this.revenueService.rebuildHistory();
       this.logger.log('Getting history data completed.');
     });
   }
@@ -115,6 +118,7 @@ export class HistoryProcessingService {
         }
       }
 
+      await this.revenueService.rebuildHistory();
       this.logger.log('Reserves processing completed.');
     });
   }

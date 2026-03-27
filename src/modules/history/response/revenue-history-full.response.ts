@@ -1,6 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 
-import { ReserveEntity } from 'modules/history/entities';
+import { RevenueEntity } from 'modules/revenue/revenue.entity';
 import { SourceFullResponse } from 'modules/source/response/source-full.response';
 
 export class RevenueHistoryFullResponse {
@@ -16,10 +16,10 @@ export class RevenueHistoryFullResponse {
   @ApiProperty({ type: SourceFullResponse })
   public source: SourceFullResponse;
 
-  constructor(reserve: ReserveEntity) {
-    this.id = reserve.id;
-    this.value = reserve.value;
-    this.date = new Date(reserve.date).getTime() / 1000;
-    this.source = new SourceFullResponse(reserve.source);
+  constructor(revenue: RevenueEntity) {
+    this.id = revenue.id;
+    this.value = revenue.value;
+    this.date = new Date(revenue.date).getTime() / 1000;
+    this.source = new SourceFullResponse(revenue.source);
   }
 }

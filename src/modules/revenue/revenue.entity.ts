@@ -1,4 +1,4 @@
-import { Column, Entity, ManyToOne, PrimaryGeneratedColumn } from 'typeorm';
+import { Column, Entity, JoinColumn, ManyToOne, PrimaryGeneratedColumn } from 'typeorm';
 
 import { SourceEntity } from 'modules/source/source.entity';
 
@@ -8,10 +8,13 @@ export class RevenueEntity {
   public id: number;
 
   @Column()
+  public reserveId: number;
+
+  @Column()
   public blockNumber: number;
 
   @Column({ type: 'numeric' })
-  public quantity: string;
+  public quantityDelta: string;
 
   @Column({ type: 'double precision' })
   public price: number; // USD
@@ -25,23 +28,10 @@ export class RevenueEntity {
   @Column()
   public createdAt: Date;
 
-  @ManyToOne(() => SourceEntity, (source) => source.reserves)
-  public source: SourceEntity;
+  @Column()
+  public updatedAt: Date;
 
-  constructor(
-    source: SourceEntity,
-    blockNumber: number,
-    quantity: string,
-    price: number,
-    value: number,
-    date: Date,
-  ) {
-    this.source = source;
-    this.blockNumber = blockNumber;
-    this.quantity = quantity;
-    this.price = price;
-    this.value = value;
-    this.date = date;
-    this.createdAt = new Date();
-  }
+  @ManyToOne(() => SourceEntity, (source) => source.revenues)
+  @JoinColumn({ name: 'sourceId' })
+  public source: SourceEntity;
 }

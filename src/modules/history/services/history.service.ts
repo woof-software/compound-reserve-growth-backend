@@ -2,6 +2,8 @@ import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 
 import { SourceRepository } from 'modules/source/source.repository';
 import { SourceEntity } from 'modules/source/source.entity';
+import { RevenueEntity } from 'modules/revenue/revenue.entity';
+import { RevenueService } from 'modules/revenue/revenue.service';
 import { CreateHistoryDto } from 'modules/history/dto/create-history.dto';
 import { OffsetDto } from 'modules/history/dto/offset.dto';
 import { PaginationDto } from 'modules/history/dto/pagination.dto';
@@ -15,6 +17,7 @@ import {
 import { IncomesRepository } from 'modules/history/repositories/incomes.repository';
 import { ReservesRepository } from 'modules/history/repositories/reserves.repository';
 import { SpendsRepository } from 'modules/history/repositories/spends.repository';
+
 import { OffsetDataDto } from '@/common/dto/offset-data.dto';
 import { PaginatedDataDto } from '@/common/dto/paginated-data.dto';
 import { Algorithm } from '@/common/enum/algorithm.enum';
@@ -30,6 +33,7 @@ export class HistoryService {
     private readonly incomesRepo: IncomesRepository,
     private readonly spendsRepo: SpendsRepository,
     private readonly sourceRepo: SourceRepository,
+    private readonly revenueService: RevenueService,
   ) {}
 
   async create(dto: CreateHistoryDto): Promise<ReserveEntity> {
@@ -102,22 +106,22 @@ export class HistoryService {
     return this.reservesRepo.getOffsetTreasuryReserves(dto);
   }
 
-  async getRevenueHistory(): Promise<ReserveEntity[]> {
-    const reserves = await this.reservesRepo.getRevenueReserves();
-    if (!reserves || reserves.length === 0) {
+  async getRevenueHistory(): Promise<RevenueEntity[]> {
+    const revenueHistory = await this.revenueService.getHistory();
+    if (!revenueHistory || revenueHistory.length === 0) {
       throw new NotFoundException('No revenue history found');
     }
-    return reserves;
+    return revenueHistory;
   }
 
   async getPaginatedRevenueHistory(
     paginationDto: PaginationDto,
-  ): Promise<PaginatedDataDto<ReserveEntity>> {
-    return this.reservesRepo.getPaginatedRevenueReserves(paginationDto);
+  ): Promise<PaginatedDataDto<RevenueEntity>> {
+    return this.revenueService.getPaginatedHistory(paginationDto);
   }
 
-  async getOffsetRevenueHistory(dto: OffsetDto): Promise<OffsetDataDto<ReserveEntity>> {
-    return this.reservesRepo.getOffsetRevenueReserves(dto);
+  async getOffsetRevenueHistory(dto: OffsetDto): Promise<OffsetDataDto<RevenueEntity>> {
+    return this.revenueService.getOffsetHistory(dto);
   }
 
   async getTreasuryHoldings(): Promise<ReserveEntity[]> {

@@ -5,6 +5,7 @@ import { AssetModule } from 'modules/asset/asset.module';
 import { SourceModule } from 'modules/source/source.module';
 import { ContractModule } from 'modules/contract/contract.module';
 import { PriceModule } from 'modules/price/price.module';
+import { RevenueModule } from 'modules/revenue/revenue.module';
 
 import { ReserveEntity, IncomesEntity, SpendsEntity } from './entities';
 import { HistoryGetCommand } from './cli/history-get.command';
@@ -26,6 +27,7 @@ import { RedisModule } from 'infrastructure/redis/redis.module';
     AssetModule,
     forwardRef(() => ContractModule),
     PriceModule,
+    RevenueModule,
     RedisModule,
   ],
   providers: [
