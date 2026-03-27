@@ -117,8 +117,8 @@ export class IncentivesRepository {
             p."createdAt" DESC,
             p."id" DESC
         ),
-        "reserve_rows" AS (
-          SELECT
+        "daily_reserves" AS (
+          SELECT DISTINCT ON (r."sourceId", r."date")
             r."id" AS "reserveId",
             r."sourceId" AS "sourceId",
             r."date" AS "date",
@@ -126,14 +126,31 @@ export class IncentivesRepository {
             r."price" AS "price",
             r."value" AS "value",
             r."quantity"::numeric AS "quantity",
-            a."decimals" AS "decimals",
-            LAG(r."quantity"::numeric) OVER (
-              PARTITION BY r."sourceId"
-              ORDER BY r."date" ASC, r."id" ASC
-            ) AS "previousQuantity"
+            a."decimals" AS "decimals"
           FROM "reserves" r
           INNER JOIN "filtered_sources" fs ON fs."id" = r."sourceId"
           INNER JOIN "asset" a ON a."id" = fs."assetId"
+          ORDER BY
+            r."sourceId" ASC,
+            r."date" ASC,
+            r."blockNumber" DESC,
+            r."id" DESC
+        ),
+        "reserve_rows" AS (
+          SELECT
+            dr."reserveId" AS "reserveId",
+            dr."sourceId" AS "sourceId",
+            dr."date" AS "date",
+            dr."day" AS "day",
+            dr."price" AS "price",
+            dr."value" AS "value",
+            dr."quantity" AS "quantity",
+            dr."decimals" AS "decimals",
+            LAG(dr."quantity") OVER (
+              PARTITION BY dr."sourceId"
+              ORDER BY dr."date" ASC, dr."reserveId" ASC
+            ) AS "previousQuantity"
+          FROM "daily_reserves" dr
         ),
         "base_rows" AS (
           SELECT
