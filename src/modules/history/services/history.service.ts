@@ -11,7 +11,12 @@ import { IncomesEntity, ReserveEntity, SpendsEntity, StatsHistory } from 'module
 import { IncomesRepository } from 'modules/history/repositories/incomes.repository';
 import { ReservesRepository } from 'modules/history/repositories/reserves.repository';
 import { SpendsRepository } from 'modules/history/repositories/spends.repository';
+import { CometReserveType } from 'modules/history/enum/comet-reserve-type.enum';
+import { CometReserveHistoryItem } from 'modules/history/types/comet-reserve-history-item.type';
 
+import { NetworkService } from 'common/chains/network/network.service';
+
+import { Algorithm } from '@/common/enum/algorithm.enum';
 import { OffsetDataDto } from '@/common/dto/offset-data.dto';
 import { OffsetDto } from '@/common/dto/offset.dto';
 import { PaginatedDataDto } from '@/common/dto/paginated-data.dto';
@@ -27,6 +32,7 @@ export class HistoryService {
     private readonly sourceRepo: SourceRepository,
     private readonly revenueService: RevenueService,
     private readonly incentivesQueryService: IncentivesQueryService,
+    private readonly networkService: NetworkService,
   ) {}
 
   async create(dto: CreateHistoryDto): Promise<ReserveEntity> {
@@ -97,6 +103,17 @@ export class HistoryService {
 
   async getOffsetTreasuryHistory(dto: OffsetDto): Promise<OffsetDataDto<ReserveEntity>> {
     return this.reservesRepo.getOffsetTreasuryReserves(dto);
+  }
+
+  async getOffsetCometReserves(dto: OffsetDto): Promise<OffsetDataDto<CometReserveHistoryItem>> {
+    const offsetData = await this.reservesRepo.getOffsetCometReserves(dto);
+
+    return new OffsetDataDto<CometReserveHistoryItem>(
+      offsetData.data.map((reserve) => this.mapCometReserveHistoryItem(reserve)),
+      offsetData.limit,
+      offsetData.offset,
+      offsetData.total,
+    );
   }
 
   async getRevenueHistory(): Promise<RevenueEntity[]> {
@@ -189,5 +206,20 @@ export class HistoryService {
 
   async getIncentiveHistory(dto: OffsetDto): Promise<OffsetDataDto<IncentiveEntity>> {
     return this.incentivesQueryService.getOffsetHistory(dto);
+  }
+
+  private mapCometReserveHistoryItem(reserve: ReserveEntity): CometReserveHistoryItem {
+    return {
+      sourceAddress: reserve.source.address,
+      quantity: reserve.quantity,
+      value: reserve.value,
+      price: reserve.price,
+      chainId: this.networkService.byName(reserve.source.network)?.chainId ?? null,
+      timestamp: Math.floor(reserve.date.getTime() / 1000),
+      blockNumber: reserve.blockNumber,
+      reserveType: reserve.source.algorithm.includes(Algorithm.COMET_COLLATERAL)
+        ? CometReserveType.COLLATERAL
+        : CometReserveType.MARKET,
+    };
   }
 }

@@ -8,6 +8,7 @@ import { OffsetDataDto } from '@/common/dto/offset-data.dto';
 import { OffsetDto } from '@/common/dto/offset.dto';
 import { PaginatedDataDto } from '@/common/dto/paginated-data.dto';
 import { PaginationDto } from '@/common/dto/pagination.dto';
+import { Algorithm } from '@/common/enum/algorithm.enum';
 
 @Injectable()
 export class ReservesRepository {
@@ -83,6 +84,29 @@ export class ReservesRepository {
       dto.perPage ?? total,
       total,
     );
+  }
+
+  async getOffsetCometReserves(dto: OffsetDto): Promise<OffsetDataDto<ReserveEntity>> {
+    const algorithmsArrayLiteral = `{${[Algorithm.COMET, Algorithm.COMET_COLLATERAL].join(',')}}`;
+    const query = this.reservesRepository
+      .createQueryBuilder('reserves')
+      .leftJoinAndSelect('reserves.source', 'source')
+      .where('source.deletedAt IS NULL')
+      .andWhere('source.algorithm && :algorithms::text[]', {
+        algorithms: algorithmsArrayLiteral,
+      })
+      .orderBy('reserves.date', dto.order)
+      .addOrderBy('source.id', 'ASC')
+      .addOrderBy('reserves.id', 'ASC')
+      .offset(dto.offset ?? 0);
+
+    if (dto.limit) {
+      query.limit(dto.limit);
+    }
+
+    const [reserves, total] = await query.getManyAndCount();
+
+    return new OffsetDataDto<ReserveEntity>(reserves, dto.limit ?? null, dto.offset ?? 0, total);
   }
 
   async getOffsetTreasuryReserves(dto: OffsetDto): Promise<OffsetDataDto<ReserveEntity>> {
