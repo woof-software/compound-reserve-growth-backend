@@ -7,15 +7,15 @@ import { IncentiveHistoryResponse } from 'modules/history/response/incentives-hi
 import { HistoryService } from 'modules/history/services/history.service';
 
 import { ReserveResponse } from './response/reserve.response';
-import { PaginationDto } from './dto/pagination.dto';
 import { PaginationRequest } from './request/pagination.request';
 import { RevenueHistoryResponse } from './response/revenue-history.response';
 import { RevenueHistoryFullResponse } from './response/revenue-history-full.response';
 import { StatsHistoryResponse } from './response/stats-history.response';
 import { ReserveFullResponse } from './response/reserve-full.response';
-import { OffsetDto } from './dto/offset.dto';
 
 import { REDIS_CLIENT } from 'infrastructure/redis/redis.module';
+import { OffsetDto } from '@/common/dto/offset.dto';
+import { PaginationDto } from '@/common/dto/pagination.dto';
 import { ApiPaginatedResponse } from '@/common/swagger/api-paginated-response.decorator';
 import { PaginatedDataResponse } from '@/common/response/paginated-data.response';
 import { PaginationMetaResponse } from '@/common/response/pagination-meta.response';

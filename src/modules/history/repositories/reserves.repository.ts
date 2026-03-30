@@ -3,11 +3,11 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 
 import { ReserveEntity } from 'modules/history/entities';
-import { PaginationDto } from 'modules/history/dto/pagination.dto';
-import { OffsetDto } from 'modules/history/dto/offset.dto';
 
-import { PaginatedDataDto } from '@/common/dto/paginated-data.dto';
 import { OffsetDataDto } from '@/common/dto/offset-data.dto';
+import { OffsetDto } from '@/common/dto/offset.dto';
+import { PaginatedDataDto } from '@/common/dto/paginated-data.dto';
+import { PaginationDto } from '@/common/dto/pagination.dto';
 
 @Injectable()
 export class ReservesRepository {

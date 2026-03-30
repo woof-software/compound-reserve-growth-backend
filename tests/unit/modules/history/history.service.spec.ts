@@ -1,7 +1,7 @@
 import { ReserveEntity } from '@/modules/history/entities';
 import { SourceEntity } from '@/modules/source/source.entity';
 import { HistoryService } from '@/modules/history/services/history.service';
-import { OffsetDto } from '@/modules/history/dto/offset.dto';
+import { OffsetDto } from '@/common/dto/offset.dto';
 import { Order } from '@/common/enum/order.enum';
 
 describe('HistoryService', () => {

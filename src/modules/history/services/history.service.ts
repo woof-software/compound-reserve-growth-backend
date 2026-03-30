@@ -7,15 +7,15 @@ import { IncentivesQueryService } from 'modules/incentives/incentives-query.serv
 import { RevenueEntity } from 'modules/revenue/revenue.entity';
 import { RevenueService } from 'modules/revenue/revenue.service';
 import { CreateHistoryDto } from 'modules/history/dto/create-history.dto';
-import { OffsetDto } from 'modules/history/dto/offset.dto';
-import { PaginationDto } from 'modules/history/dto/pagination.dto';
 import { IncomesEntity, ReserveEntity, SpendsEntity, StatsHistory } from 'modules/history/entities';
 import { IncomesRepository } from 'modules/history/repositories/incomes.repository';
 import { ReservesRepository } from 'modules/history/repositories/reserves.repository';
 import { SpendsRepository } from 'modules/history/repositories/spends.repository';
 
 import { OffsetDataDto } from '@/common/dto/offset-data.dto';
+import { OffsetDto } from '@/common/dto/offset.dto';
 import { PaginatedDataDto } from '@/common/dto/paginated-data.dto';
+import { PaginationDto } from '@/common/dto/pagination.dto';
 import { generateDailyKey } from '@/common/utils/generate-daily-key';
 
 @Injectable()

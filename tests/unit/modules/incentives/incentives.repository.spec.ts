@@ -1,6 +1,6 @@
 import { DataSource } from 'typeorm';
 
-import { OffsetDto } from '@/modules/history/dto/offset.dto';
+import { OffsetDto } from '@/common/dto/offset.dto';
 import { IncentivesRepository } from '@/modules/incentives/incentives.repository';
 import { Order } from '@/common/enum/order.enum';
 
