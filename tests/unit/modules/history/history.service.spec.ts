@@ -22,10 +22,8 @@ describe('HistoryService', () => {
 
   const makeDeps = () => {
     const findLatestBySourceId = jest.fn();
-    const getOffsetIncentivesHistory = jest.fn();
     const reservesRepo = {
       findLatestBySourceId,
-      getOffsetIncentivesHistory,
       findById: jest.fn(),
       save: jest.fn(),
       getTreasuryReserves: jest.fn(),
@@ -37,15 +35,29 @@ describe('HistoryService', () => {
     const incomesRepo = { findBySourceId: jest.fn(), save: jest.fn() };
     const spendsRepo = { findBySourceId: jest.fn(), save: jest.fn() };
     const sourceRepo = { findById: jest.fn() };
+    const revenueService = {
+      getHistory: jest.fn(),
+      getPaginatedHistory: jest.fn(),
+      getOffsetHistory: jest.fn(),
+    };
+    const incentivesQueryService = {
+      getOffsetHistory: jest.fn(),
+    };
 
     const service = new HistoryService(
       reservesRepo as never,
       incomesRepo as never,
       spendsRepo as never,
       sourceRepo as never,
+      revenueService as never,
+      incentivesQueryService as never,
     );
 
-    return { service, findLatestBySourceId, getOffsetIncentivesHistory };
+    return {
+      service,
+      findLatestBySourceId,
+      getOffsetIncentiveHistory: incentivesQueryService.getOffsetHistory,
+    };
   };
 
   beforeEach(() => {
@@ -81,12 +93,12 @@ describe('HistoryService', () => {
 
   describe('getIncentiveHistory', () => {
     it('returns row with zero incomes when repository provides incentives without reserves', async () => {
-      const { service, getOffsetIncentivesHistory } = makeDeps();
+      const { service, getOffsetIncentiveHistory } = makeDeps();
       const date = new Date('2026-01-03T00:00:00.000Z');
-      getOffsetIncentivesHistory.mockResolvedValue({
+      getOffsetIncentiveHistory.mockResolvedValue({
         data: [
           {
-            sourceId: 3,
+            source: { id: 3 },
             date,
             incomes: 0,
             rewardsSupply: 7,
@@ -104,7 +116,7 @@ describe('HistoryService', () => {
       expect(result.total).toBe(1);
       expect(result.data).toHaveLength(1);
       expect(result.data[0]).toMatchObject({
-        sourceId: 3,
+        source: { id: 3 },
         incomes: 0,
         rewardsSupply: 7,
         rewardsBorrow: 1,
@@ -113,8 +125,8 @@ describe('HistoryService', () => {
     });
 
     it('preserves total when page data is empty due to high offset', async () => {
-      const { service, getOffsetIncentivesHistory } = makeDeps();
-      getOffsetIncentivesHistory.mockResolvedValue({
+      const { service, getOffsetIncentiveHistory } = makeDeps();
+      getOffsetIncentiveHistory.mockResolvedValue({
         data: [],
         limit: 2,
         offset: 10,

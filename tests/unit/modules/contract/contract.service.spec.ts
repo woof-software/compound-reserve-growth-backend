@@ -38,6 +38,20 @@ describe('ContractService', () => {
   };
 
   const makeDeps = () => {
+    const configService = {
+      getOrThrow: jest.fn((key: string) => {
+        switch (key) {
+          case 'contract.bytes32Tokens':
+            return [];
+          case 'contract.cEthMarketAddress':
+            return '0x00000000000000000000000000000000000000ce';
+          case 'contract.nativeTokenAddress':
+            return '0x00000000000000000000000000000000000000ee';
+          default:
+            throw new Error(`Unexpected config key: ${key}`);
+        }
+      }),
+    };
     const findLatestReserveBySource = jest.fn();
     const historyService = {
       findLatestReserveBySource,
@@ -65,6 +79,7 @@ describe('ContractService', () => {
     const mailService = { notifyGetHistoryError: jest.fn() };
 
     const service = new ContractService(
+      configService as never,
       providerFactory as never,
       blockService as never,
       historyService as never,
