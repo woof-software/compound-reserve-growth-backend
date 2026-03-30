@@ -84,6 +84,7 @@ export class HistoryProcessingService {
       const reservesAlgorithms = [
         Algorithm.COMET,
         Algorithm.MARKET_V2,
+        Algorithm.COMET_COLLATERAL,
         Algorithm.ETH_WALLET,
         Algorithm.AERA_COMPOUND_RESERVES,
         Algorithm.AERA_VENDORS_VAULT,
