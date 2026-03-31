@@ -289,7 +289,12 @@ describe('ContractService', () => {
         undefined,
       );
       expect(saveReservesSpy).toHaveBeenCalledTimes(1);
-      expect(saveReservesSpy).toHaveBeenCalledWith(source, 'custom-algorithm', undefined, undefined);
+      expect(saveReservesSpy).toHaveBeenCalledWith(
+        source,
+        'custom-algorithm',
+        undefined,
+        undefined,
+      );
     });
   });
 });
