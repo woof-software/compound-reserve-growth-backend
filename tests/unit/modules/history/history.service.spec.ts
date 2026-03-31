@@ -76,7 +76,7 @@ describe('HistoryService', () => {
 
       expect(result).toBe(mockReserve);
       expect(findLatestBySourceId).toHaveBeenCalledTimes(1);
-      expect(findLatestBySourceId).toHaveBeenCalledWith(10);
+      expect(findLatestBySourceId).toHaveBeenCalledWith(10, undefined);
     });
 
     it('returns null when no reserves exist for the source', async () => {
@@ -87,7 +87,7 @@ describe('HistoryService', () => {
       const result = await service.findLatestReserveBySource(source);
 
       expect(result).toBeNull();
-      expect(findLatestBySourceId).toHaveBeenCalledWith(20);
+      expect(findLatestBySourceId).toHaveBeenCalledWith(20, undefined);
     });
   });
 

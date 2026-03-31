@@ -2,24 +2,56 @@ import { Injectable } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource, EntityManager } from 'typeorm';
 
+import { IncentiveCompPrice } from './types/incentive-comp-price.type';
 import { IncentiveProjectionRow } from './types/incentive-projection-row.type';
+import { IncentiveReserveSnapshot } from './types/incentive-reserve-snapshot.type';
+import { IncentiveSpendSnapshot } from './types/incentive-spend-snapshot.type';
+import { INCENTIVES_SUPPORTED_ALGORITHMS } from './constants/incentives-supported-algorithms.constant';
 
-import { Algorithm } from '@/common/enum/algorithm.enum';
+type IncentiveReserveSnapshotRaw = {
+  reserveId: number | string;
+  sourceId: number | string;
+  date: string | Date;
+  day: string;
+  price: number | string;
+  value: number | string;
+  quantity: string;
+  decimals: number | string;
+};
 
-type IncentiveProjectionRowRaw = {
-  reserveId: number | null;
-  spendId: number | null;
-  sourceId: number | null;
-  date: string | null;
-  incomes: number | null;
-  rewardsSupply: number | null;
-  rewardsBorrow: number | null;
-  priceComp: number | null;
+type IncentiveSpendSnapshotRaw = {
+  spendId: number | string;
+  sourceId: number | string;
+  date: string | Date;
+  day: string;
+  valueSupply: number | string | null;
+  valueBorrow: number | string | null;
+  priceComp: number | string | null;
+};
+
+type IncentiveCompPriceRaw = {
+  day: string;
+  priceComp: number | string;
 };
 
 @Injectable()
 export class IncentivesSyncRepository {
   constructor(@InjectDataSource() private readonly dataSource: DataSource) {}
+
+  public async listSupportedSourceIds(manager: EntityManager): Promise<number[]> {
+    const rawRows = (await manager.query(
+      `
+        SELECT s."id" AS "id"
+        FROM "source" s
+        WHERE s."deletedAt" IS NULL
+          AND s."algorithm" && $1::text[]
+        ORDER BY s."id" ASC
+      `,
+      [this.getSupportedAlgorithmsArrayLiteral()],
+    )) as Array<{ id: number | string }>;
+
+    return rawRows.map((row) => Number(row.id));
+  }
 
   public async inTransaction<T>(work: (manager: EntityManager) => Promise<T>): Promise<T> {
     const qr = this.dataSource.createQueryRunner();
@@ -44,12 +76,52 @@ export class IncentivesSyncRepository {
     }
   }
 
-  public async buildProjectionRows(manager: EntityManager): Promise<IncentiveProjectionRow[]> {
-    const algorithmsArrayLiteral = `{${[
-      Algorithm.COMET_STATS,
-      Algorithm.MARKET_V2,
-      Algorithm.AERA_COMPOUND_RESERVES,
-    ].join(',')}}`;
+  public async deleteOutsideScope(
+    validSourceIds: number[],
+    manager: EntityManager,
+  ): Promise<number> {
+    const deletedRows = (await manager.query(
+      `
+        DELETE FROM "incentives" i
+        WHERE EXISTS (
+          SELECT 1
+          FROM "source" s
+          WHERE s."id" = i."sourceId"
+            AND s."deletedAt" IS NOT NULL
+        )
+        OR NOT (i."sourceId" = ANY($1::int[]))
+        RETURNING i."id"
+      `,
+      [validSourceIds],
+    )) as Array<{ id: number }>;
+
+    return deletedRows.length;
+  }
+
+  public async deleteBySourceIds(sourceIds: number[], manager: EntityManager): Promise<number> {
+    if (sourceIds.length === 0) {
+      return 0;
+    }
+
+    const deletedRows = (await manager.query(
+      `
+        DELETE FROM "incentives"
+        WHERE "sourceId" = ANY($1::int[])
+        RETURNING "id"
+      `,
+      [sourceIds],
+    )) as Array<{ id: number }>;
+
+    return deletedRows.length;
+  }
+
+  public async listDailyReserveSnapshots(
+    sourceIds: number[],
+    manager: EntityManager,
+  ): Promise<IncentiveReserveSnapshot[]> {
+    if (sourceIds.length === 0) {
+      return [];
+    }
 
     const rawRows = (await manager.query(
       `
@@ -57,175 +129,118 @@ export class IncentivesSyncRepository {
           SELECT s."id", s."assetId"
           FROM "source" s
           WHERE s."deletedAt" IS NULL
-            AND s."algorithm" && $1::text[]
-        ),
-        "latest_spends" AS (
-          SELECT DISTINCT ON (s."sourceId", s."date"::date)
-            s."id" AS "spendId",
-            s."sourceId" AS "sourceId",
-            s."date" AS "date",
-            s."date"::date AS "day",
-            s."valueSupply" AS "valueSupply",
-            s."valueBorrow" AS "valueBorrow",
-            s."priceComp" AS "priceComp"
-          FROM "spends" s
-          INNER JOIN "filtered_sources" fs ON fs."id" = s."sourceId"
-          ORDER BY
-            s."sourceId" ASC,
-            s."date"::date ASC,
-            s."createdAt" DESC,
-            s."id" DESC
-        ),
-        "latest_comp_prices" AS (
-          SELECT DISTINCT ON (p."date"::date)
-            p."date"::date AS "day",
-            p."price" AS "priceComp"
-          FROM "price" p
-          WHERE p."symbol" = 'COMP'
-          ORDER BY
-            p."date"::date ASC,
-            p."createdAt" DESC,
-            p."id" DESC
-        ),
-        "daily_reserves" AS (
-          SELECT DISTINCT ON (r."sourceId", r."date")
-            r."id" AS "reserveId",
-            r."sourceId" AS "sourceId",
-            r."date" AS "date",
-            r."date"::date AS "day",
-            r."price" AS "price",
-            r."value" AS "value",
-            r."quantity"::numeric AS "quantity",
-            a."decimals" AS "decimals"
-          FROM "reserves" r
-          INNER JOIN "filtered_sources" fs ON fs."id" = r."sourceId"
-          INNER JOIN "asset" a ON a."id" = fs."assetId"
-          ORDER BY
-            r."sourceId" ASC,
-            r."date" ASC,
-            r."blockNumber" DESC,
-            r."id" DESC
-        ),
-        "reserve_rows" AS (
-          SELECT
-            dr."reserveId" AS "reserveId",
-            dr."sourceId" AS "sourceId",
-            dr."date" AS "date",
-            dr."day" AS "day",
-            dr."price" AS "price",
-            dr."value" AS "value",
-            dr."quantity" AS "quantity",
-            dr."decimals" AS "decimals",
-            LAG(dr."quantity") OVER (
-              PARTITION BY dr."sourceId"
-              ORDER BY dr."date" ASC, dr."reserveId" ASC
-            ) AS "previousQuantity"
-          FROM "daily_reserves" dr
-        ),
-        "base_rows" AS (
-          SELECT
-            rr."reserveId" AS "reserveId",
-            ls."spendId" AS "spendId",
-            rr."sourceId" AS "sourceId",
-            rr."date" AS "date",
-            CASE
-              WHEN rr."previousQuantity" IS NULL THEN rr."value"::double precision
-              ELSE (
-                ((rr."quantity" - rr."previousQuantity") / POWER(10::numeric, rr."decimals"))::double precision
-                * rr."price"
-              )
-            END AS "incomes",
-            COALESCE(ls."valueSupply", 0)::double precision AS "rewardsSupply",
-            COALESCE(ls."valueBorrow", 0)::double precision AS "rewardsBorrow",
-            COALESCE(NULLIF(ls."priceComp", 0), cp."priceComp", 0)::double precision AS "priceComp"
-          FROM "reserve_rows" rr
-          LEFT JOIN "latest_spends" ls
-            ON ls."sourceId" = rr."sourceId"
-            AND ls."day" = rr."day"
-          LEFT JOIN "latest_comp_prices" cp
-            ON cp."day" = rr."day"
-        ),
-        "spends_only_rows" AS (
-          SELECT
-            NULL::int AS "reserveId",
-            ls."spendId" AS "spendId",
-            ls."sourceId" AS "sourceId",
-            ls."date" AS "date",
-            0::double precision AS "incomes",
-            COALESCE(ls."valueSupply", 0)::double precision AS "rewardsSupply",
-            COALESCE(ls."valueBorrow", 0)::double precision AS "rewardsBorrow",
-            COALESCE(NULLIF(ls."priceComp", 0), cp."priceComp", 0)::double precision AS "priceComp"
-          FROM "latest_spends" ls
-          LEFT JOIN "latest_comp_prices" cp
-            ON cp."day" = ls."day"
-          WHERE NOT EXISTS (
-            SELECT 1
-            FROM "reserve_rows" rr
-            WHERE rr."sourceId" = ls."sourceId"
-              AND rr."day" = ls."day"
-          )
-        ),
-        "merged_rows" AS (
-          SELECT
-            "reserveId",
-            "spendId",
-            "sourceId",
-            "date",
-            "incomes",
-            "rewardsSupply",
-            "rewardsBorrow",
-            "priceComp"
-          FROM "base_rows"
-          UNION ALL
-          SELECT
-            "reserveId",
-            "spendId",
-            "sourceId",
-            "date",
-            "incomes",
-            "rewardsSupply",
-            "rewardsBorrow",
-            "priceComp"
-          FROM "spends_only_rows"
+            AND s."id" = ANY($1::int[])
         )
-        SELECT
-          mr."reserveId",
-          mr."spendId",
-          mr."sourceId",
-          mr."date",
-          mr."incomes",
-          mr."rewardsSupply",
-          mr."rewardsBorrow",
-          mr."priceComp"
-        FROM "merged_rows" mr
+        SELECT DISTINCT ON (r."sourceId", r."date")
+          r."id" AS "reserveId",
+          r."sourceId" AS "sourceId",
+          r."date" AS "date",
+          r."date"::date::text AS "day",
+          r."price" AS "price",
+          r."value" AS "value",
+          r."quantity"::text AS "quantity",
+          a."decimals" AS "decimals"
+        FROM "reserves" r
+        INNER JOIN "filtered_sources" fs ON fs."id" = r."sourceId"
+        INNER JOIN "asset" a ON a."id" = fs."assetId"
         ORDER BY
-          mr."date" ASC,
-          mr."sourceId" ASC,
-          mr."reserveId" ASC NULLS LAST,
-          mr."spendId" ASC NULLS LAST
+          r."sourceId" ASC,
+          r."date" ASC,
+          r."blockNumber" DESC,
+          r."id" DESC
       `,
-      [algorithmsArrayLiteral],
-    )) as IncentiveProjectionRowRaw[];
+      [sourceIds],
+    )) as IncentiveReserveSnapshotRaw[];
 
-    return rawRows
-      .filter((row) => row.sourceId !== null && row.date !== null)
-      .map(
-        (row): IncentiveProjectionRow => ({
-          reserveId: row.reserveId === null ? null : Number(row.reserveId),
-          spendId: row.spendId === null ? null : Number(row.spendId),
-          sourceId: Number(row.sourceId),
-          date: new Date(row.date),
-          incomes: Number(row.incomes ?? 0),
-          rewardsSupply: Number(row.rewardsSupply ?? 0),
-          rewardsBorrow: Number(row.rewardsBorrow ?? 0),
-          priceComp: Number(row.priceComp ?? 0),
-        }),
-      );
+    return rawRows.map((row) => ({
+      reserveId: Number(row.reserveId),
+      sourceId: Number(row.sourceId),
+      date: new Date(row.date),
+      day: row.day,
+      price: Number(row.price),
+      value: Number(row.value),
+      quantity: row.quantity,
+      decimals: Number(row.decimals),
+    }));
   }
 
-  public async replaceAll(rows: IncentiveProjectionRow[], manager: EntityManager): Promise<number> {
-    await manager.query(`TRUNCATE TABLE "incentives" RESTART IDENTITY`);
+  public async listLatestSpends(
+    sourceIds: number[],
+    manager: EntityManager,
+  ): Promise<IncentiveSpendSnapshot[]> {
+    if (sourceIds.length === 0) {
+      return [];
+    }
 
+    const rawRows = (await manager.query(
+      `
+        WITH "filtered_sources" AS (
+          SELECT s."id"
+          FROM "source" s
+          WHERE s."deletedAt" IS NULL
+            AND s."id" = ANY($1::int[])
+        )
+        SELECT DISTINCT ON (s."sourceId", s."date"::date)
+          s."id" AS "spendId",
+          s."sourceId" AS "sourceId",
+          s."date" AS "date",
+          s."date"::date::text AS "day",
+          s."valueSupply" AS "valueSupply",
+          s."valueBorrow" AS "valueBorrow",
+          s."priceComp" AS "priceComp"
+        FROM "spends" s
+        INNER JOIN "filtered_sources" fs ON fs."id" = s."sourceId"
+        ORDER BY
+          s."sourceId" ASC,
+          s."date"::date ASC,
+          s."createdAt" DESC,
+          s."id" DESC
+      `,
+      [sourceIds],
+    )) as IncentiveSpendSnapshotRaw[];
+
+    return rawRows.map((row) => ({
+      spendId: Number(row.spendId),
+      sourceId: Number(row.sourceId),
+      date: new Date(row.date),
+      day: row.day,
+      valueSupply: Number(row.valueSupply ?? 0),
+      valueBorrow: Number(row.valueBorrow ?? 0),
+      priceComp: Number(row.priceComp ?? 0),
+    }));
+  }
+
+  public async listLatestCompPrices(
+    days: string[],
+    manager: EntityManager,
+  ): Promise<IncentiveCompPrice[]> {
+    if (days.length === 0) {
+      return [];
+    }
+
+    const rawRows = (await manager.query(
+      `
+        SELECT DISTINCT ON (p."date"::date)
+          p."date"::date::text AS "day",
+          p."price" AS "priceComp"
+        FROM "price" p
+        WHERE p."symbol" = 'COMP'
+          AND p."date"::date = ANY($1::date[])
+        ORDER BY
+          p."date"::date ASC,
+          p."createdAt" DESC,
+          p."id" DESC
+      `,
+      [days],
+    )) as IncentiveCompPriceRaw[];
+
+    return rawRows.map((row) => ({
+      day: row.day,
+      priceComp: Number(row.priceComp),
+    }));
+  }
+
+  public async insertRows(rows: IncentiveProjectionRow[], manager: EntityManager): Promise<number> {
     if (!rows.length) {
       return 0;
     }
@@ -274,8 +289,8 @@ export class IncentivesSyncRepository {
   private chunkRows(rows: IncentiveProjectionRow[], size: number): IncentiveProjectionRow[][] {
     const chunks: IncentiveProjectionRow[][] = [];
 
-    for (let i = 0; i < rows.length; i += size) {
-      chunks.push(rows.slice(i, i + size));
+    for (let index = 0; index < rows.length; index += size) {
+      chunks.push(rows.slice(index, index + size));
     }
 
     return chunks;
@@ -291,5 +306,9 @@ export class IncentivesSyncRepository {
 
       return `(${placeholders.join(', ')})`;
     }).join(', ');
+  }
+
+  private getSupportedAlgorithmsArrayLiteral(): string {
+    return `{${[...INCENTIVES_SUPPORTED_ALGORITHMS].join(',')}}`;
   }
 }
