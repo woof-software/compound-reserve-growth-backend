@@ -3,8 +3,8 @@ import { Controller, Injectable, HttpStatus, HttpCode, Get, Query, Inject } from
 import { Throttle } from '@nestjs/throttler';
 import Redis from 'ioredis';
 
-import { IncentiveHistoryResponse } from 'modules/history/response/incentives-history.response';
-import { HistoryService } from 'modules/history/services/history.service';
+import { IncentiveHistoryResponse } from '@/modules/history/response/incentives-history.response';
+import { HistoryService } from '@/modules/history/services/history.service';
 
 import { ReserveResponse } from './response/reserve.response';
 import { PaginationRequest } from './request/pagination.request';

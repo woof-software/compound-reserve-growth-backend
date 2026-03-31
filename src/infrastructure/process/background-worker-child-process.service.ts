@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { Injectable, Logger, OnApplicationBootstrap, OnApplicationShutdown } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
-import { TAppConfig } from 'config/app';
+import { TAppConfig } from '@/config/app';
 
 @Injectable()
 export class BackgroundWorkerChildProcessService

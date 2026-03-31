@@ -1,7 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
 
-import { SourceResponse } from 'modules/source/response/source.response';
-import { TreasuryEntity } from 'modules/treasury/treasury.entity';
+import { SourceResponse } from '@/modules/source/response/source.response';
+import { TreasuryEntity } from '@/modules/treasury/treasury.entity';
 
 export class TreasuryResponse {
   @ApiProperty({ example: 1 })

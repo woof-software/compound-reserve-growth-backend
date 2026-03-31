@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 
-import { Oracle } from 'modules/oracle/oracle.entity';
+import { Oracle } from '@/modules/oracle/oracle.entity';
 
 @Injectable()
 export class OracleRepository {

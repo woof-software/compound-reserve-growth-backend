@@ -2,9 +2,6 @@ import { Injectable, Logger, OnApplicationBootstrap, OnApplicationShutdown } fro
 import { ConfigService } from '@nestjs/config';
 import { Job, Worker } from 'bullmq';
 
-import { HistoryProcessingService } from 'modules/history/services/history-processing.service';
-import { HistoryCollectionRequest } from 'modules/history/types/history-collection-request.type';
-
 import {
   HISTORY_COLLECTION_QUEUE_NAME,
   HistoryCollectionJobName,
@@ -15,6 +12,9 @@ import {
   HistoryCollectionJobDataMap,
   HistoryCollectionSwitchPayload,
 } from './history-collection.types';
+
+import { HistoryCollectionRequest } from '@/modules/history/types/history-collection-request.type';
+import { HistoryProcessingService } from '@/modules/history/services/history-processing.service';
 
 type HistoryCollectionJob = {
   [Name in HistoryCollectionJobName]: Job<HistoryCollectionJobDataMap[Name], void, Name>;

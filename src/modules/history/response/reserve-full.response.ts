@@ -1,7 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
 
-import { ReserveEntity } from 'modules/history/entities';
-import { SourceFullResponse } from 'modules/source/response/source-full.response';
+import { ReserveEntity } from '@/modules/history/entities';
+import { SourceFullResponse } from '@/modules/source/response/source-full.response';
 
 export class ReserveFullResponse {
   @ApiProperty({ example: 1 })

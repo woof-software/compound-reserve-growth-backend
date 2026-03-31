@@ -1,9 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { EntityManager, Repository } from 'typeorm';
 
-import { IncomesEntity } from 'modules/history/entities';
-
+import { IncomesEntity } from '@/modules/history/entities';
 import { OffsetDataDto } from '@/common/dto/offset-data.dto';
 import { OffsetDto } from '@/common/dto/offset.dto';
 import { Algorithm } from '@/common/enum/algorithm.enum';
@@ -14,8 +13,12 @@ export class IncomesRepository {
     @InjectRepository(IncomesEntity) private readonly incomesRepository: Repository<IncomesEntity>,
   ) {}
 
-  async save(reserve: IncomesEntity): Promise<IncomesEntity> {
-    return this.incomesRepository.save(reserve);
+  private getRepository(manager?: EntityManager): Repository<IncomesEntity> {
+    return manager?.getRepository(IncomesEntity) ?? this.incomesRepository;
+  }
+
+  async save(reserve: IncomesEntity, manager?: EntityManager): Promise<IncomesEntity> {
+    return this.getRepository(manager).save(reserve);
   }
 
   async findById(id: number): Promise<IncomesEntity | null> {
@@ -27,8 +30,8 @@ export class IncomesRepository {
       .getOne();
   }
 
-  async findBySourceId(sourceId: number): Promise<IncomesEntity | null> {
-    return this.incomesRepository
+  async findBySourceId(sourceId: number, manager?: EntityManager): Promise<IncomesEntity | null> {
+    return this.getRepository(manager)
       .createQueryBuilder('incomes')
       .leftJoinAndSelect('incomes.source', 'source')
       .where('source.deletedAt IS NULL')
@@ -58,8 +61,8 @@ export class IncomesRepository {
     return new OffsetDataDto<IncomesEntity>(incomes, dto.limit ?? null, dto.offset ?? 0, total);
   }
 
-  async deleteAll(): Promise<void> {
-    await this.incomesRepository.clear();
+  async deleteAll(manager?: EntityManager): Promise<void> {
+    await this.getRepository(manager).clear();
   }
 
   async findAllWithMissingPriceComp(): Promise<IncomesEntity[]> {

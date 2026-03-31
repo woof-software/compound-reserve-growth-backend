@@ -1,25 +1,24 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiPropertyOptional } from '@nestjs/swagger';
 import { IsBoolean, IsDate, IsOptional, ValidateIf } from 'class-validator';
 import { Transform } from 'class-transformer';
 
 export class StartCollectionRequest {
-  @ApiProperty({
-    description: 'Flag for clearing data from databases',
+  @ApiPropertyOptional({
+    description: 'Whether to clear existing history before collection starts.',
     example: false,
-    type: 'boolean',
-    required: false,
+    type: Boolean,
   })
   @Transform(({ value }) => value === 'true')
   @IsOptional()
   @IsBoolean()
   clearData?: boolean = false;
 
-  @ApiProperty({
-    description: 'Collection start date',
+  @ApiPropertyOptional({
+    description:
+      'Collection start timestamp in ISO 8601 format. The field name remains `data` for backward compatibility.',
     example: '2025-05-01',
-    type: 'string',
+    type: String,
     format: 'date-time',
-    required: false,
   })
   @Transform(({ value }) => (value ? new Date(value) : undefined))
   @ValidateIf((o) => o.clearData === true && o.data !== undefined)

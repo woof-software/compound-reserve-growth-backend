@@ -1,8 +1,8 @@
 import { CanActivate, ExecutionContext, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
-import { validateBearerHeader } from 'common/guards/validate-bearer-header';
-import { extractToken } from 'common/guards/exctract-token';
+import { validateBearerHeader } from '@/common/guards/validate-bearer-header';
+import { extractToken } from '@/common/guards/exctract-token';
 
 @Injectable()
 export class AdminGuard implements CanActivate {
