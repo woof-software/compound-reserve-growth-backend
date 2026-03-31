@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 
-import { Algorithm } from 'common/enum/algorithm.enum';
+import { Algorithm } from '@/common/enum/algorithm.enum';
 
 import { SourceEntity } from './source.entity';
 

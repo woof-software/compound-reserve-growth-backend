@@ -6,7 +6,7 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 
 import { ApiAppModule } from './api-app.module';
 
-import { TAppConfig } from 'config/app';
+import { TAppConfig } from '@/config/app';
 import { Logger } from 'infrastructure/logger';
 
 async function bootstrap() {

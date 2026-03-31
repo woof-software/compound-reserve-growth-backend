@@ -3,7 +3,7 @@ import type { ConfigType } from '@nestjs/config';
 
 import { NetworkConfig } from './network.types';
 
-import networksConfig from 'config/networks.config';
+import networksConfig from '@/config/networks.config';
 
 @Injectable()
 export class NetworkService {

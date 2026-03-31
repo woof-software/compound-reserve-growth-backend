@@ -1,8 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ethers } from 'ethers';
 
-import { ContractService } from 'modules/contract/contract.service';
-import { SourceService } from 'modules/source/source.service';
+import { ContractService } from '@/modules/contract/contract.service';
+import { SourceService } from '@/modules/source/source.service';
 
 import { CollateralAlgorithmService } from './collateral-algorithm.service';
 import type { CollateralSearchOutput } from './types/collateral.types';

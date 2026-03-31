@@ -1,10 +1,13 @@
 import { Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import Redis from 'ioredis';
+import { EntityManager } from 'typeorm';
 
 import { RevenueEntity } from './revenue.entity';
+import { RevenueSyncRepository } from './revenue-sync.repository';
 import { RevenueRepository } from './revenue.repository';
+import { buildRevenueProjectionRows } from './builders/build-revenue-projection-rows';
 
-import { REDIS_CLIENT } from 'infrastructure/redis/redis.module';
+import { REDIS_CLIENT } from '@/infrastructure/redis/redis.module';
 import { OffsetDataDto } from '@/common/dto/offset-data.dto';
 import { OffsetDto } from '@/common/dto/offset.dto';
 import { PaginatedDataDto } from '@/common/dto/paginated-data.dto';
@@ -16,16 +19,56 @@ export class RevenueService {
 
   constructor(
     private readonly revenueRepository: RevenueRepository,
+    private readonly revenueSyncRepository: RevenueSyncRepository,
     @Inject(REDIS_CLIENT) private readonly redisClient: Redis,
   ) {}
 
-  async rebuildHistory(clearData = false): Promise<void> {
-    const { deletedCount, insertedCount } = await this.revenueRepository.syncHistory(clearData);
+  async rebuildHistory(clearData = false, manager?: EntityManager): Promise<void> {
+    let rebuiltSourceCount = 0;
+
+    const rebuildWithManager = async (entityManager: EntityManager) => {
+      const sourceIds = await this.revenueSyncRepository.listSupportedSourceIds(entityManager);
+      rebuiltSourceCount = sourceIds.length;
+      const staleDeletedCount = await this.revenueSyncRepository.deleteOutsideScope(
+        sourceIds,
+        entityManager,
+      );
+
+      if (sourceIds.length === 0) {
+        return { deletedCount: staleDeletedCount, insertedCount: 0 };
+      }
+
+      const checkpoints = clearData
+        ? []
+        : await this.revenueSyncRepository.listSourceCheckpoints(sourceIds, entityManager);
+      const reserveSnapshots = await this.revenueSyncRepository.listProjectionReserveSnapshots(
+        sourceIds,
+        checkpoints,
+        entityManager,
+      );
+      const scopeDeletedCount = clearData
+        ? await this.revenueSyncRepository.deleteBySourceIds(sourceIds, entityManager)
+        : await this.revenueSyncRepository.deleteFromCheckpoints(checkpoints, entityManager);
+      const projectionRows = buildRevenueProjectionRows(reserveSnapshots);
+      const insertedCount = await this.revenueSyncRepository.insertRows(
+        projectionRows,
+        entityManager,
+      );
+
+      return {
+        deletedCount: staleDeletedCount + scopeDeletedCount,
+        insertedCount,
+      };
+    };
+
+    const { deletedCount, insertedCount } = manager
+      ? await rebuildWithManager(manager)
+      : await this.revenueSyncRepository.inTransaction(rebuildWithManager);
     const invalidatedCacheKeys =
       deletedCount > 0 || insertedCount > 0 ? await this.clearHistoryCache() : 0;
 
     this.logger.log(
-      `Revenue history sync completed deletedRows=${deletedCount} insertedRows=${insertedCount} invalidatedCacheKeys=${invalidatedCacheKeys}`,
+      `Revenue history sync completed sourceCount=${rebuiltSourceCount} deletedRows=${deletedCount} insertedRows=${insertedCount} invalidatedCacheKeys=${invalidatedCacheKeys}`,
     );
   }
 

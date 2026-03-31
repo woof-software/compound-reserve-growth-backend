@@ -3,7 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, MoreThan } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
 
-import { MailService } from 'modules/mail/mail.service';
+import { MailService } from '@/modules/mail/mail.service';
 
 import { TelegramService } from './telegram.service';
 import { Alert } from './alert.entity';

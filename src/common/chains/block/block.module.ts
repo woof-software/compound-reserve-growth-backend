@@ -1,9 +1,8 @@
 import { Module } from '@nestjs/common';
 
-import { NetworkModule } from 'common/chains/network/network.module';
-
 import { BlockService } from './block.service';
 
+import { NetworkModule } from '@/common/chains/network/network.module';
 import { RedisModule } from 'infrastructure/redis/redis.module';
 
 @Module({

@@ -2,7 +2,7 @@ import { ApiProperty } from '@nestjs/swagger';
 import { Exclude, Expose } from 'class-transformer';
 import { IsInt, IsPositive } from 'class-validator';
 
-import { IncentiveEntity } from 'modules/incentives/incentive.entity';
+import { IncentiveEntity } from '@/modules/incentives/incentive.entity';
 
 @Exclude()
 export class IncentiveHistoryResponse {

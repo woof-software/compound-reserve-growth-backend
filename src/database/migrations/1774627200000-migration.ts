@@ -4,7 +4,6 @@ export class RevenueProjection1774627200000 implements MigrationInterface {
   name = 'RevenueProjection1774627200000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
-    await queryRunner.query(`TRUNCATE TABLE "revenue" RESTART IDENTITY`);
     await queryRunner.query(`ALTER TABLE "revenue" RENAME COLUMN "quantity" TO "quantityDelta"`);
     await queryRunner.query(`ALTER TABLE "revenue" ADD "reserveId" integer NOT NULL`);
     await queryRunner.query(`ALTER TABLE "revenue" ADD "updatedAt" TIMESTAMP NOT NULL`);

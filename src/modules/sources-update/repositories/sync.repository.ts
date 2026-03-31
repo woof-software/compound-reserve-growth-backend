@@ -2,8 +2,8 @@ import { Injectable } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource, EntityManager } from 'typeorm';
 
-import { AssetEntity } from 'modules/asset/asset.entity';
-import { SourceEntity } from 'modules/source/source.entity';
+import { AssetEntity } from '@/modules/asset/asset.entity';
+import { SourceEntity } from '@/modules/source/source.entity';
 
 @Injectable()
 export class SyncRepository {

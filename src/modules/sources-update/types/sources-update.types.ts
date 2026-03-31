@@ -1,5 +1,5 @@
-import { AssetEntity } from 'modules/asset/asset.entity';
-import { SourceEntity } from 'modules/source/source.entity';
+import { AssetEntity } from '@/modules/asset/asset.entity';
+import { SourceEntity } from '@/modules/source/source.entity';
 
 import { RemoteAsset, RemoteSource } from './remote-reserve-sources.types';
 

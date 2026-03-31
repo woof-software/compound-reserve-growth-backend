@@ -1,7 +1,7 @@
 import { Logger } from '@nestjs/common';
 import { Command, CommandRunner } from 'nest-commander';
 
-import { SourcesUpdateService } from 'modules/sources-update/sources-update.service';
+import { SourcesUpdateService } from '@/modules/sources-update/sources-update.service';
 
 @Command({
   name: 'sources:update',

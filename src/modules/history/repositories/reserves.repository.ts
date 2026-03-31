@@ -1,9 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { EntityManager, Repository } from 'typeorm';
 
-import { ReserveEntity } from 'modules/history/entities';
-
+import { ReserveEntity } from '@/modules/history/entities';
 import { OffsetDataDto } from '@/common/dto/offset-data.dto';
 import { OffsetDto } from '@/common/dto/offset.dto';
 import { PaginatedDataDto } from '@/common/dto/paginated-data.dto';
@@ -16,8 +15,12 @@ export class ReservesRepository {
     @InjectRepository(ReserveEntity) private readonly reservesRepository: Repository<ReserveEntity>,
   ) {}
 
-  async save(reserve: ReserveEntity): Promise<ReserveEntity> {
-    return this.reservesRepository.save(reserve);
+  private getRepository(manager?: EntityManager): Repository<ReserveEntity> {
+    return manager?.getRepository(ReserveEntity) ?? this.reservesRepository;
+  }
+
+  async save(reserve: ReserveEntity, manager?: EntityManager): Promise<ReserveEntity> {
+    return this.getRepository(manager).save(reserve);
   }
 
   async findById(id: number): Promise<ReserveEntity | null> {
@@ -29,8 +32,11 @@ export class ReservesRepository {
       .getOne();
   }
 
-  async findLatestBySourceId(sourceId: number): Promise<ReserveEntity | null> {
-    return this.reservesRepository
+  async findLatestBySourceId(
+    sourceId: number,
+    manager?: EntityManager,
+  ): Promise<ReserveEntity | null> {
+    return this.getRepository(manager)
       .createQueryBuilder('reserves')
       .leftJoinAndSelect('reserves.source', 'source')
       .where('source.deletedAt IS NULL')
@@ -125,15 +131,15 @@ export class ReservesRepository {
     return new OffsetDataDto<ReserveEntity>(reserves, dto.limit ?? null, dto.offset ?? 0, total);
   }
 
-  async deleteAll(): Promise<void> {
-    await this.reservesRepository.clear();
+  async deleteAll(manager?: EntityManager): Promise<void> {
+    await this.getRepository(manager).clear();
   }
 
-  async deleteBySourceIds(sourceIds: number[]): Promise<void> {
+  async deleteBySourceIds(sourceIds: number[], manager?: EntityManager): Promise<void> {
     if (sourceIds.length === 0) {
       return;
     }
-    await this.reservesRepository
+    await this.getRepository(manager)
       .createQueryBuilder()
       .delete()
       .where('sourceId IN (:...sourceIds)', { sourceIds })

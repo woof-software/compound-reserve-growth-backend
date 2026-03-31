@@ -6,9 +6,6 @@ import type { Cache } from 'cache-manager';
 import type { Redis } from 'ioredis';
 import { MulticallProvider } from 'ethers-multicall-provider';
 
-import { ProviderFactory } from 'common/chains/network/provider.factory';
-import { NetworkService } from 'common/chains/network/network.service';
-
 import type {
   BlockTimingConfigData,
   BlockTimingConfigItem,
@@ -17,6 +14,8 @@ import type {
   CachedBlockData,
 } from './block.types';
 
+import { ProviderFactory } from '@/common/chains/network/provider.factory';
+import { NetworkService } from '@/common/chains/network/network.service';
 import { REDIS_CLIENT } from 'infrastructure/redis/redis.module';
 import {
   DAY_IN_SEC,
