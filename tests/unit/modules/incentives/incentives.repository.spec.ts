@@ -1,11 +1,12 @@
 import { DataSource } from 'typeorm';
 
 import { OffsetDto } from '@/common/dto/offset.dto';
+import { IncentivesSyncRepository } from '@/modules/incentives/incentives-sync.repository';
 import { IncentivesRepository } from '@/modules/incentives/incentives.repository';
 import { Order } from '@/common/enum/order.enum';
 
 describe('IncentivesRepository', () => {
-  const makeRepository = () => {
+  const makeQueryRepository = () => {
     const getManyAndCount = jest.fn();
     const queryBuilder = {
       innerJoinAndSelect: jest.fn().mockReturnThis(),
@@ -24,10 +25,22 @@ describe('IncentivesRepository', () => {
     } as unknown as DataSource;
 
     return {
-      repo: new IncentivesRepository(typeormRepository as never, dataSource),
+      repo: new IncentivesRepository(typeormRepository as never),
       typeormRepository,
       queryBuilder,
       getManyAndCount,
+      dataSource,
+    };
+  };
+
+  const makeSyncRepository = () => {
+    const dataSource = {
+      createQueryRunner: jest.fn(),
+    } as unknown as DataSource;
+
+    return {
+      repo: new IncentivesSyncRepository(dataSource),
+      dataSource,
     };
   };
 
@@ -36,7 +49,7 @@ describe('IncentivesRepository', () => {
   });
 
   it('returns offset history with deterministic ordering and pagination metadata', async () => {
-    const { repo, typeormRepository, queryBuilder, getManyAndCount } = makeRepository();
+    const { repo, typeormRepository, queryBuilder, getManyAndCount } = makeQueryRepository();
     const items = [
       {
         id: 1,
@@ -61,7 +74,7 @@ describe('IncentivesRepository', () => {
   });
 
   it('maps raw projection rows into normalized numeric values', async () => {
-    const { repo } = makeRepository();
+    const { repo } = makeSyncRepository();
     const manager = {
       query: jest.fn().mockResolvedValue([
         {
@@ -116,7 +129,7 @@ describe('IncentivesRepository', () => {
   });
 
   it('filters incomplete raw rows and defaults nullable numeric values to zero', async () => {
-    const { repo } = makeRepository();
+    const { repo } = makeSyncRepository();
     const manager = {
       query: jest.fn().mockResolvedValue([
         {
