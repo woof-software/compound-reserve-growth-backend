@@ -1,7 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
 
-import { RevenueEntity } from 'modules/revenue/revenue.entity';
-import { SourceResponse } from 'modules/source/response/source.response';
+import { RevenueEntity } from '@/modules/revenue/revenue.entity';
+import { SourceResponse } from '@/modules/source/response/source.response';
 
 export class RevenueResponse {
   @ApiProperty({ example: 1 })

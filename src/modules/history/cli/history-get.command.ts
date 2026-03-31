@@ -1,7 +1,7 @@
 import { Logger } from '@nestjs/common';
 import { Command, CommandRunner } from 'nest-commander';
 
-import { HistoryProcessingService } from 'modules/history/services/history-processing.service';
+import { HistoryProcessingService } from '@/modules/history/services/history-processing.service';
 
 @Command({ name: 'history:get', description: 'Get history data by sources' })
 export class HistoryGetCommand extends CommandRunner {

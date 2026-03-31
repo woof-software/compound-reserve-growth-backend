@@ -3,9 +3,8 @@ import { ConfigService } from '@nestjs/config';
 import { SchedulerRegistry } from '@nestjs/schedule';
 import { CronJob } from 'cron';
 
-import { HistoryCollectionQueueService } from 'modules/history/queue/history-collection-queue.service';
-
-import { TAppConfig } from 'config/app';
+import { HistoryCollectionQueueService } from '@/modules/history/queue/history-collection-queue.service';
+import { TAppConfig } from '@/config/app';
 
 @Injectable()
 export class HistoryGetCron implements OnApplicationBootstrap, OnApplicationShutdown {

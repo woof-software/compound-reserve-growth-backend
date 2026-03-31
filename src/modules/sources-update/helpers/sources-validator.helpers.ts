@@ -10,8 +10,7 @@ import type {
   ValidationContext,
   ValidationIssue,
   ValidationMiddleware,
-} from 'modules/sources-update/types/sources-validator.types';
-
+} from '@/modules/sources-update/types/sources-validator.types';
 import { ENFORCE_SOURCE_ASSET_CHAIN_MATCH } from '@/modules/sources-update/sources-validator.config';
 import { Algorithm } from '@/common/enum/algorithm.enum';
 

@@ -1,6 +1,6 @@
 import { Column, Entity, JoinColumn, ManyToOne, PrimaryGeneratedColumn } from 'typeorm';
 
-import { SourceEntity } from 'modules/source/source.entity';
+import { SourceEntity } from '@/modules/source/source.entity';
 
 @Entity({ name: 'revenue' })
 export class RevenueEntity {

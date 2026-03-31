@@ -1,6 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 
-import { RevenueEntity } from 'modules/revenue/revenue.entity';
+import { RevenueEntity } from '@/modules/revenue/revenue.entity';
 
 export class RevenueHistoryResponse {
   @ApiProperty({ example: 1 })

@@ -1,8 +1,7 @@
 import { Column, Entity, OneToMany, PrimaryGeneratedColumn } from 'typeorm';
 
-import { SourceEntity } from 'modules/source/source.entity';
-import { Oracle } from 'modules/oracle/oracle.entity';
-
+import { SourceEntity } from '@/modules/source/source.entity';
+import { Oracle } from '@/modules/oracle/oracle.entity';
 import { Asset } from '@/common/types/asset';
 
 @Entity({ name: 'asset' })

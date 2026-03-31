@@ -4,7 +4,7 @@ import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Queue } from 'bullmq';
 
-import { HistoryCollectionRequest } from 'modules/history/types/history-collection-request.type';
+import { HistoryCollectionRequest } from '@/modules/history/types/history-collection-request.type';
 
 import {
   HISTORY_COLLECTION_JOB_IDS,

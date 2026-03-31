@@ -6,17 +6,16 @@ import { ScheduleModule } from '@nestjs/schedule';
 import { redisStore } from 'cache-manager-ioredis-yet';
 import Redis from 'ioredis';
 
-import { CapoBackgroundModule } from 'modules/capo/capo-background.module';
-import { HistoryCronModule } from 'modules/history/history-cron.module';
-import { OracleDiscoveryModule } from 'modules/oracle/background/oracle-discovery.module';
-
+import { CapoBackgroundModule } from '@/modules/capo/capo-background.module';
+import { HistoryCronModule } from '@/modules/history/history-cron.module';
+import { OracleDiscoveryModule } from '@/modules/oracle/background/oracle-discovery.module';
 import { REDIS_CLIENT, RedisModule } from 'infrastructure/redis/redis.module';
-import appConfig from 'config/app';
-import databaseConfig from 'config/database';
-import networksConfig from 'config/networks.config';
-import redis from 'config/redis';
-import contractConfig from 'config/contract';
-import blockTimingConfig from 'config/block-timing.config';
+import appConfig from '@/config/app';
+import databaseConfig from '@/config/database';
+import networksConfig from '@/config/networks.config';
+import redis from '@/config/redis';
+import contractConfig from '@/config/contract';
+import blockTimingConfig from '@/config/block-timing.config';
 import { DatabaseModule } from 'database/database.module';
 
 @Module({

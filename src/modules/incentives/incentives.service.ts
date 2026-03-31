@@ -1,7 +1,8 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import Redis from 'ioredis';
+import { EntityManager } from 'typeorm';
 
-import { IncentivesRepository } from './incentives.repository';
+import { IncentivesSyncRepository } from './incentives-sync.repository';
 import { IncentiveProjectionRow } from './types/incentive-projection-row.type';
 
 import { REDIS_CLIENT } from 'infrastructure/redis/redis.module';
@@ -11,17 +12,21 @@ export class IncentivesService {
   private readonly logger = new Logger(IncentivesService.name);
 
   constructor(
-    private readonly incentivesRepository: IncentivesRepository,
+    private readonly incentivesSyncRepository: IncentivesSyncRepository,
     @Inject(REDIS_CLIENT) private readonly redisClient: Redis,
   ) {}
 
-  public async rebuildHistory(): Promise<void> {
-    const rebuiltCount = await this.incentivesRepository.inTransaction(async (manager) => {
-      const projectionRows = await this.incentivesRepository.buildProjectionRows(manager);
+  public async rebuildHistory(manager?: EntityManager): Promise<void> {
+    const rebuildWithManager = async (entityManager: EntityManager): Promise<number> => {
+      const projectionRows = await this.incentivesSyncRepository.buildProjectionRows(entityManager);
       const normalizedRows = this.fillMissingPriceComp(projectionRows);
 
-      return this.incentivesRepository.replaceAll(normalizedRows, manager);
-    });
+      return this.incentivesSyncRepository.replaceAll(normalizedRows, entityManager);
+    };
+
+    const rebuiltCount = manager
+      ? await rebuildWithManager(manager)
+      : await this.incentivesSyncRepository.inTransaction(rebuildWithManager);
 
     const invalidatedCacheKeys = await this.clearHistoryCache();
 

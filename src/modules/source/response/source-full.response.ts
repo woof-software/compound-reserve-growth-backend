@@ -1,8 +1,8 @@
 import { ApiProperty } from '@nestjs/swagger';
 
-import { AssetResponse } from 'modules/asset/response/asset.response';
-import { SourceEntity } from 'modules/source/source.entity';
-import { SourceType } from 'modules/source/enum/source-type.enum';
+import { AssetResponse } from '@/modules/asset/response/asset.response';
+import { SourceEntity } from '@/modules/source/source.entity';
+import { SourceType } from '@/modules/source/enum/source-type.enum';
 
 export class SourceFullResponse {
   @ApiProperty({ example: 1 })

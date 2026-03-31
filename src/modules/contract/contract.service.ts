@@ -2,17 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { ethers } from 'ethers';
 import { MulticallProvider } from 'ethers-multicall-provider';
-
-import { IncomesEntity, ReserveEntity, SpendsEntity } from 'modules/history/entities';
-import { HistoryService } from 'modules/history/services/history.service';
-import { SourceEntity } from 'modules/source/source.entity';
-import { PriceService } from 'modules/price/price.service';
-import { MailService } from 'modules/mail/mail.service';
-import { STABLECOIN_PRICES } from 'modules/price/constants';
-import { AlgorithmService } from 'modules/contract/algorithm.service';
-
-import { ProviderFactory } from 'common/chains/network/provider.factory';
-import { BlockService } from 'common/chains/block/block.service';
+import { EntityManager } from 'typeorm';
 
 import CometABI from './abi/CometABI.json';
 import CometExtensionABI from './abi/CometExtensionABI.json';
@@ -25,7 +15,16 @@ import Bytes32TokenABI from './abi/Bytes32TokenABI.json';
 import { MarketData, RootJson } from './contract.type';
 import { ResponseStatsAlgorithm } from './interface';
 
-import type { ContractConfig } from 'config/contract';
+import { ProviderFactory } from '@/common/chains/network/provider.factory';
+import { BlockService } from '@/common/chains/block/block.service';
+import { AlgorithmService } from '@/modules/contract/algorithm.service';
+import { STABLECOIN_PRICES } from '@/modules/price/constants';
+import { MailService } from '@/modules/mail/mail.service';
+import { PriceService } from '@/modules/price/price.service';
+import { SourceEntity } from '@/modules/source/source.entity';
+import { HistoryService } from '@/modules/history/services/history.service';
+import { IncomesEntity, ReserveEntity, SpendsEntity } from '@/modules/history/entities';
+import type { ContractConfig } from '@/config/contract';
 import { SEC_IN_MS } from '@/common/constants';
 import { Algorithm } from '@/common/enum/algorithm.enum';
 import { calculateTimeRange } from '@/common/utils/calculate-time-range';
@@ -268,28 +267,28 @@ export class ContractService {
     return tokenAddress;
   }
 
-  async getHistory(source: SourceEntity) {
+  async getHistory(source: SourceEntity, manager?: EntityManager) {
     const { algorithm } = source;
 
     for (const alg of algorithm) {
       switch (alg) {
         case Algorithm.COMET:
-          await this.saveReserves(source, alg);
+          await this.saveReserves(source, alg, undefined, manager);
           break;
         case Algorithm.COMET_COLLATERAL:
-          await this.saveReserves(source, alg);
+          await this.saveReserves(source, alg, undefined, manager);
           break;
         case Algorithm.MARKET_V2:
-          await this.saveReserves(source, alg);
+          await this.saveReserves(source, alg, undefined, manager);
           break;
         case Algorithm.ETH_WALLET:
-          await this.saveReserves(source, alg);
+          await this.saveReserves(source, alg, undefined, manager);
           break;
         case Algorithm.COMET_STATS:
-          await this.saveStats(source, alg);
+          await this.saveStats(source, alg, undefined, manager);
           break;
         default:
-          await this.saveReserves(source, alg);
+          await this.saveReserves(source, alg, undefined, manager);
       }
     }
   }
@@ -298,6 +297,7 @@ export class ContractService {
     source: SourceEntity,
     algorithm: string,
     startDate?: Date,
+    manager?: EntityManager,
   ): Promise<void> {
     const { address: contractAddress, network, asset } = source;
     const { address: assetAddress } = asset;
@@ -352,7 +352,7 @@ export class ContractService {
           return;
         }
       } else {
-        const latestReserve = await this.historyService.findLatestReserveBySource(source);
+        const latestReserve = await this.historyService.findLatestReserveBySource(source, manager);
         lastBlock = latestReserve?.blockNumber ?? source.startBlock;
         if (source.endBlock != null && lastBlock >= source.endBlock) {
           this.logger.log(
@@ -520,7 +520,7 @@ export class ContractService {
             date,
           );
 
-          await this.historyService.createReservesWithSource(newHistory);
+          await this.historyService.createReservesWithSource(newHistory, manager);
 
           lastBlock = blockTag;
           processedCount++;
@@ -567,7 +567,12 @@ export class ContractService {
     }
   }
 
-  public async saveStats(source: SourceEntity, algorithm: string, startDate?: Date): Promise<void> {
+  public async saveStats(
+    source: SourceEntity,
+    algorithm: string,
+    startDate?: Date,
+    manager?: EntityManager,
+  ): Promise<void> {
     const { address: contractAddress, network, asset } = source;
 
     this.logger.log(
@@ -614,8 +619,8 @@ export class ContractService {
           return;
         }
       } else {
-        const spends = await this.historyService.findSpendsBySource(source);
-        const incomes = await this.historyService.findIncomesBySource(source);
+        const spends = await this.historyService.findSpendsBySource(source, manager);
+        const incomes = await this.historyService.findIncomesBySource(source, manager);
 
         if (incomes?.blockNumber) {
           lastBlock = incomes.blockNumber;
@@ -784,9 +789,9 @@ export class ContractService {
               spendBorrowQuantity,
               dayDate,
             );
-            await this.historyService.createSpendsWithSource(newSpends);
+            await this.historyService.createSpendsWithSource(newSpends, manager);
           }
-          await this.historyService.createIncomesWithSource(newIncomes);
+          await this.historyService.createIncomesWithSource(newIncomes, manager);
 
           lastBlock = blockTag;
           processedCount++;

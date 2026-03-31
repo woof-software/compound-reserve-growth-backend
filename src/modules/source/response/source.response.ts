@@ -1,7 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
 
-import { SourceEntity } from 'modules/source/source.entity';
-import { SourceType } from 'modules/source/enum/source-type.enum';
+import { SourceEntity } from '@/modules/source/source.entity';
+import { SourceType } from '@/modules/source/enum/source-type.enum';
 
 export class SourceResponse {
   @ApiProperty({ example: 1 })

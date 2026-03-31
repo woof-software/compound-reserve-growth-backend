@@ -1,8 +1,8 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 
-import { SourceModule } from 'modules/source/source.module';
-import { HistoryModule } from 'modules/history/history.module';
+import { SourceModule } from '@/modules/source/source.module';
+import { HistoryModule } from '@/modules/history/history.module';
 
 import { TreasuryEntity } from './treasury.entity';
 import { TreasuryRepository } from './treasury.repository';

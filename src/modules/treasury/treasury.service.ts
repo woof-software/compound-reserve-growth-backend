@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 
-import { SourceRepository } from 'modules/source/source.repository';
+import { SourceRepository } from '@/modules/source/source.repository';
 
 import { TreasuryRepository } from './treasury.repository';
 import { TreasuryEntity } from './treasury.entity';

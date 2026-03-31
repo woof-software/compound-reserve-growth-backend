@@ -1,12 +1,12 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 
-import { Oracle } from 'modules/oracle/oracle.entity';
-import { OracleService } from 'modules/oracle/oracle.service';
-import { AlertService } from 'modules/alert/alert.service';
+import { Oracle } from '@/modules/oracle/oracle.entity';
+import { OracleService } from '@/modules/oracle/oracle.service';
+import { AlertService } from '@/modules/alert/alert.service';
 
-import { ProviderFactory } from 'common/chains/network/provider.factory';
-import { BlockService } from 'common/chains/block/block.service';
+import { ProviderFactory } from '@/common/chains/network/provider.factory';
+import { BlockService } from '@/common/chains/block/block.service';
 
 import { DailyAggregationRepository } from './repositories/daily-aggregation.repository';
 import { SnapshotRepository } from './repositories/snapshot.repository';

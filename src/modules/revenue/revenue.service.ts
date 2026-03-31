@@ -1,7 +1,9 @@
 import { Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import Redis from 'ioredis';
+import { EntityManager } from 'typeorm';
 
 import { RevenueEntity } from './revenue.entity';
+import { RevenueSyncRepository } from './revenue-sync.repository';
 import { RevenueRepository } from './revenue.repository';
 
 import { REDIS_CLIENT } from 'infrastructure/redis/redis.module';
@@ -16,11 +18,14 @@ export class RevenueService {
 
   constructor(
     private readonly revenueRepository: RevenueRepository,
+    private readonly revenueSyncRepository: RevenueSyncRepository,
     @Inject(REDIS_CLIENT) private readonly redisClient: Redis,
   ) {}
 
-  async rebuildHistory(clearData = false): Promise<void> {
-    const { deletedCount, insertedCount } = await this.revenueRepository.syncHistory(clearData);
+  async rebuildHistory(clearData = false, manager?: EntityManager): Promise<void> {
+    const { deletedCount, insertedCount } = manager
+      ? await this.revenueSyncRepository.syncHistoryWithManager(clearData, manager)
+      : await this.revenueSyncRepository.syncHistory(clearData);
     const invalidatedCacheKeys =
       deletedCount > 0 || insertedCount > 0 ? await this.clearHistoryCache() : 0;
 

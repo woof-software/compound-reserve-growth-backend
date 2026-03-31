@@ -1,17 +1,22 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { EntityManager } from 'typeorm';
 
-import { SourceRepository } from 'modules/source/source.repository';
-import { SourceEntity } from 'modules/source/source.entity';
-import { IncentiveEntity } from 'modules/incentives/incentive.entity';
-import { IncentivesQueryService } from 'modules/incentives/incentives-query.service';
-import { RevenueEntity } from 'modules/revenue/revenue.entity';
-import { RevenueService } from 'modules/revenue/revenue.service';
-import { CreateHistoryDto } from 'modules/history/dto/create-history.dto';
-import { IncomesEntity, ReserveEntity, SpendsEntity, StatsHistory } from 'modules/history/entities';
-import { IncomesRepository } from 'modules/history/repositories/incomes.repository';
-import { ReservesRepository } from 'modules/history/repositories/reserves.repository';
-import { SpendsRepository } from 'modules/history/repositories/spends.repository';
-
+import { SourceRepository } from '@/modules/source/source.repository';
+import { SourceEntity } from '@/modules/source/source.entity';
+import { IncentiveEntity } from '@/modules/incentives/incentive.entity';
+import { IncentivesQueryService } from '@/modules/incentives/incentives-query.service';
+import { RevenueEntity } from '@/modules/revenue/revenue.entity';
+import { RevenueService } from '@/modules/revenue/revenue.service';
+import { CreateHistoryDto } from '@/modules/history/dto/create-history.dto';
+import {
+  IncomesEntity,
+  ReserveEntity,
+  SpendsEntity,
+  StatsHistory,
+} from '@/modules/history/entities';
+import { IncomesRepository } from '@/modules/history/repositories/incomes.repository';
+import { ReservesRepository } from '@/modules/history/repositories/reserves.repository';
+import { SpendsRepository } from '@/modules/history/repositories/spends.repository';
 import { OffsetDataDto } from '@/common/dto/offset-data.dto';
 import { OffsetDto } from '@/common/dto/offset.dto';
 import { PaginatedDataDto } from '@/common/dto/paginated-data.dto';
@@ -45,16 +50,25 @@ export class HistoryService {
     );
     return this.reservesRepo.save(reserve);
   }
-  async createReservesWithSource(reserve: ReserveEntity): Promise<ReserveEntity> {
-    return this.reservesRepo.save(reserve);
+  async createReservesWithSource(
+    reserve: ReserveEntity,
+    manager?: EntityManager,
+  ): Promise<ReserveEntity> {
+    return this.reservesRepo.save(reserve, manager);
   }
 
-  async createIncomesWithSource(incomes: IncomesEntity): Promise<IncomesEntity> {
-    return this.incomesRepo.save(incomes);
+  async createIncomesWithSource(
+    incomes: IncomesEntity,
+    manager?: EntityManager,
+  ): Promise<IncomesEntity> {
+    return this.incomesRepo.save(incomes, manager);
   }
 
-  async createSpendsWithSource(spends: SpendsEntity): Promise<SpendsEntity> {
-    return this.spendsRepo.save(spends);
+  async createSpendsWithSource(
+    spends: SpendsEntity,
+    manager?: EntityManager,
+  ): Promise<SpendsEntity> {
+    return this.spendsRepo.save(spends, manager);
   }
 
   async findReservesById(id: number): Promise<ReserveEntity | null> {
@@ -69,16 +83,25 @@ export class HistoryService {
     return this.spendsRepo.findById(id);
   }
 
-  async findIncomesBySource(source: SourceEntity): Promise<IncomesEntity | null> {
-    return this.incomesRepo.findBySourceId(source.id);
+  async findIncomesBySource(
+    source: SourceEntity,
+    manager?: EntityManager,
+  ): Promise<IncomesEntity | null> {
+    return this.incomesRepo.findBySourceId(source.id, manager);
   }
 
-  async findSpendsBySource(source: SourceEntity): Promise<SpendsEntity | null> {
-    return this.spendsRepo.findBySourceId(source.id);
+  async findSpendsBySource(
+    source: SourceEntity,
+    manager?: EntityManager,
+  ): Promise<SpendsEntity | null> {
+    return this.spendsRepo.findBySourceId(source.id, manager);
   }
 
-  async findLatestReserveBySource(source: SourceEntity): Promise<ReserveEntity | null> {
-    return this.reservesRepo.findLatestBySourceId(source.id);
+  async findLatestReserveBySource(
+    source: SourceEntity,
+    manager?: EntityManager,
+  ): Promise<ReserveEntity | null> {
+    return this.reservesRepo.findLatestBySourceId(source.id, manager);
   }
 
   async getTreasuryHistory(): Promise<ReserveEntity[]> {
