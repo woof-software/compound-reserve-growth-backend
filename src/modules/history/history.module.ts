@@ -29,6 +29,7 @@ import { RedisModule } from 'infrastructure/redis/redis.module';
     AssetModule,
     forwardRef(() => ContractModule),
     IncentivesModule,
+    IncentivesModule,
     NetworkModule,
     PriceModule,
     RevenueModule,
