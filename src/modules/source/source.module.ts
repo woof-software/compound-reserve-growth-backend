@@ -1,9 +1,9 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 
-import { AssetModule } from 'modules/asset/asset.module';
+import { AssetModule } from '@/modules/asset/asset.module';
 
-import { NetworkModule } from 'common/chains/network/network.module';
+import { NetworkModule } from '@/common/chains/network/network.module';
 
 import { SourceEntity } from './source.entity';
 import { SourceRepository } from './source.repository';

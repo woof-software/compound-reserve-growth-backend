@@ -1,9 +1,9 @@
 import { Module } from '@nestjs/common';
 
-import { HistoryModule } from 'modules/history/history.module';
-
 import { AdminController } from './admin.controller';
 import { AdminService } from './admin.service';
+
+import { HistoryModule } from '@/modules/history/history.module';
 
 @Module({
   imports: [HistoryModule],

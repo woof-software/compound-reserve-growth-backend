@@ -1,11 +1,6 @@
 import { forwardRef, Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 
-import { AssetModule } from 'modules/asset/asset.module';
-import { SourceModule } from 'modules/source/source.module';
-import { ContractModule } from 'modules/contract/contract.module';
-import { PriceModule } from 'modules/price/price.module';
-
 import { ReserveEntity, IncomesEntity, SpendsEntity } from './entities';
 import { HistoryGetCommand } from './cli/history-get.command';
 import { StatsGetCommand } from './cli/stats-get.command';
@@ -17,6 +12,12 @@ import { SpendsRepository } from './repositories/spends.repository';
 import { HistoryProcessingService } from './services/history-processing.service';
 import { HistoryService } from './services/history.service';
 
+import { RevenueModule } from '@/modules/revenue/revenue.module';
+import { PriceModule } from '@/modules/price/price.module';
+import { ContractModule } from '@/modules/contract/contract.module';
+import { SourceModule } from '@/modules/source/source.module';
+import { IncentivesModule } from '@/modules/incentives/incentives.module';
+import { AssetModule } from '@/modules/asset/asset.module';
 import { RedisModule } from 'infrastructure/redis/redis.module';
 
 @Module({
@@ -25,7 +26,9 @@ import { RedisModule } from 'infrastructure/redis/redis.module';
     SourceModule,
     AssetModule,
     forwardRef(() => ContractModule),
+    IncentivesModule,
     PriceModule,
+    RevenueModule,
     RedisModule,
   ],
   providers: [

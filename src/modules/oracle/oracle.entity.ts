@@ -9,7 +9,7 @@ import {
   ManyToOne,
 } from 'typeorm';
 
-import { AssetEntity } from 'modules/asset/asset.entity';
+import { AssetEntity } from '@/modules/asset/asset.entity';
 
 @Entity('oracles')
 @Unique(['address'])

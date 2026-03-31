@@ -3,10 +3,10 @@ import { ConfigService } from '@nestjs/config';
 import axios from 'axios';
 import { EntityManager, QueryFailedError } from 'typeorm';
 
-import { AssetEntity } from 'modules/asset/asset.entity';
-import { SourceEntity } from 'modules/source/source.entity';
+import { AssetEntity } from '@/modules/asset/asset.entity';
+import { SourceEntity } from '@/modules/source/source.entity';
 
-import { NetworkService } from 'common/chains/network/network.service';
+import { NetworkService } from '@/common/chains/network/network.service';
 
 import {
   AssetInsertItem,
@@ -19,7 +19,7 @@ import { SyncRepository } from './repositories/sync.repository';
 import type { RemoteAsset, RemoteSource } from './types/remote-reserve-sources.types';
 import { SourcesUpdateValidationService } from './sources-validator';
 
-import type { ReserveSourcesConfig } from 'config/reserve-sources.config';
+import type { ReserveSourcesConfig } from '@/config/reserve-sources.config';
 
 /**
  * Syncs assets and sources from remote reserve data in a single transaction.

@@ -1,16 +1,16 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ethers } from 'ethers';
 
-import CometABI from 'modules/contract/abi/CometABI.json';
+import CometABI from '@/modules/contract/abi/CometABI.json';
 import type {
   CollateralLifecycleOutput,
   CometAssetInfo,
   CometContract,
   CometContractReaders,
-} from 'modules/collateral/types/collateral.types';
+} from '@/modules/collateral/types/collateral.types';
 
-import { BlockService } from 'common/chains/block/block.service';
-import { ProviderFactory } from 'common/chains/network/provider.factory';
+import { BlockService } from '@/common/chains/block/block.service';
+import { ProviderFactory } from '@/common/chains/network/provider.factory';
 
 @Injectable()
 export class CollateralAlgorithmService {

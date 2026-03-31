@@ -1,27 +1,34 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { InjectDataSource } from '@nestjs/typeorm';
+import { DataSource, EntityManager } from 'typeorm';
 
-import { ContractService } from 'modules/contract/contract.service';
-import { SourceService } from 'modules/source/source.service';
-import { PriceService } from 'modules/price/price.service';
-import { HistoryCollectionRequest } from 'modules/history/types/history-collection-request.type';
-import { IncomesRepository } from 'modules/history/repositories/incomes.repository';
-import { SpendsRepository } from 'modules/history/repositories/spends.repository';
-import { ReservesRepository } from 'modules/history/repositories/reserves.repository';
-
+import { ContractService } from '@/modules/contract/contract.service';
+import { IncentivesService } from '@/modules/incentives/incentives.service';
+import { SourceService } from '@/modules/source/source.service';
+import { PriceService } from '@/modules/price/price.service';
+import { RevenueService } from '@/modules/revenue/revenue.service';
+import { HistoryCollectionRequest } from '@/modules/history/types/history-collection-request.type';
+import { IncomesRepository } from '@/modules/history/repositories/incomes.repository';
+import { SpendsRepository } from '@/modules/history/repositories/spends.repository';
+import { ReservesRepository } from '@/modules/history/repositories/reserves.repository';
 import { Algorithm } from '@/common/enum/algorithm.enum';
 
 @Injectable()
 export class HistoryProcessingService {
   private readonly logger = new Logger(HistoryProcessingService.name);
+  private readonly TRANSACTION_ISOLATION_LEVEL = 'READ COMMITTED';
   private isProcessing = false;
 
   constructor(
+    @InjectDataSource() private readonly dataSource: DataSource,
     private readonly sourceService: SourceService,
     private readonly contractService: ContractService,
     private readonly priceService: PriceService,
     private readonly incomesRepository: IncomesRepository,
     private readonly spendsRepository: SpendsRepository,
     private readonly reservesRepository: ReservesRepository,
+    private readonly revenueService: RevenueService,
+    private readonly incentivesService: IncentivesService,
   ) {}
 
   public isProcessRunning(): boolean {
@@ -57,16 +64,24 @@ export class HistoryProcessingService {
     }
   }
 
+  private async executeInTransaction<T>(work: (manager: EntityManager) => Promise<T>): Promise<T> {
+    return this.dataSource.transaction(this.TRANSACTION_ISOLATION_LEVEL, work);
+  }
+
   async getHistory() {
     return this.executeWithLock('Daily History Sync', async () => {
       this.logger.log('Starting to get history data...');
 
       const dbSources = await this.sourceService.listAll();
 
-      for (const source of dbSources) {
-        await this.contractService.getHistory(source);
-      }
+      await this.executeInTransaction(async (manager) => {
+        for (const source of dbSources) {
+          await this.contractService.getHistory(source, manager);
+        }
 
+        await this.revenueService.rebuildHistory(false, manager);
+        await this.incentivesService.rebuildHistory(manager);
+      });
       this.logger.log('Getting history data completed.');
     });
   }
@@ -97,24 +112,27 @@ export class HistoryProcessingService {
       this.logger.log(`Found ${dbSources.length} sources for reserves processing`);
 
       let startDate: Date | undefined;
-      if (collectionSwitch?.clearData) {
-        const sourceIds = dbSources.map((source) => source.id);
-        this.logger.log(`Clearing reserves for ${sourceIds.length} sources...`);
-        await this.reservesRepository.deleteBySourceIds(sourceIds);
-        this.logger.log('Reserves cleared successfully.');
-        startDate = collectionSwitch.data;
-      }
-
-      for (const source of dbSources) {
-        const matchingAlgorithm = source.algorithm.find((algorithm) =>
-          reservesAlgorithms.includes(algorithm as Algorithm),
-        );
-
-        if (matchingAlgorithm) {
-          await this.contractService.saveReserves(source, matchingAlgorithm, startDate);
+      await this.executeInTransaction(async (manager) => {
+        if (collectionSwitch?.clearData) {
+          const sourceIds = dbSources.map((source) => source.id);
+          this.logger.log(`Clearing reserves for ${sourceIds.length} sources...`);
+          await this.reservesRepository.deleteBySourceIds(sourceIds, manager);
+          this.logger.log('Reserves cleared successfully.');
+          startDate = collectionSwitch.data;
         }
-      }
 
+        for (const source of dbSources) {
+          const matchingAlgorithm = source.algorithm.find((algorithm) =>
+            reservesAlgorithms.includes(algorithm as Algorithm),
+          );
+
+          if (matchingAlgorithm) {
+            await this.contractService.saveReserves(source, matchingAlgorithm, startDate, manager);
+          }
+        }
+
+        await this.revenueService.rebuildHistory(collectionSwitch?.clearData, manager);
+      });
       this.logger.log('Reserves processing completed.');
     });
   }
@@ -123,28 +141,34 @@ export class HistoryProcessingService {
     return this.executeWithLock('Stats Processing', async () => {
       this.logger.log('Starting to process stats...');
       let startDate: Date | undefined;
-      if (collectionSwitch?.clearData) {
-        this.logger.log('Clearing spends and incomes tables...');
-        await Promise.all([this.spendsRepository.deleteAll(), this.incomesRepository.deleteAll()]);
-        this.logger.log('Spends and incomes tables cleared successfully.');
-        startDate = collectionSwitch.data;
-      }
-
       const statsAlgorithms = [Algorithm.COMET_STATS];
       const dbSources = await this.sourceService.listByAlgorithms(statsAlgorithms);
 
       this.logger.log(`Found ${dbSources.length} sources for stats processing`);
 
-      for (const source of dbSources) {
-        const matchingAlgorithm = source.algorithm.find((algorithm) =>
-          statsAlgorithms.includes(algorithm as Algorithm),
-        );
-
-        if (matchingAlgorithm) {
-          await this.contractService.saveStats(source, matchingAlgorithm, startDate);
+      await this.executeInTransaction(async (manager) => {
+        if (collectionSwitch?.clearData) {
+          this.logger.log('Clearing spends and incomes tables...');
+          await Promise.all([
+            this.spendsRepository.deleteAll(manager),
+            this.incomesRepository.deleteAll(manager),
+          ]);
+          this.logger.log('Spends and incomes tables cleared successfully.');
+          startDate = collectionSwitch.data;
         }
-      }
 
+        for (const source of dbSources) {
+          const matchingAlgorithm = source.algorithm.find((algorithm) =>
+            statsAlgorithms.includes(algorithm as Algorithm),
+          );
+
+          if (matchingAlgorithm) {
+            await this.contractService.saveStats(source, matchingAlgorithm, startDate, manager);
+          }
+        }
+
+        await this.incentivesService.rebuildHistory(manager);
+      });
       this.logger.log('Stats processing completed.');
     });
   }
@@ -210,6 +234,7 @@ export class HistoryProcessingService {
         `Price Comp update completed: ${updatedIncomes} incomes and ${updatedSpends} spends updated successfully`,
       );
       this.logger.log(`Failed updates: ${failedIncomes} incomes and ${failedSpends} spends`);
+      await this.incentivesService.rebuildHistory();
     });
   }
 }

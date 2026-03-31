@@ -1,6 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 
-import { AssetEntity } from 'modules/asset/asset.entity';
+import { AssetEntity } from '@/modules/asset/asset.entity';
 
 export class AssetResponse {
   @ApiProperty({ example: 2 })

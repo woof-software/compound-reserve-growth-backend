@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { ethers } from 'ethers';
 
-import { ResponseStatsAlgorithm } from 'modules/contract/interface';
+import { ResponseStatsAlgorithm } from '@/modules/contract/interface';
 
 import { dailyIncomeTokens, dailySpendUsd } from './math';
 

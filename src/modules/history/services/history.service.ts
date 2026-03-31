@@ -1,35 +1,37 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
+import { EntityManager } from 'typeorm';
 
-import { SourceRepository } from 'modules/source/source.repository';
-import { SourceEntity } from 'modules/source/source.entity';
-import { CreateHistoryDto } from 'modules/history/dto/create-history.dto';
-import { OffsetDto } from 'modules/history/dto/offset.dto';
-import { PaginationDto } from 'modules/history/dto/pagination.dto';
+import { SourceRepository } from '@/modules/source/source.repository';
+import { SourceEntity } from '@/modules/source/source.entity';
+import { IncentiveEntity } from '@/modules/incentives/incentive.entity';
+import { IncentivesQueryService } from '@/modules/incentives/incentives-query.service';
+import { RevenueEntity } from '@/modules/revenue/revenue.entity';
+import { RevenueService } from '@/modules/revenue/revenue.service';
+import { CreateHistoryDto } from '@/modules/history/dto/create-history.dto';
 import {
-  IncentivesHistory,
   IncomesEntity,
   ReserveEntity,
   SpendsEntity,
   StatsHistory,
-} from 'modules/history/entities';
-import { IncomesRepository } from 'modules/history/repositories/incomes.repository';
-import { ReservesRepository } from 'modules/history/repositories/reserves.repository';
-import { SpendsRepository } from 'modules/history/repositories/spends.repository';
+} from '@/modules/history/entities';
+import { IncomesRepository } from '@/modules/history/repositories/incomes.repository';
+import { ReservesRepository } from '@/modules/history/repositories/reserves.repository';
+import { SpendsRepository } from '@/modules/history/repositories/spends.repository';
 import { OffsetDataDto } from '@/common/dto/offset-data.dto';
+import { OffsetDto } from '@/common/dto/offset.dto';
 import { PaginatedDataDto } from '@/common/dto/paginated-data.dto';
-import { Algorithm } from '@/common/enum/algorithm.enum';
-import { Order } from '@/common/enum/order.enum';
+import { PaginationDto } from '@/common/dto/pagination.dto';
 import { generateDailyKey } from '@/common/utils/generate-daily-key';
 
 @Injectable()
 export class HistoryService {
-  private readonly logger = new Logger(HistoryService.name);
-
   constructor(
     private readonly reservesRepo: ReservesRepository,
     private readonly incomesRepo: IncomesRepository,
     private readonly spendsRepo: SpendsRepository,
     private readonly sourceRepo: SourceRepository,
+    private readonly revenueService: RevenueService,
+    private readonly incentivesQueryService: IncentivesQueryService,
   ) {}
 
   async create(dto: CreateHistoryDto): Promise<ReserveEntity> {
@@ -48,16 +50,25 @@ export class HistoryService {
     );
     return this.reservesRepo.save(reserve);
   }
-  async createReservesWithSource(reserve: ReserveEntity): Promise<ReserveEntity> {
-    return this.reservesRepo.save(reserve);
+  async createReservesWithSource(
+    reserve: ReserveEntity,
+    manager?: EntityManager,
+  ): Promise<ReserveEntity> {
+    return this.reservesRepo.save(reserve, manager);
   }
 
-  async createIncomesWithSource(incomes: IncomesEntity): Promise<IncomesEntity> {
-    return this.incomesRepo.save(incomes);
+  async createIncomesWithSource(
+    incomes: IncomesEntity,
+    manager?: EntityManager,
+  ): Promise<IncomesEntity> {
+    return this.incomesRepo.save(incomes, manager);
   }
 
-  async createSpendsWithSource(spends: SpendsEntity): Promise<SpendsEntity> {
-    return this.spendsRepo.save(spends);
+  async createSpendsWithSource(
+    spends: SpendsEntity,
+    manager?: EntityManager,
+  ): Promise<SpendsEntity> {
+    return this.spendsRepo.save(spends, manager);
   }
 
   async findReservesById(id: number): Promise<ReserveEntity | null> {
@@ -72,16 +83,25 @@ export class HistoryService {
     return this.spendsRepo.findById(id);
   }
 
-  async findIncomesBySource(source: SourceEntity): Promise<IncomesEntity | null> {
-    return this.incomesRepo.findBySourceId(source.id);
+  async findIncomesBySource(
+    source: SourceEntity,
+    manager?: EntityManager,
+  ): Promise<IncomesEntity | null> {
+    return this.incomesRepo.findBySourceId(source.id, manager);
   }
 
-  async findSpendsBySource(source: SourceEntity): Promise<SpendsEntity | null> {
-    return this.spendsRepo.findBySourceId(source.id);
+  async findSpendsBySource(
+    source: SourceEntity,
+    manager?: EntityManager,
+  ): Promise<SpendsEntity | null> {
+    return this.spendsRepo.findBySourceId(source.id, manager);
   }
 
-  async findLatestReserveBySource(source: SourceEntity): Promise<ReserveEntity | null> {
-    return this.reservesRepo.findLatestBySourceId(source.id);
+  async findLatestReserveBySource(
+    source: SourceEntity,
+    manager?: EntityManager,
+  ): Promise<ReserveEntity | null> {
+    return this.reservesRepo.findLatestBySourceId(source.id, manager);
   }
 
   async getTreasuryHistory(): Promise<ReserveEntity[]> {
@@ -102,22 +122,22 @@ export class HistoryService {
     return this.reservesRepo.getOffsetTreasuryReserves(dto);
   }
 
-  async getRevenueHistory(): Promise<ReserveEntity[]> {
-    const reserves = await this.reservesRepo.getRevenueReserves();
-    if (!reserves || reserves.length === 0) {
+  async getRevenueHistory(): Promise<RevenueEntity[]> {
+    const revenueHistory = await this.revenueService.getHistory();
+    if (!revenueHistory || revenueHistory.length === 0) {
       throw new NotFoundException('No revenue history found');
     }
-    return reserves;
+    return revenueHistory;
   }
 
   async getPaginatedRevenueHistory(
     paginationDto: PaginationDto,
-  ): Promise<PaginatedDataDto<ReserveEntity>> {
-    return this.reservesRepo.getPaginatedRevenueReserves(paginationDto);
+  ): Promise<PaginatedDataDto<RevenueEntity>> {
+    return this.revenueService.getPaginatedHistory(paginationDto);
   }
 
-  async getOffsetRevenueHistory(dto: OffsetDto): Promise<OffsetDataDto<ReserveEntity>> {
-    return this.reservesRepo.getOffsetRevenueReserves(dto);
+  async getOffsetRevenueHistory(dto: OffsetDto): Promise<OffsetDataDto<RevenueEntity>> {
+    return this.revenueService.getOffsetHistory(dto);
   }
 
   async getTreasuryHoldings(): Promise<ReserveEntity[]> {
@@ -190,57 +210,7 @@ export class HistoryService {
     );
   }
 
-  async getIncentiveHistory(dto: OffsetDto): Promise<OffsetDataDto<IncentivesHistory>> {
-    const allAlgorithms = [
-      Algorithm.COMET_STATS,
-      Algorithm.MARKET_V2,
-      Algorithm.AERA_COMPOUND_RESERVES,
-    ];
-
-    if (!dto.order) {
-      dto.order = Order.ASC;
-    }
-
-    const incentivesData = await this.reservesRepo.getOffsetIncentivesHistory(dto, allAlgorithms);
-
-    if (incentivesData.data.length === 0) {
-      return new OffsetDataDto<IncentivesHistory>(
-        [],
-        incentivesData.limit,
-        incentivesData.offset,
-        incentivesData.total,
-      );
-    }
-
-    const indexesWithoutPrice: number[] = [];
-    let firstPrice = 0;
-    let previousPrice = 0;
-    const data: IncentivesHistory[] = incentivesData.data.map((item, index) => {
-      if (!item.priceComp) {
-        this.logger.warn(`incentives -> priceComp not found for ${item.date}`, item);
-        if (previousPrice) {
-          item.priceComp = previousPrice;
-        } else {
-          indexesWithoutPrice.push(index);
-        }
-      } else {
-        firstPrice = firstPrice || item.priceComp;
-        previousPrice = item.priceComp;
-      }
-      return item;
-    });
-
-    if (firstPrice) {
-      indexesWithoutPrice.forEach((index) => {
-        data[index].priceComp = firstPrice;
-      });
-    }
-
-    return new OffsetDataDto<IncentivesHistory>(
-      data,
-      incentivesData.limit,
-      incentivesData.offset,
-      incentivesData.total,
-    );
+  async getIncentiveHistory(dto: OffsetDto): Promise<OffsetDataDto<IncentiveEntity>> {
+    return this.incentivesQueryService.getOffsetHistory(dto);
   }
 }

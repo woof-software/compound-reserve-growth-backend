@@ -38,6 +38,20 @@ describe('ContractService', () => {
   };
 
   const makeDeps = () => {
+    const configService = {
+      getOrThrow: jest.fn((key: string) => {
+        switch (key) {
+          case 'contract.bytes32Tokens':
+            return [];
+          case 'contract.cEthMarketAddress':
+            return '0x00000000000000000000000000000000000000ce';
+          case 'contract.nativeTokenAddress':
+            return '0x00000000000000000000000000000000000000ee';
+          default:
+            throw new Error(`Unexpected config key: ${key}`);
+        }
+      }),
+    };
     const findLatestReserveBySource = jest.fn();
     const historyService = {
       findLatestReserveBySource,
@@ -65,6 +79,7 @@ describe('ContractService', () => {
     const mailService = { notifyGetHistoryError: jest.fn() };
 
     const service = new ContractService(
+      configService as never,
       providerFactory as never,
       blockService as never,
       historyService as never,
@@ -102,7 +117,7 @@ describe('ContractService', () => {
 
       await service.saveReserves(source, Algorithm.COMET);
 
-      expect(findLatestReserveBySource).toHaveBeenCalledWith(source);
+      expect(findLatestReserveBySource).toHaveBeenCalledWith(source, undefined);
       expect(blockService.getCachedBlock).toHaveBeenCalledWith('eth', provider, 5_000);
     });
 
@@ -118,7 +133,7 @@ describe('ContractService', () => {
 
       await service.saveReserves(source, Algorithm.COMET);
 
-      expect(findLatestReserveBySource).toHaveBeenCalledWith(source);
+      expect(findLatestReserveBySource).toHaveBeenCalledWith(source, undefined);
       expect(blockService.getCachedBlock).toHaveBeenCalledWith('eth', provider, 50_000);
     });
 
@@ -189,7 +204,7 @@ describe('ContractService', () => {
 
       await service.saveReserves(source, Algorithm.COMET);
 
-      expect(findLatestReserveBySource).toHaveBeenCalledWith(source);
+      expect(findLatestReserveBySource).toHaveBeenCalledWith(source, undefined);
       expect(historyService.createReservesWithSource).not.toHaveBeenCalled();
       expect(priceService.getHistoricalPrice).not.toHaveBeenCalled();
       expect(mailService.notifyGetHistoryError).not.toHaveBeenCalled();
@@ -267,9 +282,19 @@ describe('ContractService', () => {
       await service.getHistory(source);
 
       expect(saveStatsSpy).toHaveBeenCalledTimes(1);
-      expect(saveStatsSpy).toHaveBeenCalledWith(source, Algorithm.COMET_STATS);
+      expect(saveStatsSpy).toHaveBeenCalledWith(
+        source,
+        Algorithm.COMET_STATS,
+        undefined,
+        undefined,
+      );
       expect(saveReservesSpy).toHaveBeenCalledTimes(1);
-      expect(saveReservesSpy).toHaveBeenCalledWith(source, 'custom-algorithm');
+      expect(saveReservesSpy).toHaveBeenCalledWith(
+        source,
+        'custom-algorithm',
+        undefined,
+        undefined,
+      );
     });
   });
 });

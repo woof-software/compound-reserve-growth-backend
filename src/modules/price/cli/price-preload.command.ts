@@ -1,7 +1,7 @@
 import { Logger } from '@nestjs/common';
 import { Command, CommandRunner } from 'nest-commander';
 
-import { PriceService } from 'modules/price/price.service';
+import { PriceService } from '@/modules/price/price.service';
 
 @Command({ name: 'price:preload', description: 'Preload price data' })
 export class PricePreloadCommand extends CommandRunner {

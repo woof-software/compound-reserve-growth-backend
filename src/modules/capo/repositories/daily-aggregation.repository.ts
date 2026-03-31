@@ -2,8 +2,8 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 
-import { DailyAggregation } from 'modules/capo/entities/daily.entity';
-import { Snapshot } from 'modules/capo/entities/snapshot.entity';
+import { DailyAggregation } from '@/modules/capo/entities/daily.entity';
+import { Snapshot } from '@/modules/capo/entities/snapshot.entity';
 
 import { Order } from '@/common/enum/order.enum';
 

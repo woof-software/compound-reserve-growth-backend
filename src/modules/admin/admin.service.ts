@@ -1,8 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 
-import { StartCollectionRequest } from 'modules/admin/request';
-import { HistoryCollectionQueueService } from 'modules/history/queue/history-collection-queue.service';
-import { HistoryCollectionRequest } from 'modules/history/types/history-collection-request.type';
+import { StartCollectionRequest } from '@/modules/admin/request';
+import { HistoryCollectionQueueService } from '@/modules/history/queue/history-collection-queue.service';
+import { HistoryCollectionRequest } from '@/modules/history/types/history-collection-request.type';
 
 const toHistoryCollectionRequest = (request: StartCollectionRequest): HistoryCollectionRequest => ({
   clearData: request.clearData,

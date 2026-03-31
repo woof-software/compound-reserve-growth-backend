@@ -2,15 +2,15 @@ import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ethers } from 'ethers';
 import { Cron, CronExpression } from '@nestjs/schedule';
 
-import { SourceRepository } from 'modules/source/source.repository';
-import CometABI from 'modules/contract/abi/CometABI.json';
-import CapoABI from 'modules/capo/abi/ERC4626CorrelatedAssetsPriceOracle.json';
-import { OracleRepository } from 'modules/oracle/repositories/oracle.repository';
+import { SourceRepository } from '@/modules/source/source.repository';
+import CometABI from '@/modules/contract/abi/CometABI.json';
+import CapoABI from '@/modules/capo/abi/ERC4626CorrelatedAssetsPriceOracle.json';
+import { OracleRepository } from '@/modules/oracle/repositories/oracle.repository';
 
-import { ProviderFactory } from 'common/chains/network/provider.factory';
-import { NetworkService } from 'common/chains/network/network.service';
-import { BlockService } from 'common/chains/block/block.service';
-import { Algorithm } from 'common/enum/algorithm.enum';
+import { ProviderFactory } from '@/common/chains/network/provider.factory';
+import { NetworkService } from '@/common/chains/network/network.service';
+import { BlockService } from '@/common/chains/block/block.service';
+import { Algorithm } from '@/common/enum/algorithm.enum';
 
 interface CapoOracleInfo {
   address: string;

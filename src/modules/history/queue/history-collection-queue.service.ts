@@ -4,7 +4,7 @@ import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Queue } from 'bullmq';
 
-import { HistoryCollectionRequest } from 'modules/history/types/history-collection-request.type';
+import { HistoryCollectionRequest } from '@/modules/history/types/history-collection-request.type';
 
 import {
   HISTORY_COLLECTION_JOB_IDS,
@@ -110,11 +110,15 @@ export class HistoryCollectionQueueService implements OnModuleDestroy {
     jobName: Name,
     jobData: HistoryCollectionJobDataMap[Name],
   ): Promise<boolean> {
-    const job = await this.queue.add(jobName, jobData, {
-      jobId: HISTORY_COLLECTION_JOB_IDS[jobName],
-    });
+    const jobId = HISTORY_COLLECTION_JOB_IDS[jobName];
+    await this.queue.add(jobName, jobData, { jobId });
 
-    const wasEnqueuedByCurrentRequest = job.data.requestId === jobData.requestId;
+    const persistedJob = await this.queue.getJob(jobId);
+    if (!persistedJob) {
+      throw new Error(`History collection job ${jobName} was not found after enqueue attempt`);
+    }
+
+    const wasEnqueuedByCurrentRequest = persistedJob.data.requestId === jobData.requestId;
     if (!wasEnqueuedByCurrentRequest) {
       this.logger.warn(
         `History collection job ${jobName} was blocked - the same job is already queued or running`,
