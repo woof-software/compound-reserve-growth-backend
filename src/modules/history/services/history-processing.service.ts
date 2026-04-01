@@ -108,9 +108,7 @@ export class HistoryProcessingService {
         Algorithm.TIMELOCK,
         Algorithm.WOOF_PAYMENT_STREAM_CONTRACT,
       ];
-      const dbSources = (await this.sourceService.listByAlgorithms(reservesAlgorithms)).filter(
-        (value) => value.id === 219,
-      );
+      const dbSources = await this.sourceService.listByAlgorithms(reservesAlgorithms);
 
       this.logger.log(`Found ${dbSources.length} sources for reserves processing`);
 

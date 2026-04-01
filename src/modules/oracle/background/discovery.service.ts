@@ -6,7 +6,6 @@ import { SourceRepository } from '@/modules/source/source.repository';
 import CometABI from '@/modules/contract/abi/CometABI.json';
 import CapoABI from '@/modules/capo/abi/ERC4626CorrelatedAssetsPriceOracle.json';
 import { OracleRepository } from '@/modules/oracle/repositories/oracle.repository';
-
 import { ProviderFactory } from '@/common/chains/network/provider.factory';
 import { NetworkService } from '@/common/chains/network/network.service';
 import { BlockService } from '@/common/chains/block/block.service';
@@ -121,7 +120,7 @@ export class DiscoveryService implements OnModuleInit {
     // } catch (e) {
     //   this.logger.error(`Failed to upsert standalone oracle: ${e.message}`);
     // }
-    // await this.syncFromSources();
+    await this.syncFromSources();
     this.logger.log('Initial discovery completed');
   }
 
@@ -149,7 +148,7 @@ export class DiscoveryService implements OnModuleInit {
     return this.discoverCapoOracles(cometDescriptors);
   }
 
-  // @Cron(CronExpression.EVERY_12_HOURS)
+  @Cron(CronExpression.EVERY_12_HOURS)
   async scheduledSync(): Promise<void> {
     await this.syncFromSources();
   }

@@ -1,16 +1,14 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 
-import { Oracle } from '@/modules/oracle/oracle.entity';
-import { OracleService } from '@/modules/oracle/oracle.service';
-import { AlertService } from '@/modules/alert/alert.service';
-
-import { ProviderFactory } from '@/common/chains/network/provider.factory';
-import { BlockService } from '@/common/chains/block/block.service';
-
 import { DailyAggregationRepository } from './repositories/daily-aggregation.repository';
 import { SnapshotRepository } from './repositories/snapshot.repository';
 
+import { Oracle } from '@/modules/oracle/oracle.entity';
+import { OracleService } from '@/modules/oracle/oracle.service';
+import { AlertService } from '@/modules/alert/alert.service';
+import { ProviderFactory } from '@/common/chains/network/provider.factory';
+import { BlockService } from '@/common/chains/block/block.service';
 import { OracleData } from '@/common/types/oracle-data';
 import { CapoValues } from '@/common/types/capo-values';
 
@@ -32,7 +30,7 @@ export class CapoService {
     private readonly blockService: BlockService,
   ) {}
 
-  // @Cron(CronExpression.EVERY_MINUTE)
+  @Cron(CronExpression.EVERY_MINUTE)
   async collectOracleData() {
     if (this.isCollecting) {
       this.logger.warn('Data collection already in progress, skipping this run');
@@ -279,7 +277,7 @@ export class CapoService {
     }
   }
 
-  // @Cron('0 */15 * * * *')
+  @Cron('0 */15 * * * *')
   async aggregateDailyData() {
     if (this.isAggregating) {
       this.logger.warn('Daily aggregation is already in progress, skipping this run');
