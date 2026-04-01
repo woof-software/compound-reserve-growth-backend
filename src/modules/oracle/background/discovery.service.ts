@@ -121,7 +121,7 @@ export class DiscoveryService implements OnModuleInit {
     // } catch (e) {
     //   this.logger.error(`Failed to upsert standalone oracle: ${e.message}`);
     // }
-    await this.syncFromSources();
+    // await this.syncFromSources();
     this.logger.log('Initial discovery completed');
   }
 
@@ -149,7 +149,7 @@ export class DiscoveryService implements OnModuleInit {
     return this.discoverCapoOracles(cometDescriptors);
   }
 
-  @Cron(CronExpression.EVERY_12_HOURS)
+  // @Cron(CronExpression.EVERY_12_HOURS)
   async scheduledSync(): Promise<void> {
     await this.syncFromSources();
   }

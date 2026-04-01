@@ -8,20 +8,13 @@ import CometABI from './abi/CometABI.json';
 import CometExtensionABI from './abi/CometExtensionABI.json';
 import ComptrollerABI from './abi/ComptrollerABI.json';
 import MarketV2ABI from './abi/MarketV2ABI.json';
-import PriceFeedABI from './abi/PriceFeedABI.json';
 import RewardsABI from './abi/RewardsABI.json';
 import LegacyRewardsABI from './abi/LegacyRewardsABI.json';
 import ERC20ABI from './abi/ERC20ABI.json';
 import Bytes32TokenABI from './abi/Bytes32TokenABI.json';
-import {
-  CometAssetInfo,
-  CometCollateralContract,
-  HistoricalPriceFeedContract,
-  MarketData,
-  PriceFeedRoundData,
-  RootJson,
-} from './contract.type';
+import { MarketData, RootJson } from './contract.type';
 import { ResponseStatsAlgorithm } from './interface';
+import { HistoricalPriceAsset } from './type/historical-price-asset.type';
 
 import { ProviderFactory } from '@/common/chains/network/provider.factory';
 import { BlockService } from '@/common/chains/block/block.service';
@@ -36,12 +29,6 @@ import type { ContractConfig } from '@/config/contract';
 import { SEC_IN_MS } from '@/common/constants';
 import { Algorithm } from '@/common/enum/algorithm.enum';
 import { calculateTimeRange } from '@/common/utils/calculate-time-range';
-
-type HistoricalPriceAsset = {
-  address: string;
-  symbol: string;
-  decimals: number;
-};
 
 @Injectable()
 export class ContractService {
@@ -307,6 +294,7 @@ export class ContractService {
     algorithm: string,
     asset: HistoricalPriceAsset,
     firstDate: Date,
+    manager?: EntityManager,
   ): Promise<void> {
     if (this.isCollateralAlgorithm(algorithm)) {
       this.logger.log(
@@ -321,7 +309,7 @@ export class ContractService {
     }
 
     try {
-      await this.priceService.getHistoricalPrice(asset, firstDate);
+      await this.priceService.getHistoricalPrice(asset, firstDate, manager);
       this.logger.log(`Price data preloaded for ${asset.symbol}`);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -329,75 +317,28 @@ export class ContractService {
     }
   }
 
-  private async getHistoricalCollateralPrice(
-    contract: ethers.Contract,
-    asset: HistoricalPriceAsset,
-    network: string,
-    blockTag: number,
-    date: Date,
-    provider: MulticallProvider<ethers.JsonRpcProvider>,
-  ): Promise<number> {
-    const cometContract = contract as CometCollateralContract;
-
-    let assetInfo: CometAssetInfo;
-    try {
-      assetInfo = await cometContract.getAssetInfoByAddress(asset.address, { blockTag });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      throw new Error(
-        `Failed to read collateral asset info for ${asset.symbol} on ${date.toISOString().slice(0, 10)} block ${blockTag} network ${network}: ${message}`,
-      );
-    }
-
-    if (!assetInfo?.priceFeed) {
-      throw new Error(`No price feed configured for collateral ${asset.symbol}`);
-    }
-
-    const priceFeedContract = new ethers.Contract(
-      assetInfo.priceFeed,
-      PriceFeedABI,
-      provider,
-    ) as HistoricalPriceFeedContract;
-
-    let priceDecimalsRaw: bigint;
-    let roundData: PriceFeedRoundData;
-    try {
-      [priceDecimalsRaw, roundData] = await Promise.all([
-        priceFeedContract.decimals({ blockTag }),
-        priceFeedContract.latestRoundData({ blockTag }),
-      ]);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      throw new Error(
-        `Failed to read on-chain collateral price for ${asset.symbol} using feed ${assetInfo.priceFeed} on ${date.toISOString().slice(0, 10)} block ${blockTag} network ${network}: ${message}`,
-      );
-    }
-
-    const price = Number(ethers.formatUnits(roundData[1], Number(priceDecimalsRaw)));
-
-    if (!Number.isFinite(price) || price <= 0) {
-      throw new Error(
-        `Invalid on-chain collateral price ${price} for ${asset.symbol} using feed ${assetInfo.priceFeed}`,
-      );
-    }
-
-    return price;
-  }
-
   private async resolveReservePrice(
+    source: SourceEntity,
     algorithm: string,
-    contract: ethers.Contract,
     asset: HistoricalPriceAsset,
-    network: string,
     blockTag: number,
     date: Date,
-    provider: MulticallProvider<ethers.JsonRpcProvider>,
+    manager?: EntityManager,
   ): Promise<number> {
     if (this.isCollateralAlgorithm(algorithm)) {
-      return this.getHistoricalCollateralPrice(contract, asset, network, blockTag, date, provider);
+      return this.priceService.getCollateralHistoricalPrice(
+        asset,
+        {
+          blockTag,
+          cometAddress: source.address,
+          date,
+          network: source.network,
+        },
+        manager,
+      );
     }
 
-    const price = await this.priceService.getHistoricalPrice(asset, date);
+    const price = await this.priceService.getHistoricalPrice(asset, date, manager);
     if (price <= 0) {
       throw new Error(`Invalid price received: ${price}`);
     }
@@ -527,7 +468,7 @@ export class ContractService {
         decimals: asset.decimals,
       };
       const firstDate = new Date(firstMidnightUTC * 1000);
-      await this.preloadHistoricalPrice(algorithm, priceAsset, firstDate);
+      await this.preloadHistoricalPrice(algorithm, priceAsset, firstDate, manager);
 
       let processedCount = 0;
       let skippedCount = 0;
@@ -600,13 +541,12 @@ export class ContractService {
           let price = 1;
           try {
             price = await this.resolveReservePrice(
+              source,
               algorithm,
-              contract,
               priceAsset,
-              network,
               blockTag,
               date,
-              provider,
+              manager,
             );
           } catch (priceError) {
             const message = `Price fetch failed for ${symbol} on ${date.toISOString().slice(0, 10)}: ${priceError.message}. Stopping to retry on next cron run.`;
@@ -784,6 +724,7 @@ export class ContractService {
           await this.priceService.getHistoricalPrice(
             { address: asset.address, symbol: asset.symbol, decimals: asset.decimals },
             firstDate,
+            manager,
           );
           this.logger.log(`Price data preloaded for ${asset.symbol}`);
         } catch (error) {
@@ -814,7 +755,11 @@ export class ContractService {
           const compDate = new Date(targetTs * 1000);
           let priceComp: number;
           try {
-            priceComp = await this.priceService.getHistoricalPrice(assetCompToken, compDate);
+            priceComp = await this.priceService.getHistoricalPrice(
+              assetCompToken,
+              compDate,
+              manager,
+            );
             if (priceComp <= 0) {
               throw new Error(`Invalid price received: ${priceComp}`);
             }
@@ -862,6 +807,7 @@ export class ContractService {
             price = await this.priceService.getHistoricalPrice(
               { address: asset.address, symbol: asset.symbol, decimals: asset.decimals },
               dayDate,
+              manager,
             );
 
             if (price <= 0) {

@@ -1,10 +1,6 @@
 import { ethers } from 'ethers';
 import { MulticallProvider } from 'ethers-multicall-provider';
 
-export interface BlockTagOverride {
-  blockTag: number;
-}
-
 export interface RootJson {
   comet: string; // Comet contract address
   configurator: string; // Configurator contract address
@@ -59,34 +55,3 @@ export interface MarketData {
   rewardsAddress?: string; // optional, if not present, rewards are not used
   provider: MulticallProvider<ethers.JsonRpcProvider>;
 }
-
-export interface CometAssetInfo {
-  offset: bigint;
-  asset: string;
-  priceFeed: string;
-  scale: bigint;
-  borrowCollateralFactor: bigint;
-  liquidateCollateralFactor: bigint;
-  liquidationFactor: bigint;
-  supplyCap: bigint;
-}
-
-export type CometCollateralContract = ethers.Contract & {
-  getAssetInfoByAddress(
-    assetAddress: string,
-    overrides?: BlockTagOverride,
-  ): Promise<CometAssetInfo>;
-};
-
-export interface PriceFeedRoundData extends Array<bigint> {
-  0: bigint;
-  1: bigint;
-  2: bigint;
-  3: bigint;
-  4: bigint;
-}
-
-export type HistoricalPriceFeedContract = ethers.Contract & {
-  latestRoundData(overrides?: BlockTagOverride): Promise<PriceFeedRoundData>;
-  decimals(overrides?: BlockTagOverride): Promise<bigint>;
-};

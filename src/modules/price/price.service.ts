@@ -2,13 +2,17 @@ import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Inject, Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import type { Cache } from 'cache-manager';
 import type { Redis } from 'ioredis';
+import { EntityManager } from 'typeorm';
 
+import { CollateralPriceService } from './collateral-price.service';
 import { PriceProviderInterface } from './interfaces/price-provider.interface';
 import { CachedPrice } from './interfaces/cached-price.interface';
 import { CoinGeckoProviderService } from './providers/coingecko/coingecko.service';
 import { STABLECOIN_PRICES } from './constants';
 import { Price } from './price.entity';
 import { PriceRepository } from './price.repository';
+import { CollateralHistoricalPriceArgs } from './type/collateral-historical-price-args.type';
+import { PriceAsset } from './type/price-asset.type';
 
 import { REDIS_CLIENT } from 'infrastructure/redis/redis.module';
 import { DAY_IN_MS, DAY_IN_SEC, HOUR_IN_SEC, SEC_IN_MS } from '@/common/constants';
@@ -22,6 +26,7 @@ export class PriceService implements OnModuleInit {
   constructor(
     @Inject(CACHE_MANAGER) private cacheManager: Cache,
     @Inject(REDIS_CLIENT) private readonly redisClient: Redis,
+    private readonly collateralPriceService: CollateralPriceService,
     private readonly coinGeckoProvider: CoinGeckoProviderService,
     private readonly priceRepository: PriceRepository,
   ) {
@@ -47,8 +52,9 @@ export class PriceService implements OnModuleInit {
   }
 
   async getHistoricalPrice(
-    asset: { address: string; symbol: string; decimals: number },
+    asset: PriceAsset,
     date: Date,
+    manager?: EntityManager,
   ): Promise<number> {
     // Check cache first
     const cachedPrice = await this.getFromCache(asset.symbol, date);
@@ -60,7 +66,7 @@ export class PriceService implements OnModuleInit {
     }
 
     // Check database
-    const dbPrice = await this.getFromDatabase(asset.symbol, date);
+    const dbPrice = await this.getFromDatabase(asset.symbol, date, manager);
     if (dbPrice) {
       this.logger.debug(
         `Price DB HIT: ${asset.symbol} @ ${date.toISOString().slice(0, 10)} = ${dbPrice.price}`,
@@ -79,8 +85,7 @@ export class PriceService implements OnModuleInit {
         price = STABLECOIN_PRICES[asset.symbol];
         source = 'hardcoded';
       } else {
-        // Try providers in order of preference
-        const result = await this.fetchPriceFromProviders(asset, date);
+        const result = await this.fetchPriceFromProviders(asset, date, manager);
         if (result) {
           price = result.price;
           source = result.source;
@@ -94,13 +99,7 @@ export class PriceService implements OnModuleInit {
         );
       }
 
-      // Cache the result
       await this.setToCache(asset.symbol, date, price, source);
-
-      // Save to database if it came from an external provider
-      if (source !== 'hardcoded' && source !== 'database') {
-        await this.saveToDatabase(asset.symbol, price, date);
-      }
 
       return price;
     } catch (error) {
@@ -111,9 +110,48 @@ export class PriceService implements OnModuleInit {
     }
   }
 
+  async getCollateralHistoricalPrice(
+    asset: PriceAsset,
+    request: Omit<CollateralHistoricalPriceArgs, 'assetAddress' | 'assetSymbol'>,
+    manager?: EntityManager,
+  ): Promise<number> {
+    const cachedPrice = await this.getFromCache(asset.symbol, request.date);
+    if (cachedPrice) {
+      this.logger.debug(
+        `Collateral price cache HIT: ${asset.symbol} @ ${request.date.toISOString().slice(0, 10)} = ${cachedPrice.price}`,
+      );
+      return cachedPrice.price;
+    }
+
+    const dbPrice = await this.getFromDatabase(asset.symbol, request.date, manager);
+    if (dbPrice) {
+      this.logger.debug(
+        `Collateral price DB HIT: ${asset.symbol} @ ${request.date.toISOString().slice(0, 10)} = ${dbPrice.price}`,
+      );
+      await this.setToCache(asset.symbol, request.date, dbPrice.price, 'database');
+      return dbPrice.price;
+    }
+
+    const price = await this.collateralPriceService.getPrice({
+      ...request,
+      assetAddress: asset.address,
+      assetSymbol: asset.symbol,
+    });
+
+    await this.saveToDatabase(asset.symbol, price, request.date, manager);
+    await this.setToCache(asset.symbol, request.date, price, 'collateral_feed');
+
+    this.logger.log(
+      `Collateral price saved from on-chain feed for ${asset.symbol} @ ${request.date.toISOString().slice(0, 10)} = ${price}`,
+    );
+
+    return price;
+  }
+
   private async fetchPriceFromProviders(
-    asset: { address: string; symbol: string; decimals: number },
+    asset: PriceAsset,
     date: Date,
+    manager?: EntityManager,
   ): Promise<{ price: number; source: string } | null> {
     for (const [providerName, provider] of this.providers) {
       try {
@@ -125,13 +163,18 @@ export class PriceService implements OnModuleInit {
           continue;
         }
 
-        const result = await this.getExactOrNearestPrice(provider, coinId, asset.symbol, date);
+        const result = await this.getExactOrNearestPrice(
+          provider,
+          coinId,
+          asset.symbol,
+          date,
+          manager,
+        );
         if (result) {
           return { price: result.price, source: result.source };
         }
       } catch (error) {
         this.logger.warn(`Provider ${providerName} failed for ${asset.symbol}: ${error.message}`);
-        continue;
       }
     }
 
@@ -148,6 +191,7 @@ export class PriceService implements OnModuleInit {
     coinId: string,
     symbol: string,
     date: Date,
+    manager?: EntityManager,
   ): Promise<{ price: number; source: string } | null> {
     const providerName = provider.getProviderName();
     const dateString = date.toISOString().slice(0, 10);
@@ -169,7 +213,7 @@ export class PriceService implements OnModuleInit {
     }
 
     // Check database first for historical prices
-    const dbPrice = await this.getFromDatabase(symbol, date);
+    const dbPrice = await this.getFromDatabase(symbol, date, manager);
     if (dbPrice) {
       return { price: dbPrice.price, source: 'database' };
     }
@@ -180,7 +224,7 @@ export class PriceService implements OnModuleInit {
         `Date ${dateString} is older than 5 years, looking for earliest available price`,
       );
 
-      const earliestPrice = await this.findEarliestDatabasePrice(symbol);
+      const earliestPrice = await this.findEarliestDatabasePrice(symbol, manager);
       if (earliestPrice) {
         return { price: earliestPrice.price, source: 'database_fallback' };
       }
@@ -189,7 +233,7 @@ export class PriceService implements OnModuleInit {
       try {
         const fallbackPrice = await provider.fetchOldestAvailablePrice(coinId);
         if (fallbackPrice > 0) {
-          await this.saveToDatabase(symbol, fallbackPrice, date);
+          await this.saveToDatabase(symbol, fallbackPrice, date, manager);
           return { price: fallbackPrice, source: `${providerName}_fallback` };
         }
       } catch (error) {
@@ -200,7 +244,7 @@ export class PriceService implements OnModuleInit {
       try {
         const exactPrice = await provider.getHistoricalPrice(coinId, date);
         if (exactPrice > 0) {
-          await this.saveToDatabase(symbol, exactPrice, date);
+          await this.saveToDatabase(symbol, exactPrice, date, manager);
           return { price: exactPrice, source: providerName };
         }
       } catch (error) {
@@ -208,7 +252,7 @@ export class PriceService implements OnModuleInit {
       }
 
       // Find nearest available price in database
-      const nearestPrice = await this.findNearestDatabasePrice(symbol, date);
+      const nearestPrice = await this.findNearestDatabasePrice(symbol, date, manager);
       if (nearestPrice) {
         return { price: nearestPrice.price, source: 'database_nearest' };
       }
@@ -325,32 +369,40 @@ export class PriceService implements OnModuleInit {
   }
 
   // Database operations
-  private async getFromDatabase(symbol: string, date: Date): Promise<Price | null> {
+  private async getFromDatabase(
+    symbol: string,
+    date: Date,
+    manager?: EntityManager,
+  ): Promise<Price | null> {
     try {
-      // Normalize date to start of day for consistent querying
       const normalizedDate = new Date(date);
       normalizedDate.setUTCHours(0, 0, 0, 0);
 
-      return await this.priceRepository.findBySymbolAndDate(symbol, normalizedDate);
+      return await this.priceRepository.findBySymbolAndDate(symbol, normalizedDate, manager);
     } catch (error) {
       this.logger.error(`Database query error for ${symbol}: ${error.message}`);
       return null;
     }
   }
 
-  private async saveToDatabase(symbol: string, price: number, date: Date): Promise<void> {
+  private async saveToDatabase(
+    symbol: string,
+    price: number,
+    date: Date,
+    manager?: EntityManager,
+  ): Promise<void> {
     try {
-      // Normalize date to start of day for consistency
       const normalizedDate = new Date(date);
       normalizedDate.setUTCHours(0, 0, 0, 0);
 
       const priceEntity = new Price(symbol, price, normalizedDate);
-      await this.priceRepository.saveToDatabase(priceEntity);
+      await this.priceRepository.saveToDatabase(priceEntity, manager);
       this.logger.debug(
         `Saved price to DB: ${symbol} @ ${normalizedDate.toISOString().slice(0, 10)} = ${price}`,
       );
     } catch (error) {
       this.logger.error(`Failed to save price to database: ${error.message}`);
+      throw error;
     }
   }
 
@@ -369,21 +421,29 @@ export class PriceService implements OnModuleInit {
       this.logger.debug(`Batch saved ${prices.length} prices to database`);
     } catch (error) {
       this.logger.error(`Failed to save price batch to database: ${error.message}`);
+      throw error;
     }
   }
 
-  private async findEarliestDatabasePrice(symbol: string): Promise<Price | null> {
+  private async findEarliestDatabasePrice(
+    symbol: string,
+    manager?: EntityManager,
+  ): Promise<Price | null> {
     try {
-      return await this.priceRepository.findEarliestBySymbol(symbol);
+      return await this.priceRepository.findEarliestBySymbol(symbol, manager);
     } catch (error) {
       this.logger.error(`Error finding earliest DB price for ${symbol}: ${error.message}`);
       return null;
     }
   }
 
-  private async findNearestDatabasePrice(symbol: string, targetDate: Date): Promise<Price | null> {
+  private async findNearestDatabasePrice(
+    symbol: string,
+    targetDate: Date,
+    manager?: EntityManager,
+  ): Promise<Price | null> {
     try {
-      return await this.priceRepository.findNearestBySymbolAndDate(symbol, targetDate, 30);
+      return await this.priceRepository.findNearestBySymbolAndDate(symbol, targetDate, 30, manager);
     } catch (error) {
       this.logger.error(`Error finding nearest DB price for ${symbol}: ${error.message}`);
       return null;

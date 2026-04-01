@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { EntityManager, Repository } from 'typeorm';
 
 import { Price } from './price.entity';
 
@@ -8,33 +8,38 @@ import { Price } from './price.entity';
 export class PriceRepository {
   constructor(@InjectRepository(Price) private readonly priceRepository: Repository<Price>) {}
 
-  async save(price: Price): Promise<Price> {
-    return this.priceRepository.save(price);
+  private getRepository(manager?: EntityManager): Repository<Price> {
+    return manager ? manager.getRepository(Price) : this.priceRepository;
   }
 
-  async saveToDatabase(price: Price): Promise<Price> {
-    // Use insert with orIgnore for consistency with saveBatch
-    await this.priceRepository
+  async save(price: Price, manager?: EntityManager): Promise<Price> {
+    return this.getRepository(manager).save(price);
+  }
+
+  async saveToDatabase(price: Price, manager?: EntityManager): Promise<Price> {
+    const existingPrice = await this.findBySymbolAndDate(price.symbol, price.date, manager);
+    if (existingPrice) {
+      return existingPrice;
+    }
+
+    await this.getRepository(manager)
       .createQueryBuilder()
       .insert()
       .into(Price)
       .values(price)
-      .orIgnore() // Ignore duplicates if they exist
       .execute();
 
     return price;
   }
 
-  async saveBatch(prices: Price[]): Promise<Price[]> {
+  async saveBatch(prices: Price[], manager?: EntityManager): Promise<Price[]> {
     if (prices.length === 0) return [];
 
-    // Use bulk insert for better performance
-    await this.priceRepository
+    await this.getRepository(manager)
       .createQueryBuilder()
       .insert()
       .into(Price)
       .values(prices)
-      .orIgnore() // Ignore duplicates if they exist
       .execute();
 
     return prices;
@@ -53,17 +58,18 @@ export class PriceRepository {
     });
   }
 
-  async findBySymbolAndDate(symbol: string, date: Date): Promise<Price | null> {
+  async findBySymbolAndDate(
+    symbol: string,
+    date: Date,
+    manager?: EntityManager,
+  ): Promise<Price | null> {
     const startOfDay = new Date(date);
     startOfDay.setUTCHours(0, 0, 0, 0);
 
-    const endOfDay = new Date(date);
-    endOfDay.setUTCHours(23, 59, 59, 999);
-
-    return this.priceRepository.findOne({
+    return this.getRepository(manager).findOne({
       where: {
         symbol,
-        date: startOfDay, // Assuming dates are stored normalized to start of day
+        date: startOfDay,
       },
     });
   }
@@ -82,8 +88,9 @@ export class PriceRepository {
     symbol: string,
     startDate: Date,
     endDate: Date,
+    manager?: EntityManager,
   ): Promise<string[]> {
-    const rows = await this.priceRepository
+    const rows = await this.getRepository(manager)
       .createQueryBuilder('price')
       .select('price.date', 'date')
       .where('price.symbol = :symbol', { symbol })
@@ -95,8 +102,8 @@ export class PriceRepository {
     return rows.map((row) => new Date(row.date).toISOString().slice(0, 10));
   }
 
-  async findEarliestBySymbol(symbol: string): Promise<Price | null> {
-    return this.priceRepository.findOne({
+  async findEarliestBySymbol(symbol: string, manager?: EntityManager): Promise<Price | null> {
+    return this.getRepository(manager).findOne({
       where: { symbol },
       order: { date: 'ASC' },
     });
@@ -113,6 +120,7 @@ export class PriceRepository {
     symbol: string,
     targetDate: Date,
     maxDaysDifference: number = 30,
+    manager?: EntityManager,
   ): Promise<Price | null> {
     const startDate = new Date(targetDate);
     startDate.setDate(startDate.getDate() - maxDaysDifference);
@@ -120,7 +128,7 @@ export class PriceRepository {
     const endDate = new Date(targetDate);
     endDate.setDate(endDate.getDate() + maxDaysDifference);
 
-    const prices = await this.priceRepository
+    const prices = await this.getRepository(manager)
       .createQueryBuilder('price')
       .where('price.symbol = :symbol', { symbol })
       .andWhere('price.date >= :startDate', { startDate })

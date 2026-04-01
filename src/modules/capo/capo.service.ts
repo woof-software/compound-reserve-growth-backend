@@ -32,7 +32,7 @@ export class CapoService {
     private readonly blockService: BlockService,
   ) {}
 
-  @Cron(CronExpression.EVERY_MINUTE)
+  // @Cron(CronExpression.EVERY_MINUTE)
   async collectOracleData() {
     if (this.isCollecting) {
       this.logger.warn('Data collection already in progress, skipping this run');
@@ -279,7 +279,7 @@ export class CapoService {
     }
   }
 
-  @Cron('0 */15 * * * *')
+  // @Cron('0 */15 * * * *')
   async aggregateDailyData() {
     if (this.isAggregating) {
       this.logger.warn('Daily aggregation is already in progress, skipping this run');
@@ -291,7 +291,7 @@ export class CapoService {
     try {
       this.logger.log('Starting daily aggregation...');
 
-      const provider = this.providerFactory.get('mainnet');
+      const provider = this.providerFactory.multicall('mainnet');
       const [latestBlock, latestSnapshot] = await Promise.all([
         provider.getBlock('latest'),
         this.snapshotRepository.findLatest(),
