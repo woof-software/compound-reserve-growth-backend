@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, Injectable, InternalServerErrorException, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import axios from 'axios';
 import { EntityManager, QueryFailedError } from 'typeorm';
@@ -315,7 +315,7 @@ export class SourcesUpdateService {
     try {
       return this.networkService.byChainId(chainId).network;
     } catch (error) {
-      if (error instanceof BadRequestException) {
+      if (error instanceof InternalServerErrorException) {
         return null;
       }
 

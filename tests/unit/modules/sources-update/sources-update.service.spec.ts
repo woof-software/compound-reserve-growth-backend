@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { BadRequestException } from '@nestjs/common';
+import { InternalServerErrorException } from '@nestjs/common';
 import { QueryFailedError } from 'typeorm';
 
 import { Algorithm } from '@/common/enum/algorithm.enum';
@@ -79,7 +79,7 @@ describe('SourcesUpdateService', () => {
           return { network: 'eth' };
         }
 
-        throw new BadRequestException(`ChainId "${chainId}" is not configured`);
+        throw new InternalServerErrorException(`ChainId "${chainId}" is not configured`);
       }),
     };
 

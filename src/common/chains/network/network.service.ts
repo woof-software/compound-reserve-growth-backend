@@ -1,4 +1,4 @@
-import { BadRequestException, Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, InternalServerErrorException } from '@nestjs/common';
 import type { ConfigType } from '@nestjs/config';
 
 import { NetworkConfig } from './network.types';
@@ -19,7 +19,7 @@ export class NetworkService {
   byName(name: string): NetworkConfig {
     const network = this.networks.find((item) => item.network === name);
     if (!network) {
-      throw new BadRequestException(`Network "${name}" is not configured`);
+      throw new InternalServerErrorException(`Network "${name}" is not configured`);
     }
 
     return network;
@@ -28,7 +28,7 @@ export class NetworkService {
   byChainId(chainId: number): NetworkConfig {
     const network = this.networks.find((item) => item.chainId === chainId);
     if (!network) {
-      throw new BadRequestException(`ChainId "${chainId}" is not configured`);
+      throw new InternalServerErrorException(`ChainId "${chainId}" is not configured`);
     }
 
     return network;
