@@ -5,7 +5,7 @@ export type CometReserveHistoryItem = {
   quantity: string;
   value: number;
   price: number;
-  chainId: number | null;
+  chainId: number;
   timestamp: number;
   blockNumber: number;
   reserveType: CometReserveType;

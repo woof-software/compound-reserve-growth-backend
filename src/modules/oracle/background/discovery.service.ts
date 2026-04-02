@@ -139,7 +139,7 @@ export class DiscoveryService implements OnModuleInit {
       const netCfg = this.networkService.byName(source.network);
       return {
         address: source.address,
-        chainId: netCfg?.chainId ?? 0,
+        chainId: netCfg.chainId,
         network: source.network,
       };
     });

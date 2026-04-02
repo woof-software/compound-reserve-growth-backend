@@ -237,7 +237,7 @@ export class HistoryService {
       quantity: reserve.quantity,
       value: reserve.value,
       price: reserve.price,
-      chainId: this.networkService.byName(reserve.source.network)?.chainId ?? null,
+      chainId: this.networkService.byName(reserve.source.network).chainId,
       timestamp: Math.floor(reserve.date.getTime() / 1000),
       blockNumber: reserve.blockNumber,
       reserveType: reserve.source.algorithm.includes(Algorithm.COMET_COLLATERAL)
