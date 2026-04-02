@@ -1,6 +1,8 @@
 import { forwardRef, Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 
+import { NetworkModule } from 'common/chains/network/network.module';
+
 import { ReserveEntity, IncomesEntity, SpendsEntity } from './entities';
 import { HistoryGetCommand } from './cli/history-get.command';
 import { StatsGetCommand } from './cli/stats-get.command';
@@ -27,6 +29,8 @@ import { RedisModule } from 'infrastructure/redis/redis.module';
     AssetModule,
     forwardRef(() => ContractModule),
     IncentivesModule,
+    IncentivesModule,
+    NetworkModule,
     PriceModule,
     RevenueModule,
     RedisModule,

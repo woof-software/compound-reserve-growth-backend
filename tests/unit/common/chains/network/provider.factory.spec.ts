@@ -13,8 +13,20 @@ describe('ProviderFactory', () => {
     };
 
     const networkService = {
-      byName: jest.fn((name: string) => (name === config.network ? config : undefined)),
-      byChainId: jest.fn((chainId: number) => (chainId === config.chainId ? config : undefined)),
+      byName: jest.fn((name: string) => {
+        if (name !== config.network) {
+          throw new Error(`Network "${name}" is not configured`);
+        }
+
+        return config;
+      }),
+      byChainId: jest.fn((chainId: number) => {
+        if (chainId !== config.chainId) {
+          throw new Error(`ChainId "${chainId}" is not configured`);
+        }
+
+        return config;
+      }),
     };
 
     const factory = new ProviderFactory(networkService as never);

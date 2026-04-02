@@ -9,6 +9,7 @@ import { RevenueHistoryResponse } from './response/revenue-history.response';
 import { RevenueHistoryFullResponse } from './response/revenue-history-full.response';
 import { StatsHistoryResponse } from './response/stats-history.response';
 import { ReserveFullResponse } from './response/reserve-full.response';
+import { CometReserveHistoryResponse } from './response/comet-reserve-history.response';
 
 import { HistoryService } from '@/modules/history/services/history.service';
 import { IncentiveHistoryResponse } from '@/modules/history/response/incentives-history.response';
@@ -49,6 +50,31 @@ export class HistoryController {
       }),
       new PaginationMetaResponse(paginatedData.page, paginatedData.perPage, paginatedData.total),
     );
+  }
+
+  @Throttle({ default: { limit: 15, ttl: 1000 } })
+  @ApiOperation({ summary: 'Get COMET and COMET collateral reserves' })
+  @ApiOffsetResponse(CometReserveHistoryResponse)
+  @HttpCode(HttpStatus.OK)
+  @Get('v2/reserves')
+  async getCometReserves(
+    @Query() request: OffsetRequest,
+  ): Promise<OffsetDataResponse<CometReserveHistoryResponse>> {
+    const key = `history:v2:reserves:${request.limit ?? 'null'}:${request.offset ?? 0}:${request.order ?? 'DESC'}`;
+    const ttl = HOUR_IN_SEC;
+
+    const cached = await this.redisClient.get(key);
+    if (cached) return JSON.parse(cached) as OffsetDataResponse<CometReserveHistoryResponse>;
+
+    const paginatedData = await this.historyService.getOffsetCometReserves(
+      new OffsetDto(request?.limit, request?.offset, request?.order),
+    );
+    const res = new OffsetDataResponse<CometReserveHistoryResponse>(
+      paginatedData.data.map((reserve) => new CometReserveHistoryResponse(reserve)),
+      new OffsetMetaResponse(paginatedData.limit, paginatedData.offset, paginatedData.total),
+    );
+    await this.redisClient.set(key, JSON.stringify(res), 'EX', ttl);
+    return res;
   }
 
   @Throttle({ default: { limit: 15, ttl: 1000 } })

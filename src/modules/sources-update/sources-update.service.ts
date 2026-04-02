@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, Injectable, InternalServerErrorException, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import axios from 'axios';
 import { EntityManager, QueryFailedError } from 'typeorm';
@@ -312,7 +312,15 @@ export class SourcesUpdateService {
   }
 
   private resolveNetwork(chainId: number): string | null {
-    return this.networkService.byChainId(chainId)?.network ?? null;
+    try {
+      return this.networkService.byChainId(chainId).network;
+    } catch (error) {
+      if (error instanceof InternalServerErrorException) {
+        return null;
+      }
+
+      throw error;
+    }
   }
 
   private applyRemoteToAsset(asset: AssetEntity, remote: RemoteAsset): boolean {
