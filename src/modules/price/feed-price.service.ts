@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ethers } from 'ethers';
 
+import { USD_QUOTE_ALIASES } from './constants';
 import { PriceFeedContract, RawPriceFeedRoundData } from './type/collateral-price-contract.type';
 import { FeedPriceRequest, FeedSnapshot } from './type/feed-price.type';
 import { QuotePriceService } from './quote-price.service';
@@ -188,7 +189,7 @@ export class FeedPriceService {
 
   private isUsdQuote(symbol: string): boolean {
     const normalizedSymbol = this.normalizeAssetKey(symbol);
-    return normalizedSymbol === 'USD';
+    return USD_QUOTE_ALIASES.has(normalizedSymbol);
   }
 
   private normalizeFeedDescription(description: string): string {

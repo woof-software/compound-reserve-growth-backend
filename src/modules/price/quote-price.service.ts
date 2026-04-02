@@ -1,8 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ethers } from 'ethers';
 
-import WstEthABI from 'modules/contract/abi/WstEthABI.json';
-
 import {
   BTC_QUOTE_ALIASES,
   ETH_QUOTE_ALIASES,
@@ -18,6 +16,7 @@ import { NetworkService } from '@/common/chains/network/network.service';
 import { ProviderFactory } from '@/common/chains/network/provider.factory';
 import { QuoteUsdFeedSymbol } from '@/common/chains/network/network.types';
 import PriceFeedABI from '@/modules/contract/abi/PriceFeedABI.json';
+import WstEthABI from '@/modules/contract/abi/WstEthABI.json';
 
 @Injectable()
 export class QuotePriceService {
@@ -41,6 +40,8 @@ export class QuotePriceService {
     const canonicalSymbol = this.canonicalizeQuoteSymbol(symbol);
 
     switch (canonicalSymbol) {
+      case 'USD':
+        return 1;
       case 'ETH':
       case 'BTC':
       case 'RON':

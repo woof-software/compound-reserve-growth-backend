@@ -56,13 +56,16 @@ export class PriceService implements OnModuleInit {
     date: Date,
     manager?: EntityManager,
   ): Promise<number> {
-    // Check cache first
-    const cachedPrice = await this.getFromCache(asset.symbol, date);
-    if (cachedPrice) {
-      this.logger.debug(
-        `Price cache HIT: ${asset.symbol} @ ${date.toISOString().slice(0, 10)} = ${cachedPrice.price}`,
-      );
-      return cachedPrice.price;
+    const shouldUseCache = this.shouldUseCache(manager);
+
+    if (shouldUseCache) {
+      const cachedPrice = await this.getFromCache(asset.symbol, date);
+      if (cachedPrice) {
+        this.logger.debug(
+          `Price cache HIT: ${asset.symbol} @ ${date.toISOString().slice(0, 10)} = ${cachedPrice.price}`,
+        );
+        return cachedPrice.price;
+      }
     }
 
     // Check database
@@ -71,8 +74,9 @@ export class PriceService implements OnModuleInit {
       this.logger.debug(
         `Price DB HIT: ${asset.symbol} @ ${date.toISOString().slice(0, 10)} = ${dbPrice.price}`,
       );
-      // Cache the DB result for faster future access
-      await this.setToCache(asset.symbol, date, dbPrice.price, 'database');
+      if (shouldUseCache) {
+        await this.setToCache(asset.symbol, date, dbPrice.price, 'database');
+      }
       return dbPrice.price;
     }
 
@@ -99,7 +103,9 @@ export class PriceService implements OnModuleInit {
         );
       }
 
-      await this.setToCache(asset.symbol, date, price, source);
+      if (shouldUseCache) {
+        await this.setToCache(asset.symbol, date, price, source);
+      }
 
       return price;
     } catch (error) {
@@ -115,12 +121,16 @@ export class PriceService implements OnModuleInit {
     request: Omit<CollateralHistoricalPriceArgs, 'assetAddress' | 'assetSymbol'>,
     manager?: EntityManager,
   ): Promise<number> {
-    const cachedPrice = await this.getFromCache(asset.symbol, request.date);
-    if (cachedPrice) {
-      this.logger.debug(
-        `Collateral price cache HIT: ${asset.symbol} @ ${request.date.toISOString().slice(0, 10)} = ${cachedPrice.price}`,
-      );
-      return cachedPrice.price;
+    const shouldUseCache = this.shouldUseCache(manager);
+
+    if (shouldUseCache) {
+      const cachedPrice = await this.getFromCache(asset.symbol, request.date);
+      if (cachedPrice) {
+        this.logger.debug(
+          `Collateral price cache HIT: ${asset.symbol} @ ${request.date.toISOString().slice(0, 10)} = ${cachedPrice.price}`,
+        );
+        return cachedPrice.price;
+      }
     }
 
     const dbPrice = await this.getFromDatabase(asset.symbol, request.date, manager);
@@ -128,7 +138,9 @@ export class PriceService implements OnModuleInit {
       this.logger.debug(
         `Collateral price DB HIT: ${asset.symbol} @ ${request.date.toISOString().slice(0, 10)} = ${dbPrice.price}`,
       );
-      await this.setToCache(asset.symbol, request.date, dbPrice.price, 'database');
+      if (shouldUseCache) {
+        await this.setToCache(asset.symbol, request.date, dbPrice.price, 'database');
+      }
       return dbPrice.price;
     }
 
@@ -139,7 +151,9 @@ export class PriceService implements OnModuleInit {
     });
 
     await this.saveToDatabase(asset.symbol, price, request.date, manager);
-    await this.setToCache(asset.symbol, request.date, price, 'collateral_feed');
+    if (shouldUseCache) {
+      await this.setToCache(asset.symbol, request.date, price, 'collateral_feed');
+    }
 
     this.logger.log(
       `Collateral price saved from on-chain feed for ${asset.symbol} @ ${request.date.toISOString().slice(0, 10)} = ${price}`,
@@ -202,15 +216,7 @@ export class PriceService implements OnModuleInit {
 
     const isOlderThanFiveYears = date < fiveYearsAgo;
 
-    // Check if we need to preload historical data
-    const preloadKey = `preload_status:${coinId}`;
-    const preloadStatus = await this.getPreloadStatus(preloadKey);
-
-    if (!preloadStatus.loaded) {
-      this.logger.log(`Preloading historical data for ${coinId} from ${providerName}`);
-      await this.preloadHistoricalPrices(provider, coinId, symbol);
-      await this.setPreloadStatus(preloadKey, true);
-    }
+    await this.ensureHistoricalPricesPreloaded(provider, coinId, symbol);
 
     // Check database first for historical prices
     const dbPrice = await this.getFromDatabase(symbol, date, manager);
@@ -271,101 +277,95 @@ export class PriceService implements OnModuleInit {
     provider: PriceProviderInterface,
     coinId: string,
     symbol: string,
-  ): Promise<void> {
-    try {
-      if (!(provider instanceof CoinGeckoProviderService)) {
-        this.logger.warn(`Preloading not supported for provider: ${provider.getProviderName()}`);
-        return;
-      }
-
-      const apiType = provider.getApiType();
-      const maxDaysBack = apiType === 'pro' ? 6 * 365 : 365; // 6 years for pro, 1 year for demo/free
-
-      this.logger.log(
-        `Preloading ${maxDaysBack} days of data for ${coinId} (API type: ${apiType})`,
-      );
-
-      const prices = await provider.preloadPrices(coinId);
-
-      if (!Array.isArray(prices) || prices.length === 0) {
-        this.logger.warn(`No price data returned for ${coinId}`);
-        return;
-      }
-
-      let rangeStart: Date | null = null;
-      let rangeEnd: Date | null = null;
-      let earliestDate: string | null = null;
-      let latestDate: string | null = null;
-
-      for (const [timestamp] of prices) {
-        const date = new Date(timestamp);
-        date.setUTCHours(0, 0, 0, 0);
-        const dateStr = date.toISOString().slice(0, 10);
-
-        if (rangeStart === null || date < rangeStart) {
-          rangeStart = date;
-        }
-        if (rangeEnd === null || date > rangeEnd) {
-          rangeEnd = date;
-        }
-        if (!earliestDate || dateStr < earliestDate) {
-          earliestDate = dateStr;
-        }
-        if (!latestDate || dateStr > latestDate) {
-          latestDate = dateStr;
-        }
-      }
-
-      const existingDateKeys =
-        rangeStart && rangeEnd
-          ? new Set(
-              await this.priceRepository.findDateKeysBySymbolInDateRange(
-                symbol,
-                rangeStart,
-                rangeEnd,
-              ),
-            )
-          : new Set<string>();
-      const seenDateKeys = new Set<string>();
-      const pendingBatch: Price[] = [];
-      let savedCount = 0;
-
-      for (const [timestamp, price] of prices) {
-        const date = new Date(timestamp);
-        date.setUTCHours(0, 0, 0, 0);
-        const dateStr = date.toISOString().slice(0, 10);
-
-        if (existingDateKeys.has(dateStr) || seenDateKeys.has(dateStr)) {
-          continue;
-        }
-
-        seenDateKeys.add(dateStr);
-        pendingBatch.push(new Price(symbol, price, date));
-
-        if (pendingBatch.length >= this.batchSize) {
-          await this.saveBatchToDatabase(pendingBatch);
-          savedCount += pendingBatch.length;
-          pendingBatch.length = 0;
-        }
-      }
-
-      if (pendingBatch.length > 0) {
-        await this.saveBatchToDatabase(pendingBatch);
-        savedCount += pendingBatch.length;
-      }
-
-      if (savedCount > 0) {
-        this.logger.log(`Preloaded and saved ${savedCount} new price records for ${symbol}`);
-      } else {
-        this.logger.log(`All price data for ${symbol} already exists in database`);
-      }
-
-      if (earliestDate && latestDate) {
-        this.logger.log(`Date range: ${earliestDate} to ${latestDate}`);
-      }
-    } catch (error) {
-      this.logger.warn(`Failed to preload historical prices for ${coinId}: ${error.message}`);
+  ): Promise<boolean> {
+    if (!(provider instanceof CoinGeckoProviderService)) {
+      this.logger.warn(`Preloading not supported for provider: ${provider.getProviderName()}`);
+      return false;
     }
+
+    const apiType = provider.getApiType();
+    const maxDaysBack = apiType === 'pro' ? 6 * 365 : 365; // 6 years for pro, 1 year for demo/free
+
+    this.logger.log(`Preloading ${maxDaysBack} days of data for ${coinId} (API type: ${apiType})`);
+
+    const prices = await provider.preloadPrices(coinId);
+
+    if (!Array.isArray(prices) || prices.length === 0) {
+      this.logger.warn(`No price data returned for ${coinId}`);
+      return false;
+    }
+
+    let rangeStart: Date | null = null;
+    let rangeEnd: Date | null = null;
+    let earliestDate: string | null = null;
+    let latestDate: string | null = null;
+
+    for (const [timestamp] of prices) {
+      const date = new Date(timestamp);
+      date.setUTCHours(0, 0, 0, 0);
+      const dateStr = date.toISOString().slice(0, 10);
+
+      if (rangeStart === null || date < rangeStart) {
+        rangeStart = date;
+      }
+      if (rangeEnd === null || date > rangeEnd) {
+        rangeEnd = date;
+      }
+      if (!earliestDate || dateStr < earliestDate) {
+        earliestDate = dateStr;
+      }
+      if (!latestDate || dateStr > latestDate) {
+        latestDate = dateStr;
+      }
+    }
+
+    const existingDateKeys =
+      rangeStart && rangeEnd
+        ? new Set(
+            await this.priceRepository.findDateKeysBySymbolInDateRange(
+              symbol,
+              rangeStart,
+              rangeEnd,
+            ),
+          )
+        : new Set<string>();
+    const seenDateKeys = new Set<string>();
+    const pendingBatch: Price[] = [];
+    let savedCount = 0;
+
+    for (const [timestamp, price] of prices) {
+      const date = new Date(timestamp);
+      date.setUTCHours(0, 0, 0, 0);
+      const dateStr = date.toISOString().slice(0, 10);
+
+      if (existingDateKeys.has(dateStr) || seenDateKeys.has(dateStr)) {
+        continue;
+      }
+
+      seenDateKeys.add(dateStr);
+      pendingBatch.push(new Price(symbol, price, date));
+
+      if (pendingBatch.length >= this.batchSize) {
+        savedCount += await this.saveBatchToDatabase(pendingBatch);
+        pendingBatch.length = 0;
+      }
+    }
+
+    if (pendingBatch.length > 0) {
+      savedCount += await this.saveBatchToDatabase(pendingBatch);
+    }
+
+    if (savedCount > 0) {
+      this.logger.log(`Preloaded and saved ${savedCount} new price records for ${symbol}`);
+    } else {
+      this.logger.log(`All price data for ${symbol} already exists in database`);
+    }
+
+    if (earliestDate && latestDate) {
+      this.logger.log(`Date range: ${earliestDate} to ${latestDate}`);
+    }
+
+    return true;
   }
 
   // Database operations
@@ -406,9 +406,11 @@ export class PriceService implements OnModuleInit {
     }
   }
 
-  private async saveBatchToDatabase(prices: Price[]): Promise<void> {
+  private async saveBatchToDatabase(prices: Price[]): Promise<number> {
     try {
-      if (prices.length === 0) return;
+      if (prices.length === 0) {
+        return 0;
+      }
 
       // Normalize all dates to start of day
       const normalizedPrices = prices.map((price) => {
@@ -417,8 +419,9 @@ export class PriceService implements OnModuleInit {
         return new Price(price.symbol, price.price, normalizedDate);
       });
 
-      await this.priceRepository.saveBatch(normalizedPrices);
-      this.logger.debug(`Batch saved ${prices.length} prices to database`);
+      const savedPrices = await this.priceRepository.saveBatch(normalizedPrices);
+      this.logger.debug(`Batch saved ${savedPrices.length} prices to database`);
+      return savedPrices.length;
     } catch (error) {
       this.logger.error(`Failed to save price batch to database: ${error.message}`);
       throw error;
@@ -451,21 +454,53 @@ export class PriceService implements OnModuleInit {
   }
 
   // Preload status management
-  private async getPreloadStatus(key: string): Promise<{ loaded: boolean }> {
+  private async getPreloadStatus(key: string): Promise<{ loaded: boolean; failed: boolean }> {
     try {
       const cached = await this.getCacheValue(key);
-      return { loaded: cached === 'true' };
+      if (cached === 'loaded' || cached === 'true') {
+        return { loaded: true, failed: false };
+      }
+
+      if (cached === 'failed') {
+        return { loaded: false, failed: true };
+      }
+
+      return { loaded: false, failed: false };
     } catch (error) {
-      return { loaded: false };
+      return { loaded: false, failed: false };
     }
   }
 
-  private async setPreloadStatus(key: string, loaded: boolean): Promise<void> {
+  private async setPreloadStatus(key: string, status: 'loaded' | 'failed'): Promise<void> {
     try {
-      const ttl = 7 * DAY_IN_SEC; // Cache for 7 days
-      await this.setCacheValue(key, loaded.toString(), ttl);
+      const ttl = status === 'loaded' ? 7 * DAY_IN_SEC : HOUR_IN_SEC;
+      await this.setCacheValue(key, status, ttl);
     } catch (error) {
       this.logger.warn(`Failed to set preload status: ${error.message}`);
+    }
+  }
+
+  private async ensureHistoricalPricesPreloaded(
+    provider: PriceProviderInterface,
+    coinId: string,
+    symbol: string,
+  ): Promise<void> {
+    const preloadKey = `preload_status:${coinId}`;
+    const preloadStatus = await this.getPreloadStatus(preloadKey);
+
+    if (preloadStatus.loaded || preloadStatus.failed) {
+      return;
+    }
+
+    this.logger.log(`Preloading historical data for ${coinId} from ${provider.getProviderName()}`);
+
+    try {
+      const preloadSucceeded = await this.preloadHistoricalPrices(provider, coinId, symbol);
+      await this.setPreloadStatus(preloadKey, preloadSucceeded ? 'loaded' : 'failed');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.warn(`Failed to preload historical prices for ${coinId}: ${message}`);
+      await this.setPreloadStatus(preloadKey, 'failed');
     }
   }
 
@@ -1108,5 +1143,9 @@ export class PriceService implements OnModuleInit {
         symbolsWithFullHistory: {},
       };
     }
+  }
+
+  private shouldUseCache(manager?: EntityManager): boolean {
+    return !manager;
   }
 }

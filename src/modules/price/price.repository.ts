@@ -33,16 +33,31 @@ export class PriceRepository {
   }
 
   async saveBatch(prices: Price[], manager?: EntityManager): Promise<Price[]> {
-    if (prices.length === 0) return [];
+    if (prices.length === 0) {
+      return [];
+    }
+
+    const uniquePrices = this.deduplicatePrices(prices);
+    const existingDateKeysBySymbol = await this.findExistingDateKeysBySymbol(uniquePrices, manager);
+    const pricesToInsert = uniquePrices.filter((price) => {
+      const symbolDateKeys = existingDateKeysBySymbol.get(price.symbol);
+      const dateKey = price.date.toISOString().slice(0, 10);
+
+      return !symbolDateKeys?.has(dateKey);
+    });
+
+    if (pricesToInsert.length === 0) {
+      return [];
+    }
 
     await this.getRepository(manager)
       .createQueryBuilder()
       .insert()
       .into(Price)
-      .values(prices)
+      .values(pricesToInsert)
       .execute();
 
-    return prices;
+    return pricesToInsert;
   }
 
   async findById(id: number): Promise<Price> {
@@ -176,5 +191,56 @@ export class PriceRepository {
       earliest: new Date(result.earliest),
       latest: new Date(result.latest),
     };
+  }
+
+  private deduplicatePrices(prices: Price[]): Price[] {
+    const uniquePrices = new Map<string, Price>();
+
+    for (const price of prices) {
+      const dateKey = price.date.toISOString().slice(0, 10);
+      uniquePrices.set(`${price.symbol}:${dateKey}`, price);
+    }
+
+    return Array.from(uniquePrices.values());
+  }
+
+  private async findExistingDateKeysBySymbol(
+    prices: Price[],
+    manager?: EntityManager,
+  ): Promise<Map<string, Set<string>>> {
+    const priceRanges = new Map<string, { startDate: Date; endDate: Date }>();
+
+    for (const price of prices) {
+      const existingRange = priceRanges.get(price.symbol);
+      if (!existingRange) {
+        priceRanges.set(price.symbol, {
+          startDate: new Date(price.date),
+          endDate: new Date(price.date),
+        });
+        continue;
+      }
+
+      if (price.date < existingRange.startDate) {
+        existingRange.startDate = new Date(price.date);
+      }
+      if (price.date > existingRange.endDate) {
+        existingRange.endDate = new Date(price.date);
+      }
+    }
+
+    const existingEntries = await Promise.all(
+      Array.from(priceRanges.entries()).map(async ([symbol, range]) => {
+        const dateKeys = await this.findDateKeysBySymbolInDateRange(
+          symbol,
+          range.startDate,
+          range.endDate,
+          manager,
+        );
+
+        return [symbol, new Set(dateKeys)] as const;
+      }),
+    );
+
+    return new Map(existingEntries);
   }
 }
