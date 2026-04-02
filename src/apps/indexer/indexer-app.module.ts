@@ -15,7 +15,6 @@ import databaseConfig from '@/config/database';
 import networksConfig from '@/config/networks.config';
 import redis from '@/config/redis';
 import contractConfig from '@/config/contract';
-import priceOnChainConfig from '@/config/price-on-chain.config';
 import blockTimingConfig from '@/config/block-timing.config';
 import { DatabaseModule } from 'database/database.module';
 
@@ -23,15 +22,7 @@ import { DatabaseModule } from 'database/database.module';
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      load: [
-        appConfig,
-        databaseConfig,
-        networksConfig,
-        redis,
-        contractConfig,
-        priceOnChainConfig,
-        blockTimingConfig,
-      ],
+      load: [appConfig, databaseConfig, networksConfig, redis, contractConfig, blockTimingConfig],
     }),
     ScheduleModule.forRoot(),
     CacheModule.registerAsync({

@@ -8,6 +8,11 @@ export default registerAs('networks', (): NetworkConfig[] => [
     chainId: 1,
     //url: `http://18.198.202.237:8545`,
     url: `https://rpc.ankr.com/eth/${process.env.ANKR_KEY}`,
+    quoteUsdFeeds: {
+      ETH: '0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419',
+      BTC: '0xF4030086522a5bEEa4988F8cA5B36dbC97BeE88c',
+    },
+    wstEthAddress: '0x7f39C581F595B53c5cb19bD0b3f8dA6c935E2Ca0',
   },
   {
     network: 'sepolia',
@@ -19,6 +24,9 @@ export default registerAs('networks', (): NetworkConfig[] => [
     chainId: 2020,
     url: 'https://ronin.drpc.org',
     batchMaxCount: 3,
+    quoteUsdFeeds: {
+      RON: '0x0B6074F21488B95945989E513EFEA070096d931D',
+    },
   },
   {
     network: 'polygon',
@@ -29,6 +37,9 @@ export default registerAs('networks', (): NetworkConfig[] => [
     network: 'optimism',
     chainId: 10,
     url: `https://rpc.ankr.com/optimism/${process.env.ANKR_KEY}`,
+    quoteUsdFeeds: {
+      ETH: '0x13e3Ee699D1909E989722E753853AE30b17e08c5',
+    },
   },
   {
     network: 'mantle',
@@ -46,11 +57,17 @@ export default registerAs('networks', (): NetworkConfig[] => [
     network: 'base',
     chainId: 8453,
     url: `https://rpc.ankr.com/base/${process.env.ANKR_KEY}`,
+    quoteUsdFeeds: {
+      ETH: '0x71041dddad3595F9CEd3DcCFBe3D1F4b0a16Bb70',
+    },
   },
   {
     network: 'arbitrum',
     chainId: 42161,
     url: `https://rpc.ankr.com/arbitrum/${process.env.ANKR_KEY}`,
+    quoteUsdFeeds: {
+      ETH: '0x639Fe6ab55C921f74e7fac1ee960C0B6293ba612',
+    },
   },
   {
     network: 'avalanche',
@@ -73,5 +90,8 @@ export default registerAs('networks', (): NetworkConfig[] => [
     network: 'linea',
     chainId: 59144,
     url: `https://omniscient-hardworking-gas.linea-mainnet.quiknode.pro/${process.env.LINEA_QUICKNODE_KEY}/`,
+    quoteUsdFeeds: {
+      ETH: '0x3c6Cd9Cc7c7a4c2Cf5a82734CD249D7D593354dA',
+    },
   },
 ]);

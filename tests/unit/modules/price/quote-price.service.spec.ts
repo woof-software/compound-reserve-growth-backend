@@ -1,34 +1,53 @@
 import { ethers } from 'ethers';
 
+import type { NetworkConfig } from '@/common/chains/network/network.types';
 import { QuotePriceService } from '@/modules/price/quote-price.service';
-import type { PriceOnChainConfig } from '@/config/price-on-chain.config';
 
 describe('QuotePriceService', () => {
-  const priceOnChainConfig: PriceOnChainConfig = {
-    quoteUsdFeeds: {
-      ETH: {
-        mainnet: '0xeth-mainnet-feed',
-        base: '0xeth-base-feed',
+  const networks: NetworkConfig[] = [
+    {
+      network: 'mainnet',
+      chainId: 1,
+      url: 'https://rpc.example/mainnet',
+      quoteUsdFeeds: {
+        ETH: '0xeth-mainnet-feed',
+        BTC: '0xbtc-mainnet-feed',
       },
-      BTC: {
-        mainnet: '0xbtc-mainnet-feed',
-      },
-      RON: {
-        ronin: '0xron-feed',
+      wstEthAddress: '0xwsteth-mainnet',
+    },
+    {
+      network: 'base',
+      chainId: 8453,
+      url: 'https://rpc.example/base',
+      quoteUsdFeeds: {
+        ETH: '0xeth-base-feed',
       },
     },
-    quoteFeedFallbackNetwork: {
-      ETH: 'mainnet',
-      BTC: 'mainnet',
+    {
+      network: 'ronin',
+      chainId: 2020,
+      url: 'https://rpc.example/ronin',
+      quoteUsdFeeds: {
+        RON: '0xron-feed',
+      },
     },
-    wstEth: {
-      mainnetAddress: '0xwsteth-mainnet',
+    {
+      network: 'arbitrum',
+      chainId: 42161,
+      url: 'https://rpc.example/arbitrum',
     },
-  };
+  ];
 
   const makeService = () => {
-    const configService = {
-      getOrThrow: jest.fn().mockReturnValue(priceOnChainConfig),
+    const networkService = {
+      byName: jest.fn((name: string) => {
+        const network = networks.find((item) => item.network === name);
+        if (!network) {
+          throw new Error(`Network "${name}" is not configured`);
+        }
+
+        return network;
+      }),
     };
     const providerFactory = {
       multicall: jest.fn((network: string) => ({ network })),
@@ -38,7 +57,7 @@ describe('QuotePriceService', () => {
     };
 
     const service = new QuotePriceService(
-      configService as never,
+      networkService as never,
       providerFactory as never,
       blockService as never,
     );
@@ -46,7 +65,7 @@ describe('QuotePriceService', () => {
     return {
       service,
       blockService,
-      configService,
+      networkService,
       providerFactory,
     };
   };
@@ -73,7 +92,7 @@ describe('QuotePriceService', () => {
   });
 
   it('reads ETH/USD from the current network without cross-network block lookup', async () => {
-    const { service, blockService, configService, providerFactory } = makeService();
+    const { service, blockService, networkService, providerFactory } = makeService();
     const blockTag = 12_345;
 
     const ethBaseFeed = {
@@ -94,7 +113,7 @@ describe('QuotePriceService', () => {
       symbol: 'WETH',
     });
 
-    expect(configService.getOrThrow).toHaveBeenCalledWith(expect.stringContaining('priceOnChain'));
+    expect(networkService.byName).toHaveBeenCalledWith('base');
     expect(providerFactory.multicall).toHaveBeenCalledWith('base');
     expect(blockService.findBlockByTimestamp).not.toHaveBeenCalled();
     expect(contractCtor).toHaveBeenCalledWith(
@@ -108,7 +127,7 @@ describe('QuotePriceService', () => {
   });
 
   it('falls back to mainnet feed and resolves historical block for BTC/USD', async () => {
-    const { service, blockService, providerFactory } = makeService();
+    const { service, blockService, networkService, providerFactory } = makeService();
     const date = new Date('2024-04-01T00:00:00.000Z');
 
     blockService.findBlockByTimestamp.mockResolvedValue(54_321);
@@ -131,6 +150,8 @@ describe('QuotePriceService', () => {
       symbol: 'WBTC',
     });
 
+    expect(networkService.byName).toHaveBeenCalledWith('arbitrum');
+    expect(networkService.byName).toHaveBeenCalledWith('mainnet');
     expect(providerFactory.multicall).toHaveBeenCalledWith('mainnet');
     expect(blockService.findBlockByTimestamp).toHaveBeenCalledWith(
       'mainnet',
@@ -143,7 +164,7 @@ describe('QuotePriceService', () => {
   });
 
   it('derives wstETH/USD from historical stEthPerToken and ETH/USD', async () => {
-    const { service, blockService, providerFactory } = makeService();
+    const { service, blockService, networkService, providerFactory } = makeService();
     const date = new Date('2024-04-01T00:00:00.000Z');
 
     blockService.findBlockByTimestamp.mockResolvedValue(99_999);
@@ -173,6 +194,7 @@ describe('QuotePriceService', () => {
     const expected = 1.1620997892460414 * 3645.95061933;
 
     expect(providerFactory.multicall).toHaveBeenCalledWith('mainnet');
+    expect(networkService.byName).toHaveBeenCalledWith('mainnet');
     expect(blockService.findBlockByTimestamp).toHaveBeenCalledTimes(1);
     expect(wstEthContract.stEthPerToken).toHaveBeenCalledWith({ blockTag: 99_999 });
     expect(ethMainnetFeed.latestRoundData).toHaveBeenCalledWith({ blockTag: 99_999 });

@@ -1,5 +1,4 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { ethers } from 'ethers';
 
 import WstEthABI from 'modules/contract/abi/WstEthABI.json';
@@ -15,8 +14,9 @@ import { PriceFeedContract, RawPriceFeedRoundData } from './type/collateral-pric
 import { CanonicalQuoteSymbol, QuotePriceRequest, WstEthContract } from './type/quote-price.type';
 
 import { BlockService } from '@/common/chains/block/block.service';
+import { NetworkService } from '@/common/chains/network/network.service';
 import { ProviderFactory } from '@/common/chains/network/provider.factory';
-import { PriceOnChainConfig } from '@/config/price-on-chain.config';
+import { QuoteUsdFeedSymbol } from '@/common/chains/network/network.types';
 import PriceFeedABI from '@/modules/contract/abi/PriceFeedABI.json';
 
 @Injectable()
@@ -24,16 +24,18 @@ export class QuotePriceService {
   private readonly logger = new Logger(QuotePriceService.name);
   private readonly blockTagCache = new Map<string, number>();
   private readonly priceCache = new Map<string, number>();
+  private readonly quoteFeedFallbackNetwork: Partial<
+    Record<Exclude<CanonicalQuoteSymbol, 'USD' | 'wstETH'>, string>
+  > = {
+    ETH: 'mainnet',
+    BTC: 'mainnet',
+  };
 
   constructor(
-    private readonly configService: ConfigService,
+    private readonly networkService: NetworkService,
     private readonly providerFactory: ProviderFactory,
     private readonly blockService: BlockService,
   ) {}
-
-  private get priceOnChain(): PriceOnChainConfig {
-    return this.configService.getOrThrow<PriceOnChainConfig>('priceOnChain');
-  }
 
   async getUsdPrice({ blockTag, date, network, symbol }: QuotePriceRequest): Promise<number> {
     const canonicalSymbol = this.canonicalizeQuoteSymbol(symbol);
@@ -56,22 +58,7 @@ export class QuotePriceService {
     date: Date,
     blockTag: number,
   ): Promise<number> {
-    const configuredFeedNetworks = this.priceOnChain.quoteUsdFeeds[symbol];
-    const feedNetwork =
-      network in configuredFeedNetworks
-        ? network
-        : this.priceOnChain.quoteFeedFallbackNetwork[
-            symbol as keyof typeof this.priceOnChain.quoteFeedFallbackNetwork
-          ];
-
-    if (!feedNetwork) {
-      throw new Error(`No on-chain USD feed configured for ${symbol} on network ${network}`);
-    }
-
-    const feedAddress = configuredFeedNetworks[feedNetwork];
-    if (!feedAddress) {
-      throw new Error(`Missing feed address for ${symbol} on network ${feedNetwork}`);
-    }
+    const { feedAddress, feedNetwork } = this.resolveQuoteFeed(symbol, network);
 
     const resolvedBlockTag = await this.resolveBlockTag(feedNetwork, network, date, blockTag);
     const cacheKey = `${symbol}:${feedNetwork}:${resolvedBlockTag}`;
@@ -113,7 +100,7 @@ export class QuotePriceService {
 
     const provider = this.providerFactory.multicall('mainnet');
     const wstEthContract = new ethers.Contract(
-      this.priceOnChain.wstEth.mainnetAddress,
+      this.getMainnetWstEthAddress(),
       WstEthABI,
       provider,
     ) as WstEthContract;
@@ -132,6 +119,45 @@ export class QuotePriceService {
 
     this.priceCache.set(cacheKey, price);
     return price;
+  }
+
+  private resolveQuoteFeed(
+    symbol: QuoteUsdFeedSymbol,
+    network: string,
+  ): { feedAddress: string; feedNetwork: string } {
+    const networkConfig = this.networkService.byName(network);
+    const directFeedAddress = networkConfig.quoteUsdFeeds?.[symbol];
+    if (directFeedAddress) {
+      return {
+        feedAddress: directFeedAddress,
+        feedNetwork: network,
+      };
+    }
+
+    const fallbackNetwork = this.quoteFeedFallbackNetwork[symbol];
+    if (!fallbackNetwork) {
+      throw new Error(`No on-chain USD feed configured for ${symbol} on network ${network}`);
+    }
+
+    const fallbackNetworkConfig = this.networkService.byName(fallbackNetwork);
+    const fallbackFeedAddress = fallbackNetworkConfig.quoteUsdFeeds?.[symbol];
+    if (!fallbackFeedAddress) {
+      throw new Error(`Missing feed address for ${symbol} on network ${fallbackNetwork}`);
+    }
+
+    return {
+      feedAddress: fallbackFeedAddress,
+      feedNetwork: fallbackNetwork,
+    };
+  }
+
+  private getMainnetWstEthAddress(): string {
+    const mainnetConfig = this.networkService.byName('mainnet');
+    if (!mainnetConfig.wstEthAddress) {
+      throw new Error('Missing wstETH address on network mainnet');
+    }
+
+    return mainnetConfig.wstEthAddress;
   }
 
   private async resolveBlockTag(

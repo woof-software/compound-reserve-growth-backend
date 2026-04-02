@@ -1,5 +1,4 @@
 import { Module } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 
 import { CollateralPriceService } from './collateral-price.service';
@@ -13,12 +12,10 @@ import { QuotePriceService } from './quote-price.service';
 
 import { RedisModule } from 'infrastructure/redis/redis.module';
 import { BlockModule } from '@/common/chains/block/block.module';
-import priceOnChainConfig from '@/config/price-on-chain.config';
 import { NetworkModule } from '@/common/chains/network/network.module';
 
 @Module({
   imports: [
-    ConfigModule.forFeature(priceOnChainConfig),
     TypeOrmModule.forFeature([Price]),
     RedisModule,
     CoinGeckoModule,
