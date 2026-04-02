@@ -21,6 +21,7 @@ export class IncentivesService {
 
   public async rebuildHistory(manager?: EntityManager): Promise<void> {
     let rebuiltSourceCount = 0;
+    const usesExternalTransaction = Boolean(manager);
 
     const rebuildWithManager = async (entityManager: EntityManager) => {
       const sourceIds = await this.incentivesSyncRepository.listSupportedSourceIds(entityManager);
@@ -71,7 +72,9 @@ export class IncentivesService {
       ? await rebuildWithManager(manager)
       : await this.incentivesSyncRepository.inTransaction(rebuildWithManager);
     const invalidatedCacheKeys =
-      deletedCount > 0 || insertedCount > 0 ? await this.clearHistoryCache() : 0;
+      !usesExternalTransaction && (deletedCount > 0 || insertedCount > 0)
+        ? await this.clearHistoryCache()
+        : 0;
 
     this.logger.log(
       `Incentives history rebuild completed sourceCount=${rebuiltSourceCount} deletedRows=${deletedCount} insertedRows=${insertedCount} invalidatedCacheKeys=${invalidatedCacheKeys}`,

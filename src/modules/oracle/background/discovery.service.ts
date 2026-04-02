@@ -6,7 +6,6 @@ import { SourceRepository } from '@/modules/source/source.repository';
 import CometABI from '@/modules/contract/abi/CometABI.json';
 import CapoABI from '@/modules/capo/abi/ERC4626CorrelatedAssetsPriceOracle.json';
 import { OracleRepository } from '@/modules/oracle/repositories/oracle.repository';
-
 import { ProviderFactory } from '@/common/chains/network/provider.factory';
 import { NetworkService } from '@/common/chains/network/network.service';
 import { BlockService } from '@/common/chains/block/block.service';

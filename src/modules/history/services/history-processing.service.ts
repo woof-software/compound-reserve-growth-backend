@@ -74,14 +74,12 @@ export class HistoryProcessingService {
 
       const dbSources = await this.sourceService.listAll();
 
-      await this.executeInTransaction(async (manager) => {
-        for (const source of dbSources) {
-          await this.contractService.getHistory(source, manager);
-        }
+      for (const source of dbSources) {
+        await this.contractService.getHistory(source);
+      }
 
-        await this.revenueService.rebuildHistory(false, manager);
-        await this.incentivesService.rebuildHistory(manager);
-      });
+      await this.revenueService.rebuildHistory(false);
+      await this.incentivesService.rebuildHistory();
       this.logger.log('Getting history data completed.');
     });
   }
@@ -93,6 +91,7 @@ export class HistoryProcessingService {
       const reservesAlgorithms = [
         Algorithm.COMET,
         Algorithm.MARKET_V2,
+        Algorithm.COMET_COLLATERAL,
         Algorithm.ETH_WALLET,
         Algorithm.AERA_COMPOUND_RESERVES,
         Algorithm.AERA_VENDORS_VAULT,
@@ -112,27 +111,27 @@ export class HistoryProcessingService {
       this.logger.log(`Found ${dbSources.length} sources for reserves processing`);
 
       let startDate: Date | undefined;
-      await this.executeInTransaction(async (manager) => {
-        if (collectionSwitch?.clearData) {
-          const sourceIds = dbSources.map((source) => source.id);
+      if (collectionSwitch?.clearData) {
+        const sourceIds = dbSources.map((source) => source.id);
+        await this.executeInTransaction(async (manager) => {
           this.logger.log(`Clearing reserves for ${sourceIds.length} sources...`);
           await this.reservesRepository.deleteBySourceIds(sourceIds, manager);
-          this.logger.log('Reserves cleared successfully.');
-          startDate = collectionSwitch.data;
+        });
+        this.logger.log('Reserves cleared successfully.');
+        startDate = collectionSwitch.data;
+      }
+
+      for (const source of dbSources) {
+        const matchingAlgorithm = source.algorithm.find((algorithm) =>
+          reservesAlgorithms.includes(algorithm as Algorithm),
+        );
+
+        if (matchingAlgorithm) {
+          await this.contractService.saveReserves(source, matchingAlgorithm, startDate);
         }
+      }
 
-        for (const source of dbSources) {
-          const matchingAlgorithm = source.algorithm.find((algorithm) =>
-            reservesAlgorithms.includes(algorithm as Algorithm),
-          );
-
-          if (matchingAlgorithm) {
-            await this.contractService.saveReserves(source, matchingAlgorithm, startDate, manager);
-          }
-        }
-
-        await this.revenueService.rebuildHistory(collectionSwitch?.clearData, manager);
-      });
+      await this.revenueService.rebuildHistory(collectionSwitch?.clearData);
       this.logger.log('Reserves processing completed.');
     });
   }
@@ -146,29 +145,29 @@ export class HistoryProcessingService {
 
       this.logger.log(`Found ${dbSources.length} sources for stats processing`);
 
-      await this.executeInTransaction(async (manager) => {
-        if (collectionSwitch?.clearData) {
+      if (collectionSwitch?.clearData) {
+        await this.executeInTransaction(async (manager) => {
           this.logger.log('Clearing spends and incomes tables...');
           await Promise.all([
             this.spendsRepository.deleteAll(manager),
             this.incomesRepository.deleteAll(manager),
           ]);
-          this.logger.log('Spends and incomes tables cleared successfully.');
-          startDate = collectionSwitch.data;
+        });
+        this.logger.log('Spends and incomes tables cleared successfully.');
+        startDate = collectionSwitch.data;
+      }
+
+      for (const source of dbSources) {
+        const matchingAlgorithm = source.algorithm.find((algorithm) =>
+          statsAlgorithms.includes(algorithm as Algorithm),
+        );
+
+        if (matchingAlgorithm) {
+          await this.contractService.saveStats(source, matchingAlgorithm, startDate);
         }
+      }
 
-        for (const source of dbSources) {
-          const matchingAlgorithm = source.algorithm.find((algorithm) =>
-            statsAlgorithms.includes(algorithm as Algorithm),
-          );
-
-          if (matchingAlgorithm) {
-            await this.contractService.saveStats(source, matchingAlgorithm, startDate, manager);
-          }
-        }
-
-        await this.incentivesService.rebuildHistory(manager);
-      });
+      await this.incentivesService.rebuildHistory();
       this.logger.log('Stats processing completed.');
     });
   }

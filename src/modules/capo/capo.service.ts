@@ -1,16 +1,14 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 
-import { Oracle } from '@/modules/oracle/oracle.entity';
-import { OracleService } from '@/modules/oracle/oracle.service';
-import { AlertService } from '@/modules/alert/alert.service';
-
-import { ProviderFactory } from '@/common/chains/network/provider.factory';
-import { BlockService } from '@/common/chains/block/block.service';
-
 import { DailyAggregationRepository } from './repositories/daily-aggregation.repository';
 import { SnapshotRepository } from './repositories/snapshot.repository';
 
+import { Oracle } from '@/modules/oracle/oracle.entity';
+import { OracleService } from '@/modules/oracle/oracle.service';
+import { AlertService } from '@/modules/alert/alert.service';
+import { ProviderFactory } from '@/common/chains/network/provider.factory';
+import { BlockService } from '@/common/chains/block/block.service';
 import { OracleData } from '@/common/types/oracle-data';
 import { CapoValues } from '@/common/types/capo-values';
 
@@ -291,7 +289,7 @@ export class CapoService {
     try {
       this.logger.log('Starting daily aggregation...');
 
-      const provider = this.providerFactory.get('mainnet');
+      const provider = this.providerFactory.multicall('mainnet');
       const [latestBlock, latestSnapshot] = await Promise.all([
         provider.getBlock('latest'),
         this.snapshotRepository.findLatest(),
