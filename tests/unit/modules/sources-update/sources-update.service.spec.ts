@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { BadRequestException } from '@nestjs/common';
 import { QueryFailedError } from 'typeorm';
 
 import { Algorithm } from '@/common/enum/algorithm.enum';
@@ -74,8 +75,11 @@ describe('SourcesUpdateService', () => {
 
     const networkService = {
       byChainId: jest.fn((chainId: number) => {
-        if (chainId === 1) return { network: 'eth' };
-        return null;
+        if (chainId === 1) {
+          return { network: 'eth' };
+        }
+
+        throw new BadRequestException(`ChainId "${chainId}" is not configured`);
       }),
     };
 

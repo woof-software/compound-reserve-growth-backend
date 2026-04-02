@@ -312,7 +312,15 @@ export class SourcesUpdateService {
   }
 
   private resolveNetwork(chainId: number): string | null {
-    return this.networkService.byChainId(chainId)?.network ?? null;
+    try {
+      return this.networkService.byChainId(chainId).network;
+    } catch (error) {
+      if (error instanceof BadRequestException) {
+        return null;
+      }
+
+      throw error;
+    }
   }
 
   private applyRemoteToAsset(asset: AssetEntity, remote: RemoteAsset): boolean {

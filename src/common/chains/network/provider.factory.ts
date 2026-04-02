@@ -18,10 +18,6 @@ export class ProviderFactory {
         ? this.networkService.byName(identifier)
         : this.networkService.byChainId(identifier);
 
-    if (!config) {
-      throw new Error(`Unsupported network or chainId: ${identifier}`);
-    }
-
     if (!this.cache.has(config.chainId)) {
       const provider = new ethers.JsonRpcProvider(
         config.url,

@@ -16,8 +16,8 @@ export class CometReserveHistoryResponse {
   @ApiProperty({ example: 1.05, description: 'Reserve price in USD' })
   public price: number;
 
-  @ApiProperty({ example: 1, nullable: true, description: 'Source chain ID' })
-  public chainId: number | null;
+  @ApiProperty({ example: 1, description: 'Source chain ID' })
+  public chainId: number;
 
   @ApiProperty({ example: 1750809600, description: 'Reserve timestamp in seconds since epoch' })
   public timestamp: number;
