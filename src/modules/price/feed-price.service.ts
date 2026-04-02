@@ -167,21 +167,14 @@ export class FeedPriceService {
       return { kind: 'constant', quoteSymbol: null };
     }
 
-    const normalizedDescription = trimmedDescription
-      .replace(/^Calculated\s+/i, '')
-      .replace(/\s+SVR Price Feed$/i, '')
-      .replace(/\s+CAPO Price Feed$/i, '')
-      .replace(/\s+price feed$/i, '')
-      .replace(/\s+Price Feed$/i, '')
-      .replace(/\s+Exchange Rate$/i, '')
-      .trim();
+    const normalizedDescription = this.normalizeFeedDescription(trimmedDescription);
 
     const match = normalizedDescription.match(/^(.+?)\s*\/\s*(.+)$/);
     if (!match) {
       return { kind: 'unknown', quoteSymbol: null };
     }
 
-    const quoteSymbol = match[2]?.trim() || null;
+    const quoteSymbol = this.normalizeQuoteSymbol(match[2] ?? '');
     if (!quoteSymbol) {
       return { kind: 'unknown', quoteSymbol: null };
     }
@@ -196,6 +189,27 @@ export class FeedPriceService {
   private isUsdQuote(symbol: string): boolean {
     const normalizedSymbol = this.normalizeAssetKey(symbol);
     return normalizedSymbol === 'USD';
+  }
+
+  private normalizeFeedDescription(description: string): string {
+    return description
+      .replace(/^Calculated\s+/i, '')
+      .replace(/\s+SVR Price Feed$/i, '')
+      .replace(/\s+CAPO Price Feed$/i, '')
+      .replace(/\s+price feed$/i, '')
+      .replace(/\s+Price Feed$/i, '')
+      .replace(/\s+Exchange Rate$/i, '')
+      .trim();
+  }
+
+  private normalizeQuoteSymbol(symbol: string): string | null {
+    const normalizedSymbol = symbol
+      .replace(/\bCAPO\b/gi, ' ')
+      .replace(/\bSVR\b/gi, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+
+    return normalizedSymbol || null;
   }
 
   private normalizeAssetKey(symbol: string): string {

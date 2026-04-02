@@ -69,6 +69,33 @@ describe('FeedPriceService', () => {
     expect(providerFactory.multicall).toHaveBeenCalledWith('polygon');
   });
 
+  it('treats CAPO SVR USD feeds as direct USD prices', async () => {
+    const { service, quotePriceService } = makeService();
+
+    const capoUsdFeed = {
+      description: jest.fn().mockResolvedValue('rsETH / USD CAPO SVR Price Feed'),
+      decimals: jest.fn().mockResolvedValue(8n),
+      latestRoundData: jest.fn().mockResolvedValue({
+        answer: 399_125_000_000n,
+      }),
+    };
+
+    mockContracts({
+      '0xcapo-feed': capoUsdFeed,
+    });
+
+    const result = await service.getUsdPrice({
+      assetSymbol: 'rsETH',
+      blockTag: 101,
+      date: new Date('2025-07-12T00:00:00.000Z'),
+      feedAddress: '0xcapo-feed',
+      network: 'mainnet',
+    });
+
+    expect(result).toBeCloseTo(3991.25);
+    expect(quotePriceService.getUsdPrice).not.toHaveBeenCalled();
+  });
+
   it('multiplies quoted feeds by the resolved quote USD price', async () => {
     const { service, quotePriceService } = makeService();
     quotePriceService.getUsdPrice.mockResolvedValue(3645.95061933);
