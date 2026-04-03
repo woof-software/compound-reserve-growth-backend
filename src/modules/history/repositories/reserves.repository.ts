@@ -97,6 +97,7 @@ export class ReservesRepository {
     const query = this.reservesRepository
       .createQueryBuilder('reserves')
       .leftJoinAndSelect('reserves.source', 'source')
+      .leftJoinAndSelect('source.asset', 'asset')
       .where('source.deletedAt IS NULL')
       .andWhere('source.algorithm && :algorithms::text[]', {
         algorithms: algorithmsArrayLiteral,

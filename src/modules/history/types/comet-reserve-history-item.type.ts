@@ -1,12 +1,13 @@
-import { CometReserveType } from 'modules/history/enum/comet-reserve-type.enum';
+import { AssetRole } from '@/modules/history/enum/comet-reserve-type.enum';
 
 export type CometReserveHistoryItem = {
-  sourceAddress: string;
-  quantity: string;
-  value: number;
-  price: number;
   chainId: number;
+  marketAddress: string;
+  assetAddress: string;
+  assetRole: AssetRole;
+  quantity: string;
+  price: number;
+  value: number;
   timestamp: number;
   blockNumber: number;
-  reserveType: CometReserveType;
 };

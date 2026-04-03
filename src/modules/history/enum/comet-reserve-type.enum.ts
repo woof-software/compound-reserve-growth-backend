@@ -1,4 +1,4 @@
-export enum CometReserveType {
-  MARKET = 'market',
+export enum AssetRole {
+  BASE = 'base',
   COLLATERAL = 'collateral',
 }

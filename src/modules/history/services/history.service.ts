@@ -9,7 +9,7 @@ import { PaginationDto } from '@/common/dto/pagination.dto';
 import { NetworkService } from '@/common/chains/network/network.service';
 import { generateDailyKey } from '@/common/utils/generate-daily-key';
 import { CreateHistoryDto } from '@/modules/history/dto/create-history.dto';
-import { CometReserveType } from '@/modules/history/enum/comet-reserve-type.enum';
+import { AssetRole } from '@/modules/history/enum/comet-reserve-type.enum';
 import { CometReserveHistoryItem } from '@/modules/history/types/comet-reserve-history-item.type';
 import { SourceEntity } from '@/modules/source/source.entity';
 import { SourceRepository } from '@/modules/source/source.repository';
@@ -232,16 +232,17 @@ export class HistoryService {
 
   private mapCometReserveHistoryItem(reserve: ReserveEntity): CometReserveHistoryItem {
     return {
-      sourceAddress: reserve.source.address,
-      quantity: reserve.quantity,
-      value: reserve.value,
-      price: reserve.price,
       chainId: this.networkService.byName(reserve.source.network).chainId,
+      marketAddress: reserve.source.address,
+      assetAddress: reserve.source.asset.address,
+      assetRole: reserve.source.algorithm.includes(Algorithm.COMET_COLLATERAL)
+        ? AssetRole.COLLATERAL
+        : AssetRole.BASE,
+      quantity: reserve.quantity,
+      price: reserve.price,
+      value: reserve.value,
       timestamp: Math.floor(reserve.date.getTime() / 1000),
       blockNumber: reserve.blockNumber,
-      reserveType: reserve.source.algorithm.includes(Algorithm.COMET_COLLATERAL)
-        ? CometReserveType.COLLATERAL
-        : CometReserveType.MARKET,
     };
   }
 }
