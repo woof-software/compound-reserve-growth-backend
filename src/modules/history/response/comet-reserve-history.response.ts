@@ -13,6 +13,12 @@ export class CometReserveHistoryResponse {
   @ApiProperty({ example: '0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48' })
   public assetAddress: string;
 
+  @ApiProperty({ example: 'USDC' })
+  public assetSymbol: string;
+
+  @ApiProperty({ example: 6 })
+  public assetDecimals: number;
+
   @ApiProperty({ example: AssetRole.BASE, enum: AssetRole })
   public assetRole: AssetRole;
 
@@ -35,6 +41,8 @@ export class CometReserveHistoryResponse {
     this.chainId = item.chainId;
     this.marketAddress = item.marketAddress;
     this.assetAddress = item.assetAddress;
+    this.assetSymbol = item.assetSymbol;
+    this.assetDecimals = item.assetDecimals;
     this.assetRole = item.assetRole;
     this.quantity = item.quantity;
     this.price = item.price;

@@ -4,6 +4,8 @@ export type CometReserveHistoryItem = {
   chainId: number;
   marketAddress: string;
   assetAddress: string;
+  assetSymbol: string;
+  assetDecimals: number;
   assetRole: AssetRole;
   quantity: string;
   price: number;

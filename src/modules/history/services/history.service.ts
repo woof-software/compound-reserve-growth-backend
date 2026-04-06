@@ -235,6 +235,8 @@ export class HistoryService {
       chainId: this.networkService.byName(reserve.source.network).chainId,
       marketAddress: reserve.source.address,
       assetAddress: reserve.source.asset.address,
+      assetSymbol: reserve.source.asset.symbol,
+      assetDecimals: reserve.source.asset.decimals,
       assetRole: reserve.source.algorithm.includes(Algorithm.COMET_COLLATERAL)
         ? AssetRole.COLLATERAL
         : AssetRole.BASE,
