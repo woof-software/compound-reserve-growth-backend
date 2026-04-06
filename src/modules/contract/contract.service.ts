@@ -14,6 +14,7 @@ import ERC20ABI from './abi/ERC20ABI.json';
 import Bytes32TokenABI from './abi/Bytes32TokenABI.json';
 import { MarketData, RootJson } from './contract.type';
 import { ResponseStatsAlgorithm } from './interface';
+import { DailyCollectionStart } from './type/daily-collection-start.type';
 import { HistoricalPriceAsset } from './type/historical-price-asset.type';
 
 import { ProviderFactory } from '@/common/chains/network/provider.factory';
@@ -28,7 +29,12 @@ import { IncomesEntity, ReserveEntity, SpendsEntity } from '@/modules/history/en
 import type { ContractConfig } from '@/config/contract';
 import { SEC_IN_MS } from '@/common/constants';
 import { Algorithm } from '@/common/enum/algorithm.enum';
-import { calculateTimeRange } from '@/common/utils/calculate-time-range';
+import {
+  calculateTimeRangeFromFirstTargetTimestamp,
+  getNextUtcMidnightTimestamp,
+  getNextUtcMidnightTimestampFromDate,
+  getUtcMidnightTimestamp,
+} from '@/common/utils/calculate-time-range';
 
 @Injectable()
 export class ContractService {
@@ -346,6 +352,148 @@ export class ContractService {
     return price;
   }
 
+  private async getSourceFirstCollectableDayTimestamp(
+    source: SourceEntity,
+    provider: MulticallProvider<ethers.JsonRpcProvider>,
+  ): Promise<number> {
+    const sourceStartBlockData = await this.blockService.getCachedBlock(
+      source.network,
+      provider,
+      source.startBlock,
+    );
+
+    return getNextUtcMidnightTimestamp(sourceStartBlockData.timestamp);
+  }
+
+  private async getSourceLastCollectableDayTimestamp(
+    source: SourceEntity,
+    provider: MulticallProvider<ethers.JsonRpcProvider>,
+  ): Promise<number | null> {
+    if (source.endBlock == null) {
+      return null;
+    }
+
+    const endBlockData = await this.blockService.getCachedBlock(
+      source.network,
+      provider,
+      source.endBlock,
+    );
+
+    return getUtcMidnightTimestamp(new Date(endBlockData.timestamp * SEC_IN_MS));
+  }
+
+  private async resolveManualCollectionStart(
+    source: SourceEntity,
+    provider: MulticallProvider<ethers.JsonRpcProvider>,
+    startDate: Date,
+  ): Promise<DailyCollectionStart> {
+    const firstCollectableDayTs = await this.getSourceFirstCollectableDayTimestamp(
+      source,
+      provider,
+    );
+    const requestedDayTs = getUtcMidnightTimestamp(startDate);
+    const firstTargetTs = Math.max(firstCollectableDayTs, requestedDayTs);
+
+    if (requestedDayTs < firstCollectableDayTs) {
+      this.logger.log(
+        `Provided date ${startDate.toISOString()} is older than source.startBlock. Starting from ${new Date(firstTargetTs * SEC_IN_MS).toISOString()} for ${source.address} on ${source.network}`,
+      );
+
+      return {
+        firstTargetTs,
+        lastBlock: source.startBlock,
+      };
+    }
+
+    const lastBlock =
+      firstTargetTs === firstCollectableDayTs
+        ? source.startBlock
+        : await this.blockService.findBlockByTimestamp(
+            source.network,
+            provider,
+            firstTargetTs,
+            source.startBlock,
+          );
+
+    this.logger.log(
+      `Using provided date ${startDate.toISOString()} to start from ${new Date(firstTargetTs * SEC_IN_MS).toISOString()} for ${source.address} on ${source.network}`,
+    );
+
+    return {
+      firstTargetTs,
+      lastBlock,
+    };
+  }
+
+  private async resolveReservesCollectionStart(
+    source: SourceEntity,
+    provider: MulticallProvider<ethers.JsonRpcProvider>,
+    startDate?: Date,
+    manager?: EntityManager,
+  ): Promise<DailyCollectionStart> {
+    if (startDate) {
+      return this.resolveManualCollectionStart(source, provider, startDate);
+    }
+
+    const latestReserve = await this.historyService.findLatestReserveBySource(source, manager);
+    if (!latestReserve) {
+      return {
+        firstTargetTs: await this.getSourceFirstCollectableDayTimestamp(source, provider),
+        lastBlock: source.startBlock,
+      };
+    }
+
+    return {
+      firstTargetTs: getNextUtcMidnightTimestampFromDate(latestReserve.date),
+      lastBlock: latestReserve.blockNumber,
+    };
+  }
+
+  private async resolveStatsCollectionStart(
+    source: SourceEntity,
+    provider: MulticallProvider<ethers.JsonRpcProvider>,
+    startDate?: Date,
+    manager?: EntityManager,
+  ): Promise<DailyCollectionStart> {
+    if (startDate) {
+      return this.resolveManualCollectionStart(source, provider, startDate);
+    }
+
+    const [latestIncome, latestSpend] = await Promise.all([
+      this.historyService.findIncomesBySource(source, manager),
+      this.historyService.findSpendsBySource(source, manager),
+    ]);
+
+    if (latestIncome) {
+      if (latestSpend && latestSpend.date.getTime() > latestIncome.date.getTime()) {
+        this.logger.warn(
+          `Detected stats mismatch for source ${source.id}: latest spend date ${latestSpend.date.toISOString()} is newer than latest income date ${latestIncome.date.toISOString()}. Reprocessing from income checkpoint.`,
+        );
+      }
+
+      return {
+        firstTargetTs: getNextUtcMidnightTimestampFromDate(latestIncome.date),
+        lastBlock: latestIncome.blockNumber,
+      };
+    }
+
+    if (latestSpend) {
+      this.logger.warn(
+        `Detected stats state without incomes for source ${source.id}. Reprocessing from latest spend date ${latestSpend.date.toISOString()}.`,
+      );
+
+      return {
+        firstTargetTs: getNextUtcMidnightTimestampFromDate(latestSpend.date),
+        lastBlock: latestSpend.blockNumber,
+      };
+    }
+
+    return {
+      firstTargetTs: await this.getSourceFirstCollectableDayTimestamp(source, provider),
+      lastBlock: source.startBlock,
+    };
+  }
+
   async getHistory(source: SourceEntity, manager?: EntityManager) {
     const { algorithm } = source;
 
@@ -387,64 +535,17 @@ export class ContractService {
 
     try {
       const provider = this.providerFactory.multicall(network);
-
-      let lastBlock: number;
-
-      if (startDate) {
-        try {
-          const startBlockData = await this.blockService.getCachedBlock(
-            network,
-            provider,
-            source.startBlock,
-          );
-          const startBlockTimestamp = startBlockData.timestamp;
-          const providedTimestamp = Math.floor(startDate.getTime() / 1000);
-
-          const targetTimestamp = Math.max(startBlockTimestamp, providedTimestamp);
-
-          if (providedTimestamp < startBlockTimestamp) {
-            this.logger.log(
-              `Provided date ${startDate.toISOString()} is older than source.startBlock. Using startBlock ${source.startBlock} for ${source.address} on ${source.network}`,
-            );
-            lastBlock = source.startBlock;
-          } else {
-            lastBlock = await this.blockService.findBlockByTimestamp(
-              network,
-              provider,
-              targetTimestamp,
-            );
-            if (source.endBlock != null && lastBlock > source.endBlock) {
-              lastBlock = source.endBlock;
-              this.logger.log(
-                `Capped to source.endBlock=${lastBlock} for ${source.address} on ${source.network}`,
-              );
-            }
-            this.logger.log(
-              `Using provided date ${startDate.toISOString()} to start from block ${lastBlock} for ${source.address} on ${source.network}`,
-            );
-          }
-        } catch (e: unknown) {
-          const message = e instanceof Error ? e.message : String(e);
-          this.logger.error(
-            `Failed to find block for date ${startDate.toISOString()} for ${source.address} on ${source.network}: ${message}`,
-          );
-          return;
-        }
-      } else {
-        const latestReserve = await this.historyService.findLatestReserveBySource(source, manager);
-        lastBlock = latestReserve?.blockNumber ?? source.startBlock;
-        if (source.endBlock != null && lastBlock >= source.endBlock) {
-          this.logger.log(
-            `No historical data needed - source ${source.id} already reached endBlock ${source.endBlock}`,
-          );
-          return;
-        }
-      }
-
-      const startBlockData = await this.blockService.getCachedBlock(network, provider, lastBlock);
-      const startTs = startBlockData.timestamp;
-
-      const { firstMidnightUTC, todayMidnightUTC, dailyTs } = calculateTimeRange(startTs);
+      const { firstTargetTs, lastBlock: initialLastBlock } =
+        await this.resolveReservesCollectionStart(source, provider, startDate, manager);
+      let lastBlock = initialLastBlock;
+      const lastCollectableDayTs = await this.getSourceLastCollectableDayTimestamp(
+        source,
+        provider,
+      );
+      const { firstMidnightUTC, todayMidnightUTC, dailyTs } =
+        lastCollectableDayTs === null
+          ? calculateTimeRangeFromFirstTargetTimestamp(firstTargetTs)
+          : calculateTimeRangeFromFirstTargetTimestamp(firstTargetTs, lastCollectableDayTs);
 
       // Check if we have any days to process
       if (firstMidnightUTC > todayMidnightUTC) {
@@ -548,8 +649,10 @@ export class ContractService {
               date,
               manager,
             );
-          } catch (priceError) {
-            const message = `Price fetch failed for ${symbol} on ${date.toISOString().slice(0, 10)}: ${priceError.message}. Stopping to retry on next cron run.`;
+          } catch (priceError: unknown) {
+            const errorMessage =
+              priceError instanceof Error ? priceError.message : String(priceError);
+            const message = `Price fetch failed for ${symbol} on ${date.toISOString().slice(0, 10)}: ${errorMessage}. Stopping to retry on next cron run.`;
             this.logger.error(message);
             await this.mailService.notifyGetHistoryError(message);
 
@@ -598,8 +701,9 @@ export class ContractService {
               `Progress: ${processedCount}/${dailyTs.length} days processed (${skippedCount} skipped)`,
             );
           }
-        } catch (error) {
-          this.logger.error(`Failed to process timestamp ${targetTs}: ${error.message}`);
+        } catch (error: unknown) {
+          const errorMessage = error instanceof Error ? error.message : String(error);
+          this.logger.error(`Failed to process timestamp ${targetTs}: ${errorMessage}`);
 
           const blocksPerDay = this.blockService.getBlocksPerDay(network, lastBlock);
           lastBlock = lastBlock + blocksPerDay;
@@ -620,8 +724,9 @@ export class ContractService {
       this.logger.log(
         `Completed: ${successRate}% success (${processedCount}/${totalAttempted} processed, ${skippedCount} skipped)`,
       );
-    } catch (error) {
-      const message = `Error processing source ${source.id} on ${network} for contract ${contractAddress}, algorithm ${algorithm}, asset ${asset.symbol}: ${error.message}`;
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      const message = `Error processing source ${source.id} on ${network} for contract ${contractAddress}, algorithm ${algorithm}, asset ${asset.symbol}: ${errorMessage}`;
       this.logger.error(message);
       await this.mailService.notifyGetHistoryError(message);
     }
@@ -641,65 +746,21 @@ export class ContractService {
 
     try {
       const provider = this.providerFactory.multicall(network);
-
-      let lastBlock: number | undefined;
-
-      if (startDate) {
-        try {
-          const startBlockData = await this.blockService.getCachedBlock(
-            network,
-            provider,
-            source.startBlock,
-          );
-          const startBlockTimestamp = startBlockData.timestamp;
-          const providedTimestamp = Math.floor(startDate.getTime() / 1000);
-
-          const targetTimestamp = Math.max(startBlockTimestamp, providedTimestamp);
-
-          if (providedTimestamp < startBlockTimestamp) {
-            this.logger.log(
-              `Provided date ${startDate.toISOString()} is older than source.startBlock. Using startBlock ${source.startBlock} for ${source.address} on ${source.network}`,
-            );
-            lastBlock = source.startBlock;
-          } else {
-            lastBlock = await this.blockService.findBlockByTimestamp(
-              network,
-              provider,
-              targetTimestamp,
-            );
-            this.logger.log(
-              `Using provided date ${startDate.toISOString()} to start from block ${lastBlock} for ${source.address} on ${source.network}`,
-            );
-          }
-        } catch (e: unknown) {
-          const message = e instanceof Error ? e.message : String(e);
-          this.logger.error(
-            `Failed to find block for date ${startDate.toISOString()} for ${source.address} on ${source.network}: ${message}`,
-          );
-          return;
-        }
-      } else {
-        const spends = await this.historyService.findSpendsBySource(source, manager);
-        const incomes = await this.historyService.findIncomesBySource(source, manager);
-
-        if (incomes?.blockNumber) {
-          lastBlock = incomes.blockNumber;
-        }
-        if (spends?.blockNumber && (!lastBlock || spends.blockNumber < lastBlock)) {
-          lastBlock = spends.blockNumber;
-        }
-        if (!lastBlock) {
-          lastBlock = source.startBlock;
-          this.logger.log(
-            `No previous stats events. Starting scan from source.startBlock=${lastBlock} for ${source.address} on ${source.network}`,
-          );
-        }
-      }
-
-      const startBlockData = await this.blockService.getCachedBlock(network, provider, lastBlock);
-      const startTs = startBlockData.timestamp;
-
-      const { firstMidnightUTC, todayMidnightUTC, dailyTs } = calculateTimeRange(startTs);
+      const { firstTargetTs, lastBlock: initialLastBlock } = await this.resolveStatsCollectionStart(
+        source,
+        provider,
+        startDate,
+        manager,
+      );
+      let lastBlock = initialLastBlock;
+      const lastCollectableDayTs = await this.getSourceLastCollectableDayTimestamp(
+        source,
+        provider,
+      );
+      const { firstMidnightUTC, todayMidnightUTC, dailyTs } =
+        lastCollectableDayTs === null
+          ? calculateTimeRangeFromFirstTargetTimestamp(firstTargetTs)
+          : calculateTimeRangeFromFirstTargetTimestamp(firstTargetTs, lastCollectableDayTs);
 
       // Check if we have any days to process
       if (firstMidnightUTC > todayMidnightUTC) {
@@ -727,8 +788,9 @@ export class ContractService {
             manager,
           );
           this.logger.log(`Price data preloaded for ${asset.symbol}`);
-        } catch (error) {
-          this.logger.warn(`Failed to preload price data for ${asset.symbol}: ${error.message}`);
+        } catch (error: unknown) {
+          const errorMessage = error instanceof Error ? error.message : String(error);
+          this.logger.warn(`Failed to preload price data for ${asset.symbol}: ${errorMessage}`);
         }
       } else {
         this.logger.log(`Skipping preload for stablecoin ${asset.symbol}`);
@@ -744,12 +806,15 @@ export class ContractService {
 
       for (const targetTs of dailyTs) {
         try {
-          const blockTag = await this.blockService.findBlockByTimestamp(
+          let blockTag = await this.blockService.findBlockByTimestamp(
             network,
             provider,
             targetTs,
             lastBlock,
           );
+          if (source.endBlock != null && blockTag > source.endBlock) {
+            blockTag = source.endBlock;
+          }
 
           const assetCompToken = { address: null, symbol: 'COMP', decimals: null };
           const compDate = new Date(targetTs * 1000);
@@ -763,8 +828,10 @@ export class ContractService {
             if (priceComp <= 0) {
               throw new Error(`Invalid price received: ${priceComp}`);
             }
-          } catch (priceError: any) {
-            const message = `Price fetch failed for ${asset.symbol} on ${compDate.toISOString().slice(0, 10)}: ${priceError.message}. Stopping to retry on next cron run.`;
+          } catch (priceError: unknown) {
+            const errorMessage =
+              priceError instanceof Error ? priceError.message : String(priceError);
+            const message = `Price fetch failed for ${asset.symbol} on ${compDate.toISOString().slice(0, 10)}: ${errorMessage}. Stopping to retry on next cron run.`;
             this.logger.error(message);
             await this.mailService.notifyGetHistoryError(message);
             return;
@@ -813,8 +880,10 @@ export class ContractService {
             if (price <= 0) {
               throw new Error(`Invalid price received: ${price}`);
             }
-          } catch (priceError) {
-            const message = `Price fetch failed for ${symbol} on ${dayDate.toISOString().slice(0, 10)}: ${priceError.message}. Stopping to retry on next cron run.`;
+          } catch (priceError: unknown) {
+            const errorMessage =
+              priceError instanceof Error ? priceError.message : String(priceError);
+            const message = `Price fetch failed for ${symbol} on ${dayDate.toISOString().slice(0, 10)}: ${errorMessage}. Stopping to retry on next cron run.`;
             this.logger.error(message);
             await this.mailService.notifyGetHistoryError(message);
 
@@ -867,8 +936,9 @@ export class ContractService {
               `Progress: ${processedCount}/${dailyTs.length} days processed (${skippedCount} skipped)`,
             );
           }
-        } catch (error) {
-          this.logger.error(`Failed to process timestamp ${targetTs}: ${error.message}`);
+        } catch (error: unknown) {
+          const errorMessage = error instanceof Error ? error.message : String(error);
+          this.logger.error(`Failed to process timestamp ${targetTs}: ${errorMessage}`);
 
           const blocksPerDay = this.blockService.getBlocksPerDay(network, lastBlock);
           lastBlock = lastBlock + blocksPerDay;
@@ -885,8 +955,9 @@ export class ContractService {
       this.logger.log(
         `Completed: ${successRate}% success (${processedCount}/${totalAttempted} processed, ${skippedCount} skipped)`,
       );
-    } catch (error) {
-      const message = `Error processing source ${source.id} on ${network} for contract ${contractAddress}, algorithm ${algorithm}, asset ${asset.symbol}: ${error.message}`;
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      const message = `Error processing source ${source.id} on ${network} for contract ${contractAddress}, algorithm ${algorithm}, asset ${asset.symbol}: ${errorMessage}`;
       this.logger.error(message);
       await this.mailService.notifyGetHistoryError(message);
     }

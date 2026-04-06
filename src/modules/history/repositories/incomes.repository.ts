@@ -18,7 +18,27 @@ export class IncomesRepository {
   }
 
   async save(reserve: IncomesEntity, manager?: EntityManager): Promise<IncomesEntity> {
-    return this.getRepository(manager).save(reserve);
+    const repository = this.getRepository(manager);
+    const existingIncome = await this.findBySourceIdAndDate(
+      reserve.source.id,
+      reserve.date,
+      manager,
+    );
+
+    if (!existingIncome) {
+      return repository.save(reserve);
+    }
+
+    existingIncome.blockNumber = reserve.blockNumber;
+    existingIncome.quantitySupply = reserve.quantitySupply;
+    existingIncome.quantityBorrow = reserve.quantityBorrow;
+    existingIncome.price = reserve.price;
+    existingIncome.priceComp = reserve.priceComp;
+    existingIncome.valueSupply = reserve.valueSupply;
+    existingIncome.valueBorrow = reserve.valueBorrow;
+    existingIncome.source = reserve.source;
+
+    return repository.save(existingIncome);
   }
 
   async findById(id: number): Promise<IncomesEntity | null> {
@@ -36,7 +56,8 @@ export class IncomesRepository {
       .leftJoinAndSelect('incomes.source', 'source')
       .where('source.deletedAt IS NULL')
       .andWhere('source.id = :sourceId', { sourceId })
-      .orderBy('incomes.blockNumber', 'DESC')
+      .orderBy('incomes.date', 'DESC')
+      .addOrderBy('incomes.id', 'DESC')
       .getOne();
   }
 
@@ -77,5 +98,19 @@ export class IncomesRepository {
 
   async updatePriceComp(id: number, priceComp: number): Promise<void> {
     await this.incomesRepository.update(id, { priceComp });
+  }
+
+  private async findBySourceIdAndDate(
+    sourceId: number,
+    date: Date,
+    manager?: EntityManager,
+  ): Promise<IncomesEntity | null> {
+    return this.getRepository(manager)
+      .createQueryBuilder('incomes')
+      .innerJoin('incomes.source', 'source')
+      .where('source.id = :sourceId', { sourceId })
+      .andWhere('incomes.date = :date', { date })
+      .orderBy('incomes.id', 'DESC')
+      .getOne();
   }
 }
