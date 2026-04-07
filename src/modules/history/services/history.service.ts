@@ -1,16 +1,12 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { EntityManager } from 'typeorm';
 
-import { Algorithm } from '@/common/enum/algorithm.enum';
 import { OffsetDataDto } from '@/common/dto/offset-data.dto';
 import { OffsetDto } from '@/common/dto/offset.dto';
 import { PaginatedDataDto } from '@/common/dto/paginated-data.dto';
 import { PaginationDto } from '@/common/dto/pagination.dto';
-import { NetworkService } from '@/common/chains/network/network.service';
 import { generateDailyKey } from '@/common/utils/generate-daily-key';
 import { CreateHistoryDto } from '@/modules/history/dto/create-history.dto';
-import { AssetRole } from '@/modules/history/enum/comet-reserve-type.enum';
-import { CometReserveHistoryItem } from '@/modules/history/types/comet-reserve-history-item.type';
 import { SourceEntity } from '@/modules/source/source.entity';
 import { SourceRepository } from '@/modules/source/source.repository';
 import { IncentiveEntity } from '@/modules/incentives/incentive.entity';
@@ -36,7 +32,6 @@ export class HistoryService {
     private readonly sourceRepo: SourceRepository,
     private readonly revenueService: RevenueService,
     private readonly incentivesQueryService: IncentivesQueryService,
-    private readonly networkService: NetworkService,
   ) {}
 
   async create(dto: CreateHistoryDto): Promise<ReserveEntity> {
@@ -125,17 +120,6 @@ export class HistoryService {
 
   async getOffsetTreasuryHistory(dto: OffsetDto): Promise<OffsetDataDto<ReserveEntity>> {
     return this.reservesRepo.getOffsetTreasuryReserves(dto);
-  }
-
-  async getOffsetCometReserves(dto: OffsetDto): Promise<OffsetDataDto<CometReserveHistoryItem>> {
-    const offsetData = await this.reservesRepo.getOffsetCometReserves(dto);
-
-    return new OffsetDataDto<CometReserveHistoryItem>(
-      offsetData.data.map((reserve) => this.mapCometReserveHistoryItem(reserve)),
-      offsetData.limit,
-      offsetData.offset,
-      offsetData.total,
-    );
   }
 
   async getRevenueHistory(): Promise<RevenueEntity[]> {
@@ -228,23 +212,5 @@ export class HistoryService {
 
   async getIncentiveHistory(dto: OffsetDto): Promise<OffsetDataDto<IncentiveEntity>> {
     return this.incentivesQueryService.getOffsetHistory(dto);
-  }
-
-  private mapCometReserveHistoryItem(reserve: ReserveEntity): CometReserveHistoryItem {
-    return {
-      chainId: this.networkService.byName(reserve.source.network).chainId,
-      marketAddress: reserve.source.address,
-      assetAddress: reserve.source.asset.address,
-      assetSymbol: reserve.source.asset.symbol,
-      assetDecimals: reserve.source.asset.decimals,
-      assetRole: reserve.source.algorithm.includes(Algorithm.COMET_COLLATERAL)
-        ? AssetRole.COLLATERAL
-        : AssetRole.BASE,
-      quantity: reserve.quantity,
-      price: reserve.price,
-      value: reserve.value,
-      timestamp: Math.floor(reserve.date.getTime() / 1000),
-      blockNumber: reserve.blockNumber,
-    };
   }
 }

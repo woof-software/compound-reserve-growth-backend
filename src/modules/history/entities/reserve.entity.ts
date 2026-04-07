@@ -1,4 +1,4 @@
-import { Column, Entity, ManyToOne, PrimaryGeneratedColumn } from 'typeorm';
+import { Column, Entity, ManyToOne, PrimaryGeneratedColumn, UpdateDateColumn } from 'typeorm';
 
 import { SourceEntity } from '@/modules/source/source.entity';
 
@@ -24,6 +24,9 @@ export class ReserveEntity {
 
   @Column()
   public createdAt: Date;
+
+  @UpdateDateColumn()
+  public updatedAt: Date;
 
   @ManyToOne(() => SourceEntity, (source) => source.reserves)
   public source: SourceEntity;
