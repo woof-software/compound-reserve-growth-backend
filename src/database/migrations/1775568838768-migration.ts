@@ -1,7 +1,7 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
-export class DailyHistoryUniqueness1775433600000 implements MigrationInterface {
-  name = 'DailyHistoryUniqueness1775433600000';
+export class DailyHistoryUniqueness1775568838768 implements MigrationInterface {
+  name = 'DailyHistoryUniqueness1775568838768';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(

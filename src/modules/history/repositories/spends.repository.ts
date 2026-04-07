@@ -19,26 +19,29 @@ export class SpendsRepository {
 
   async save(reserve: SpendsEntity, manager?: EntityManager): Promise<SpendsEntity> {
     const repository = this.getRepository(manager);
-    const existingSpend = await this.findBySourceIdAndDate(
-      reserve.source.id,
-      reserve.date,
-      manager,
-    );
+    await repository
+      .createQueryBuilder()
+      .insert()
+      .into(SpendsEntity)
+      .values(reserve)
+      .orUpdate(
+        [
+          'blockNumber',
+          'quantitySupply',
+          'quantityBorrow',
+          'price',
+          'priceComp',
+          'valueSupply',
+          'valueBorrow',
+        ],
+        ['sourceId', 'date'],
+        {
+          skipUpdateIfNoValuesChanged: true,
+        },
+      )
+      .execute();
 
-    if (!existingSpend) {
-      return repository.save(reserve);
-    }
-
-    existingSpend.blockNumber = reserve.blockNumber;
-    existingSpend.quantitySupply = reserve.quantitySupply;
-    existingSpend.quantityBorrow = reserve.quantityBorrow;
-    existingSpend.price = reserve.price;
-    existingSpend.priceComp = reserve.priceComp;
-    existingSpend.valueSupply = reserve.valueSupply;
-    existingSpend.valueBorrow = reserve.valueBorrow;
-    existingSpend.source = reserve.source;
-
-    return repository.save(existingSpend);
+    return reserve;
   }
 
   async findById(id: number): Promise<SpendsEntity | null> {
@@ -101,19 +104,5 @@ export class SpendsRepository {
 
   async updatePriceComp(id: number, priceComp: number): Promise<void> {
     await this.spendsRepository.update(id, { priceComp });
-  }
-
-  private async findBySourceIdAndDate(
-    sourceId: number,
-    date: Date,
-    manager?: EntityManager,
-  ): Promise<SpendsEntity | null> {
-    return this.getRepository(manager)
-      .createQueryBuilder('spends')
-      .innerJoin('spends.source', 'source')
-      .where('source.id = :sourceId', { sourceId })
-      .andWhere('spends.date = :date', { date })
-      .orderBy('spends.id', 'DESC')
-      .getOne();
   }
 }

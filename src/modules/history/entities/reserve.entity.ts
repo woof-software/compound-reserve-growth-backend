@@ -1,8 +1,10 @@
-import { Column, Entity, ManyToOne, PrimaryGeneratedColumn, UpdateDateColumn } from 'typeorm';
+import { Column, Entity, Index, ManyToOne, PrimaryGeneratedColumn, UpdateDateColumn } from 'typeorm';
 
 import { SourceEntity } from '@/modules/source/source.entity';
 
 @Entity({ name: 'reserves' })
+@Index('UQ_reserves_sourceId_date', ['source', 'date'], { unique: true })
+@Index('IDX_reserves_date_source_id', ['date', 'source', 'id'])
 export class ReserveEntity {
   @PrimaryGeneratedColumn()
   public id: number;

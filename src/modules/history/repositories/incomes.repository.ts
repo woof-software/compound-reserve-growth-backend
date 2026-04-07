@@ -19,26 +19,29 @@ export class IncomesRepository {
 
   async save(reserve: IncomesEntity, manager?: EntityManager): Promise<IncomesEntity> {
     const repository = this.getRepository(manager);
-    const existingIncome = await this.findBySourceIdAndDate(
-      reserve.source.id,
-      reserve.date,
-      manager,
-    );
+    await repository
+      .createQueryBuilder()
+      .insert()
+      .into(IncomesEntity)
+      .values(reserve)
+      .orUpdate(
+        [
+          'blockNumber',
+          'quantitySupply',
+          'quantityBorrow',
+          'price',
+          'priceComp',
+          'valueSupply',
+          'valueBorrow',
+        ],
+        ['sourceId', 'date'],
+        {
+          skipUpdateIfNoValuesChanged: true,
+        },
+      )
+      .execute();
 
-    if (!existingIncome) {
-      return repository.save(reserve);
-    }
-
-    existingIncome.blockNumber = reserve.blockNumber;
-    existingIncome.quantitySupply = reserve.quantitySupply;
-    existingIncome.quantityBorrow = reserve.quantityBorrow;
-    existingIncome.price = reserve.price;
-    existingIncome.priceComp = reserve.priceComp;
-    existingIncome.valueSupply = reserve.valueSupply;
-    existingIncome.valueBorrow = reserve.valueBorrow;
-    existingIncome.source = reserve.source;
-
-    return repository.save(existingIncome);
+    return reserve;
   }
 
   async findById(id: number): Promise<IncomesEntity | null> {
@@ -98,19 +101,5 @@ export class IncomesRepository {
 
   async updatePriceComp(id: number, priceComp: number): Promise<void> {
     await this.incomesRepository.update(id, { priceComp });
-  }
-
-  private async findBySourceIdAndDate(
-    sourceId: number,
-    date: Date,
-    manager?: EntityManager,
-  ): Promise<IncomesEntity | null> {
-    return this.getRepository(manager)
-      .createQueryBuilder('incomes')
-      .innerJoin('incomes.source', 'source')
-      .where('source.id = :sourceId', { sourceId })
-      .andWhere('incomes.date = :date', { date })
-      .orderBy('incomes.id', 'DESC')
-      .getOne();
   }
 }

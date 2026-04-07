@@ -20,23 +20,17 @@ export class ReservesRepository {
 
   async save(reserve: ReserveEntity, manager?: EntityManager): Promise<ReserveEntity> {
     const repository = this.getRepository(manager);
-    const existingReserve = await this.findBySourceIdAndDate(
-      reserve.source.id,
-      reserve.date,
-      manager,
-    );
+    await repository
+      .createQueryBuilder()
+      .insert()
+      .into(ReserveEntity)
+      .values(reserve)
+      .orUpdate(['blockNumber', 'quantity', 'price', 'value'], ['sourceId', 'date'], {
+        skipUpdateIfNoValuesChanged: true,
+      })
+      .execute();
 
-    if (!existingReserve) {
-      return repository.save(reserve);
-    }
-
-    existingReserve.blockNumber = reserve.blockNumber;
-    existingReserve.quantity = reserve.quantity;
-    existingReserve.price = reserve.price;
-    existingReserve.value = reserve.value;
-    existingReserve.source = reserve.source;
-
-    return repository.save(existingReserve);
+    return reserve;
   }
 
   async findById(id: number): Promise<ReserveEntity | null> {
@@ -138,19 +132,5 @@ export class ReservesRepository {
       .delete()
       .where('sourceId IN (:...sourceIds)', { sourceIds })
       .execute();
-  }
-
-  private async findBySourceIdAndDate(
-    sourceId: number,
-    date: Date,
-    manager?: EntityManager,
-  ): Promise<ReserveEntity | null> {
-    return this.getRepository(manager)
-      .createQueryBuilder('reserves')
-      .innerJoin('reserves.source', 'source')
-      .where('source.id = :sourceId', { sourceId })
-      .andWhere('reserves.date = :date', { date })
-      .orderBy('reserves.id', 'DESC')
-      .getOne();
   }
 }
