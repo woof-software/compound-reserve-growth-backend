@@ -1,15 +1,16 @@
-import { AssetRole } from '@/modules/history/enum/comet-reserve-type.enum';
+import { SyncReserveAssetRole } from '@/modules/sync/enum/sync-reserve-asset-role.enum';
 
-export type CometReserveHistoryItem = {
+export type SyncReserveItem = {
   chainId: number;
   marketAddress: string;
   assetAddress: string;
   assetSymbol: string;
   assetDecimals: number;
-  assetRole: AssetRole;
+  assetRole: SyncReserveAssetRole;
   quantity: string;
   price: number;
   value: number;
   timestamp: number;
   blockNumber: number;
+  updatedAt: Date;
 };

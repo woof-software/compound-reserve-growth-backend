@@ -22,6 +22,7 @@ import { MailModule } from '@/modules/mail/mail.module';
 import { EventModule } from '@/modules/event/event.module';
 import { CoinGeckoModule } from '@/modules/price/providers/coingecko/coingecko.module';
 import { CapoModule } from '@/modules/capo/capo.module';
+import { SyncModule } from '@/modules/sync/sync.module';
 import { getAdminModule } from '@/modules/admin';
 import { NetworkModule } from '@/common/chains/network/network.module';
 import { RedisModule, REDIS_CLIENT } from 'infrastructure/redis/redis.module';
@@ -34,6 +35,7 @@ import admin from '@/config/admin';
 import contractConfig from '@/config/contract';
 import reserveSourcesConfig from '@/config/reserve-sources.config';
 import blockTimingConfig from '@/config/block-timing.config';
+import syncConfig from '@/config/sync.config';
 import { DatabaseModule } from 'database/database.module';
 import { BackgroundWorkerModule } from 'infrastructure/process/background-worker.module';
 import { Logger } from 'infrastructure/logger';
@@ -53,6 +55,7 @@ import { ExceptionInterceptor } from 'infrastructure/http/interceptors/exception
         contractConfig,
         reserveSourcesConfig,
         blockTimingConfig,
+        syncConfig,
       ],
     }),
     ThrottlerModule.forRoot({
@@ -100,6 +103,7 @@ import { ExceptionInterceptor } from 'infrastructure/http/interceptors/exception
     MailModule,
     EventModule,
     CapoModule,
+    SyncModule,
   ],
   controllers: [AppController],
   providers: [

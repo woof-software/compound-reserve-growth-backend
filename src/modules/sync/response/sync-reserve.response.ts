@@ -1,9 +1,9 @@
 import { ApiProperty } from '@nestjs/swagger';
 
-import { AssetRole } from '@/modules/history/enum/comet-reserve-type.enum';
-import { CometReserveHistoryItem } from '@/modules/history/types/comet-reserve-history-item.type';
+import { SyncReserveAssetRole } from '@/modules/sync/enum/sync-reserve-asset-role.enum';
+import { SyncReserveItem } from '@/modules/sync/types/sync-reserve-item.type';
 
-export class CometReserveHistoryResponse {
+export class SyncReserveResponse {
   @ApiProperty({ example: 1, description: 'Source chain ID' })
   public chainId: number;
 
@@ -19,8 +19,8 @@ export class CometReserveHistoryResponse {
   @ApiProperty({ example: 6 })
   public assetDecimals: number;
 
-  @ApiProperty({ example: AssetRole.BASE, enum: AssetRole })
-  public assetRole: AssetRole;
+  @ApiProperty({ example: SyncReserveAssetRole.BASE, enum: SyncReserveAssetRole })
+  public assetRole: SyncReserveAssetRole;
 
   @ApiProperty({ example: '10008879' })
   public quantity: string;
@@ -37,7 +37,13 @@ export class CometReserveHistoryResponse {
   @ApiProperty({ example: 20123456, description: 'Reserve block number' })
   public blockNumber: number;
 
-  constructor(item: CometReserveHistoryItem) {
+  @ApiProperty({
+    example: '2026-04-07T00:00:00.000Z',
+    description: 'Reserve row update timestamp used for sync pagination.',
+  })
+  public updatedAt: string;
+
+  constructor(item: SyncReserveItem) {
     this.chainId = item.chainId;
     this.marketAddress = item.marketAddress;
     this.assetAddress = item.assetAddress;
@@ -49,5 +55,6 @@ export class CometReserveHistoryResponse {
     this.value = item.value;
     this.timestamp = item.timestamp;
     this.blockNumber = item.blockNumber;
+    this.updatedAt = item.updatedAt.toISOString();
   }
 }
