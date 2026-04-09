@@ -9,14 +9,14 @@ export class SyncReservesCursorMetaResponse {
     nullable: true,
     description: 'Cursor to use in the next request.',
   })
-  public nextCursor: string | null;
+  public lastItemCursor: string | null;
 
   @ApiProperty({ example: true })
   public hasNextPage: boolean;
 
-  constructor(limit: number, nextCursor: string | null, hasNextPage: boolean) {
+  constructor(limit: number, lastItemCursor: string | null, hasNextPage: boolean) {
     this.limit = limit;
-    this.nextCursor = nextCursor;
+    this.lastItemCursor = lastItemCursor;
     this.hasNextPage = hasNextPage;
   }
 }

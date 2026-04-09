@@ -1,6 +1,6 @@
 export type SyncReservesPage<T> = {
   data: T[];
   limit: number;
-  nextCursor: string | null;
+  lastItemCursor: string | null;
   hasNextPage: boolean;
 };

@@ -24,7 +24,7 @@ export class SyncReservesRequest {
   readonly limit?: number;
 
   @ApiPropertyOptional({
-    description: 'Cursor from the previous response nextCursor value.',
+    description: 'Cursor from the previous response lastItemCursor value.',
     example: '2026-04-07T00:00:00.000Z-501',
     maxLength: MAX_SYNC_RESERVES_CURSOR_LENGTH,
   })
