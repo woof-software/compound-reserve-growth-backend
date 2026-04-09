@@ -16,6 +16,10 @@ export class SyncReservesResponse {
 
   constructor(page: SyncReservesPage<SyncReserveItem>) {
     this.data = page.data.map((item) => new SyncReserveResponse(item));
-    this.meta = new SyncReservesCursorMetaResponse(page.limit, page.nextCursor, page.hasNextPage);
+    this.meta = new SyncReservesCursorMetaResponse(
+      page.limit,
+      page.lastItemCursor,
+      page.hasNextPage,
+    );
   }
 }

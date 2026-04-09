@@ -14,7 +14,7 @@ export class SyncReservesController {
   @ApiOperation({
     summary: 'Get COMET and COMET collateral reserves for sync',
     description:
-      'Returns reserve rows ordered for incremental synchronization. Use nextCursor from the response meta as the cursor for the next request.',
+      'Returns reserve rows ordered for incremental synchronization. Use lastItemCursor from the response meta as the cursor for the next request.',
   })
   @ApiResponse({ status: 200, type: SyncReservesResponse })
   @HttpCode(HttpStatus.OK)

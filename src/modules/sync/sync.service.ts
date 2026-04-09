@@ -45,7 +45,7 @@ export class SyncService {
     return {
       data: pageReserves.map((reserve) => this.mapReserveItem(reserve)),
       limit,
-      nextCursor: lastReserve ? this.buildCursor(lastReserve) : null,
+      lastItemCursor: lastReserve ? this.buildCursor(lastReserve) : null,
       hasNextPage: reserves.length > limit,
     };
   }
