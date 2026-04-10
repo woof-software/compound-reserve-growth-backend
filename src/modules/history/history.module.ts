@@ -12,7 +12,6 @@ import { SpendsRepository } from './repositories/spends.repository';
 import { HistoryProcessingService } from './services/history-processing.service';
 import { HistoryService } from './services/history.service';
 
-import { NetworkModule } from '@/common/chains/network/network.module';
 import { RedisModule } from '@/infrastructure/redis/redis.module';
 import { AssetModule } from '@/modules/asset/asset.module';
 import { ContractModule } from '@/modules/contract/contract.module';
@@ -28,7 +27,6 @@ import { SourceModule } from '@/modules/source/source.module';
     AssetModule,
     forwardRef(() => ContractModule),
     IncentivesModule,
-    NetworkModule,
     PriceModule,
     RevenueModule,
     RedisModule,
