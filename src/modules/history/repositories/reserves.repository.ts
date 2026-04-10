@@ -19,7 +19,18 @@ export class ReservesRepository {
   }
 
   async save(reserve: ReserveEntity, manager?: EntityManager): Promise<ReserveEntity> {
-    return this.getRepository(manager).save(reserve);
+    const repository = this.getRepository(manager);
+    await repository
+      .createQueryBuilder()
+      .insert()
+      .into(ReserveEntity)
+      .values(reserve)
+      .orUpdate(['blockNumber', 'quantity', 'price', 'value'], ['sourceId', 'date'], {
+        skipUpdateIfNoValuesChanged: true,
+      })
+      .execute();
+
+    return reserve;
   }
 
   async findById(id: number): Promise<ReserveEntity | null> {
@@ -40,7 +51,8 @@ export class ReservesRepository {
       .leftJoinAndSelect('reserves.source', 'source')
       .where('source.deletedAt IS NULL')
       .andWhere('source.id = :sourceId', { sourceId })
-      .orderBy('reserves.blockNumber', 'DESC')
+      .orderBy('reserves.date', 'DESC')
+      .addOrderBy('reserves.id', 'DESC')
       .getOne();
   }
 

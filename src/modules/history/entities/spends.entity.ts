@@ -1,8 +1,10 @@
-import { Column, Entity, ManyToOne, PrimaryGeneratedColumn } from 'typeorm';
+import { Column, Entity, Index, ManyToOne, PrimaryGeneratedColumn } from 'typeorm';
 
 import { SourceEntity } from '@/modules/source/source.entity';
 
 @Entity({ name: 'spends' })
+@Index('UQ_spends_sourceId_date', ['source', 'date'], { unique: true })
+@Index('IDX_spends_date_source_id', ['date', 'source', 'id'])
 export class SpendsEntity {
   @PrimaryGeneratedColumn()
   public id: number;

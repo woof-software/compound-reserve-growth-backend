@@ -111,40 +111,76 @@ export class BlockService implements OnModuleInit {
     toBlock?: number,
   ): Promise<number> {
     const upperBound = toBlock ?? (await provider.getBlockNumber());
+    const normalizedFromBlock = Math.max(0, Math.min(fromBlock, upperBound));
 
     if (
       network === 'arbitrum' &&
-      upperBound - fromBlock > this.ARBITRUM_WIDE_RANGE_THRESHOLD_BLOCKS
+      upperBound - normalizedFromBlock > this.ARBITRUM_WIDE_RANGE_THRESHOLD_BLOCKS
     ) {
-      return this.findArbitrumBlockByTimestamp(provider, targetTs, fromBlock, upperBound);
+      const candidateBlock = await this.findArbitrumBlockByTimestamp(
+        provider,
+        targetTs,
+        normalizedFromBlock,
+        upperBound,
+      );
+
+      return this.ensureBlockAtOrAfterTimestamp(
+        network,
+        provider,
+        targetTs,
+        normalizedFromBlock,
+        upperBound,
+        candidateBlock,
+      );
     }
 
     if (network === 'scroll') {
-      return this.findScrollBlockByTimestamp(provider, targetTs, fromBlock, upperBound);
+      const candidateBlock = await this.findScrollBlockByTimestamp(
+        provider,
+        targetTs,
+        normalizedFromBlock,
+        upperBound,
+      );
+
+      return this.ensureBlockAtOrAfterTimestamp(
+        network,
+        provider,
+        targetTs,
+        normalizedFromBlock,
+        upperBound,
+        candidateBlock,
+      );
     }
 
-    const networkConf = this.getNetworkConfigForBlock(network, fromBlock);
+    const networkConf = this.getNetworkConfigForBlock(network, normalizedFromBlock);
     const avgBlockTime = networkConf.avgBlockTime;
 
-    const referenceBlock = await this.getCachedBlock(network, provider, fromBlock);
+    const referenceBlock = await this.getCachedBlock(network, provider, normalizedFromBlock);
     const timeDiff = targetTs - referenceBlock.timestamp;
     const blockDiff = Math.round(timeDiff / avgBlockTime);
     let estimatedBlock = referenceBlock.blockNumber + blockDiff;
 
-    estimatedBlock = Math.max(fromBlock, Math.min(upperBound, estimatedBlock));
+    estimatedBlock = Math.max(normalizedFromBlock, Math.min(upperBound, estimatedBlock));
 
     const estimatedBlockData = await this.getCachedBlock(network, provider, estimatedBlock);
 
     const allowedSlip =
       network === 'linea' ? this.LINEA_ALLOWED_SLIP_IN_SEC : this.DEFAULT_ALLOWED_SLIP_IN_SEC;
     if (Math.abs(estimatedBlockData.timestamp - targetTs) < allowedSlip) {
-      return estimatedBlock;
+      return this.ensureBlockAtOrAfterTimestamp(
+        network,
+        provider,
+        targetTs,
+        normalizedFromBlock,
+        upperBound,
+        estimatedBlock,
+      );
     }
 
     const timeError = estimatedBlockData.timestamp - targetTs;
     const blockCorrection = Math.round(timeError / avgBlockTime);
     const searchStart = Math.max(
-      fromBlock,
+      normalizedFromBlock,
       estimatedBlock - Math.abs(blockCorrection) - this.ESTIMATION_SEARCH_PADDING_BLOCKS,
     );
     const searchEnd = Math.min(
@@ -152,7 +188,45 @@ export class BlockService implements OnModuleInit {
       estimatedBlock - blockCorrection + this.ESTIMATION_SEARCH_PADDING_BLOCKS,
     );
 
-    return this.binarySearchWithCache(network, provider, targetTs, searchStart, searchEnd);
+    if (searchEnd < searchStart) {
+      this.logger.warn(
+        `Invalid block search range network=${network} targetTs=${targetTs} fromBlock=${normalizedFromBlock} estimatedBlock=${estimatedBlock} searchStart=${searchStart} searchEnd=${searchEnd}. Falling back to full-range binary search.`,
+      );
+
+      const fallbackBlock = await this.binarySearchWithCache(
+        network,
+        provider,
+        targetTs,
+        normalizedFromBlock,
+        upperBound,
+      );
+
+      return this.ensureBlockAtOrAfterTimestamp(
+        network,
+        provider,
+        targetTs,
+        normalizedFromBlock,
+        upperBound,
+        fallbackBlock,
+      );
+    }
+
+    const candidateBlock = await this.binarySearchWithCache(
+      network,
+      provider,
+      targetTs,
+      searchStart,
+      searchEnd,
+    );
+
+    return this.ensureBlockAtOrAfterTimestamp(
+      network,
+      provider,
+      targetTs,
+      normalizedFromBlock,
+      upperBound,
+      candidateBlock,
+    );
   }
 
   getBlocksPerDay(network: string, blockNumber: number): number {
@@ -293,6 +367,67 @@ export class BlockService implements OnModuleInit {
     }
 
     return left;
+  }
+
+  private async ensureBlockAtOrAfterTimestamp(
+    network: string,
+    provider: MulticallProvider<ethers.JsonRpcProvider>,
+    targetTs: number,
+    fromBlock: number,
+    upperBound: number,
+    candidateBlock: number,
+  ): Promise<number> {
+    const normalizedCandidate = Math.max(fromBlock, Math.min(candidateBlock, upperBound));
+    const candidateData = await this.getCachedBlock(network, provider, normalizedCandidate);
+
+    if (candidateData.timestamp < targetTs) {
+      if (normalizedCandidate >= upperBound) {
+        return upperBound;
+      }
+
+      const correctedBlock = await this.binarySearchWithCache(
+        network,
+        provider,
+        targetTs,
+        normalizedCandidate + 1,
+        upperBound,
+      );
+
+      return this.ensureBlockAtOrAfterTimestamp(
+        network,
+        provider,
+        targetTs,
+        normalizedCandidate + 1,
+        upperBound,
+        correctedBlock,
+      );
+    }
+
+    if (normalizedCandidate <= fromBlock) {
+      return normalizedCandidate;
+    }
+
+    const previousBlock = await this.getCachedBlock(network, provider, normalizedCandidate - 1);
+    if (previousBlock.timestamp < targetTs) {
+      return normalizedCandidate;
+    }
+
+    const correctedBlock = await this.binarySearchWithCache(
+      network,
+      provider,
+      targetTs,
+      fromBlock,
+      normalizedCandidate - 1,
+    );
+
+    return this.ensureBlockAtOrAfterTimestamp(
+      network,
+      provider,
+      targetTs,
+      fromBlock,
+      normalizedCandidate - 1,
+      correctedBlock,
+    );
   }
 
   private async findArbitrumBlockByTimestamp(

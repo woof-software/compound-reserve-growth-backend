@@ -18,7 +18,30 @@ export class IncomesRepository {
   }
 
   async save(reserve: IncomesEntity, manager?: EntityManager): Promise<IncomesEntity> {
-    return this.getRepository(manager).save(reserve);
+    const repository = this.getRepository(manager);
+    await repository
+      .createQueryBuilder()
+      .insert()
+      .into(IncomesEntity)
+      .values(reserve)
+      .orUpdate(
+        [
+          'blockNumber',
+          'quantitySupply',
+          'quantityBorrow',
+          'price',
+          'priceComp',
+          'valueSupply',
+          'valueBorrow',
+        ],
+        ['sourceId', 'date'],
+        {
+          skipUpdateIfNoValuesChanged: true,
+        },
+      )
+      .execute();
+
+    return reserve;
   }
 
   async findById(id: number): Promise<IncomesEntity | null> {
@@ -36,7 +59,8 @@ export class IncomesRepository {
       .leftJoinAndSelect('incomes.source', 'source')
       .where('source.deletedAt IS NULL')
       .andWhere('source.id = :sourceId', { sourceId })
-      .orderBy('incomes.blockNumber', 'DESC')
+      .orderBy('incomes.date', 'DESC')
+      .addOrderBy('incomes.id', 'DESC')
       .getOne();
   }
 

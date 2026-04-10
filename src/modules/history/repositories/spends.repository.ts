@@ -3,7 +3,6 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { EntityManager, Repository } from 'typeorm';
 
 import { SpendsEntity } from '@/modules/history/entities';
-
 import { OffsetDataDto } from '@/common/dto/offset-data.dto';
 import { OffsetDto } from '@/common/dto/offset.dto';
 import { Algorithm } from '@/common/enum/algorithm.enum';
@@ -19,7 +18,30 @@ export class SpendsRepository {
   }
 
   async save(reserve: SpendsEntity, manager?: EntityManager): Promise<SpendsEntity> {
-    return this.getRepository(manager).save(reserve);
+    const repository = this.getRepository(manager);
+    await repository
+      .createQueryBuilder()
+      .insert()
+      .into(SpendsEntity)
+      .values(reserve)
+      .orUpdate(
+        [
+          'blockNumber',
+          'quantitySupply',
+          'quantityBorrow',
+          'price',
+          'priceComp',
+          'valueSupply',
+          'valueBorrow',
+        ],
+        ['sourceId', 'date'],
+        {
+          skipUpdateIfNoValuesChanged: true,
+        },
+      )
+      .execute();
+
+    return reserve;
   }
 
   async findById(id: number): Promise<SpendsEntity | null> {
@@ -37,7 +59,8 @@ export class SpendsRepository {
       .leftJoinAndSelect('spends.source', 'source')
       .where('source.deletedAt IS NULL')
       .andWhere('source.id = :sourceId', { sourceId })
-      .orderBy('spends.blockNumber', 'DESC')
+      .orderBy('spends.date', 'DESC')
+      .addOrderBy('spends.id', 'DESC')
       .getOne();
   }
 
