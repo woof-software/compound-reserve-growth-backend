@@ -327,6 +327,10 @@ describe('BlockService', () => {
           'findArbitrumBlockByTimestamp',
         )
         .mockResolvedValue(777);
+      jest
+        .spyOn(service, 'getCachedBlock')
+        .mockResolvedValueOnce({ blockNumber: 777, timestamp: 10_100, hash: '0x777' })
+        .mockResolvedValueOnce({ blockNumber: 776, timestamp: 9_900, hash: '0x776' });
 
       const result = await service.findBlockByTimestamp(
         'arbitrum',
@@ -348,6 +352,10 @@ describe('BlockService', () => {
           'findScrollBlockByTimestamp',
         )
         .mockResolvedValue(333);
+      jest
+        .spyOn(service, 'getCachedBlock')
+        .mockResolvedValueOnce({ blockNumber: 333, timestamp: 10_100, hash: '0x333' })
+        .mockResolvedValueOnce({ blockNumber: 332, timestamp: 9_900, hash: '0x332' });
 
       const result = await service.findBlockByTimestamp(
         'scroll',
@@ -367,7 +375,9 @@ describe('BlockService', () => {
       const getCachedBlockSpy = jest
         .spyOn(service, 'getCachedBlock')
         .mockResolvedValueOnce({ blockNumber: 100, timestamp: 1000, hash: '0x1' })
-        .mockResolvedValueOnce({ blockNumber: 130, timestamp: 1400, hash: '0x2' });
+        .mockResolvedValueOnce({ blockNumber: 130, timestamp: 1400, hash: '0x2' })
+        .mockResolvedValueOnce({ blockNumber: 130, timestamp: 1400, hash: '0x2' })
+        .mockResolvedValueOnce({ blockNumber: 129, timestamp: 1350, hash: '0x3' });
 
       const binarySearchSpy = jest.spyOn(
         service as unknown as { binarySearchWithCache: jest.Mock },
@@ -383,7 +393,7 @@ describe('BlockService', () => {
       );
 
       expect(result).toBe(130);
-      expect(getCachedBlockSpy).toHaveBeenCalledTimes(2);
+      expect(getCachedBlockSpy).toHaveBeenCalledTimes(4);
       expect(binarySearchSpy).not.toHaveBeenCalled();
     });
 
@@ -393,7 +403,9 @@ describe('BlockService', () => {
       jest
         .spyOn(service, 'getCachedBlock')
         .mockResolvedValueOnce({ blockNumber: 100, timestamp: 1000, hash: '0x1' })
-        .mockResolvedValueOnce({ blockNumber: 130, timestamp: 6000, hash: '0x2' });
+        .mockResolvedValueOnce({ blockNumber: 130, timestamp: 6000, hash: '0x2' })
+        .mockResolvedValueOnce({ blockNumber: 150, timestamp: 1400, hash: '0x3' })
+        .mockResolvedValueOnce({ blockNumber: 149, timestamp: 1350, hash: '0x4' });
 
       const binarySearchSpy = jest
         .spyOn(service as unknown as { binarySearchWithCache: jest.Mock }, 'binarySearchWithCache')
