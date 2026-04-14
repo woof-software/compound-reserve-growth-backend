@@ -38,6 +38,7 @@ export class SyncService {
       limit: limit + 1,
       cursorUpdatedAt: cursor?.updatedAt,
       cursorId: cursor?.id,
+      excludedNetworks: this.config.reserves.excludedNetworks,
     });
     const pageReserves = reserves.slice(0, limit);
     const lastReserve = pageReserves[pageReserves.length - 1] ?? null;

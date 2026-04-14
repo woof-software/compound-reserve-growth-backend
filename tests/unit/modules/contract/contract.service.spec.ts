@@ -186,13 +186,8 @@ describe('ContractService', () => {
     });
 
     it('returns early when firstMidnightUTC is greater than todayMidnightUTC', async () => {
-      const {
-        service,
-        findLatestReserveBySource,
-        historyService,
-        priceService,
-        mailService,
-      } = makeDeps();
+      const { service, findLatestReserveBySource, historyService, priceService, mailService } =
+        makeDeps();
       const source = makeSource({ id: 32, startBlock: 7_000 });
       findLatestReserveBySource.mockResolvedValue({
         blockNumber: 7_000,
