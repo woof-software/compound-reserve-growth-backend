@@ -1,4 +1,5 @@
 import { Algorithm } from '@/common/enum/algorithm.enum';
+import { DAY_IN_MS } from '@/common/constants';
 import { AssetEntity } from '@/modules/asset/asset.entity';
 import { ContractService } from '@/modules/contract/contract.service';
 import { SourceEntity } from '@/modules/source/source.entity';
@@ -122,19 +123,20 @@ describe('ContractService', () => {
     });
 
     it('uses latest reserve blockNumber when source has reserves in DB (resume path)', async () => {
-      const { service, findLatestReserveBySource, blockService, provider } = makeDeps();
+      const { service, findLatestReserveBySource, blockService } = makeDeps();
       const source = makeSource({ id: 20, startBlock: 1_000 });
-      findLatestReserveBySource.mockResolvedValue({ id: 1, blockNumber: 50_000, sourceId: 20 });
-      blockService.getCachedBlock.mockResolvedValue({
+      findLatestReserveBySource.mockResolvedValue({
+        id: 1,
         blockNumber: 50_000,
-        timestamp: Math.floor(Date.now() / 1000),
-        hash: '0x',
+        sourceId: 20,
+        date: new Date(),
       });
 
       await service.saveReserves(source, Algorithm.COMET);
 
       expect(findLatestReserveBySource).toHaveBeenCalledWith(source, undefined);
-      expect(blockService.getCachedBlock).toHaveBeenCalledWith('eth', provider, 50_000);
+      expect(blockService.getCachedBlock).not.toHaveBeenCalled();
+      expect(blockService.findBlockByTimestamp).not.toHaveBeenCalled();
     });
 
     it('uses source.startBlock when provided startDate is older than start block timestamp', async () => {
@@ -185,21 +187,12 @@ describe('ContractService', () => {
     });
 
     it('returns early when firstMidnightUTC is greater than todayMidnightUTC', async () => {
-      const {
-        service,
-        findLatestReserveBySource,
-        historyService,
-        priceService,
-        mailService,
-        blockService,
-      } = makeDeps();
+      const { service, findLatestReserveBySource, historyService, priceService, mailService } =
+        makeDeps();
       const source = makeSource({ id: 32, startBlock: 7_000 });
-      findLatestReserveBySource.mockResolvedValue({ blockNumber: 7_000 });
-
-      blockService.getCachedBlock.mockResolvedValue({
+      findLatestReserveBySource.mockResolvedValue({
         blockNumber: 7_000,
-        timestamp: Math.floor(Date.now() / 1000) + 2 * 86_400,
-        hash: '0x',
+        date: new Date(),
       });
 
       await service.saveReserves(source, Algorithm.COMET);
@@ -222,15 +215,18 @@ describe('ContractService', () => {
       const source = makeSource({ id: 33, startBlock: 1_000, endBlock: 100 });
       source.asset.symbol = 'ETH';
 
-      findLatestReserveBySource.mockResolvedValue({ blockNumber: 90 });
+      const threeDaysAgo = new Date(Date.now() - 3 * DAY_IN_MS);
+      const yesterdayTs = Math.floor((Date.now() - DAY_IN_MS) / 1000);
+
+      findLatestReserveBySource.mockResolvedValue({ blockNumber: 90, date: threeDaysAgo });
       (provider as { getBalance?: jest.Mock }).getBalance = jest
         .fn()
         .mockResolvedValue(1_000_000_000_000_000_000n);
       priceService.getHistoricalPrice.mockResolvedValue(1);
 
       blockService.getCachedBlock.mockResolvedValue({
-        blockNumber: 90,
-        timestamp: Math.floor(Date.now() / 1000) - 3 * 86_400,
+        blockNumber: 100,
+        timestamp: yesterdayTs,
         hash: '0x',
       });
       blockService.findBlockByTimestamp
@@ -255,15 +251,26 @@ describe('ContractService', () => {
     });
 
     it('returns early when latest stored block already reached source.endBlock', async () => {
-      const { service, findLatestReserveBySource, historyService, priceService, blockService } =
-        makeDeps();
+      const {
+        service,
+        findLatestReserveBySource,
+        historyService,
+        priceService,
+        blockService,
+        provider,
+      } = makeDeps();
       const source = makeSource({ id: 34, startBlock: 1_000, endBlock: 10_000 });
 
-      findLatestReserveBySource.mockResolvedValue({ blockNumber: 10_000 });
+      findLatestReserveBySource.mockResolvedValue({ blockNumber: 10_000, date: new Date() });
+      blockService.getCachedBlock.mockResolvedValue({
+        blockNumber: 10_000,
+        timestamp: Math.floor(Date.now() / 1000),
+        hash: '0x',
+      });
 
       await service.saveReserves(source, Algorithm.COMET);
 
-      expect(blockService.getCachedBlock).not.toHaveBeenCalled();
+      expect(blockService.getCachedBlock).toHaveBeenCalledWith('eth', provider, 10_000);
       expect(blockService.findBlockByTimestamp).not.toHaveBeenCalled();
       expect(historyService.createReservesWithSource).not.toHaveBeenCalled();
       expect(priceService.getHistoricalPrice).not.toHaveBeenCalled();

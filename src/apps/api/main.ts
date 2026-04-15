@@ -29,6 +29,12 @@ async function bootstrap() {
       .setVersion('1.0.1')
       .addTag('Compound Reserve Growth API project documentation')
       .addBearerAuth()
+      .addSecurity('SyncAccessKey', {
+        type: 'apiKey',
+        in: 'header',
+        name: 'X-Sync-Access-Key',
+        description: 'Sync access key for integration-kit requests to this backend service',
+      })
       .build();
 
     const document = SwaggerModule.createDocument(app, config);

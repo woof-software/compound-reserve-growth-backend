@@ -43,6 +43,12 @@ export class SyncRepository {
       .addOrderBy('reserve.id', 'ASC')
       .limit(queryArgs.limit);
 
+    if (queryArgs.excludedNetworks?.length) {
+      query.andWhere('source.network NOT IN (:...excludedNetworks)', {
+        excludedNetworks: queryArgs.excludedNetworks,
+      });
+    }
+
     if (queryArgs.cursorUpdatedAt && queryArgs.cursorId) {
       query.andWhere(
         '(reserve.updatedAt > :cursorUpdatedAt OR (reserve.updatedAt = :cursorUpdatedAt AND reserve.id > :cursorId))',
