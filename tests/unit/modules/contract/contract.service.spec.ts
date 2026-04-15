@@ -1,4 +1,5 @@
 import { Algorithm } from '@/common/enum/algorithm.enum';
+import { DAY_IN_MS } from '@/common/constants';
 import { AssetEntity } from '@/modules/asset/asset.entity';
 import { ContractService } from '@/modules/contract/contract.service';
 import { SourceEntity } from '@/modules/source/source.entity';
@@ -214,8 +215,8 @@ describe('ContractService', () => {
       const source = makeSource({ id: 33, startBlock: 1_000, endBlock: 100 });
       source.asset.symbol = 'ETH';
 
-      const threeDaysAgo = new Date(Date.now() - 3 * 86_400_000);
-      const yesterdayTs = Math.floor((Date.now() - 86_400_000) / 1000);
+      const threeDaysAgo = new Date(Date.now() - 3 * DAY_IN_MS);
+      const yesterdayTs = Math.floor((Date.now() - DAY_IN_MS) / 1000);
 
       findLatestReserveBySource.mockResolvedValue({ blockNumber: 90, date: threeDaysAgo });
       (provider as { getBalance?: jest.Mock }).getBalance = jest

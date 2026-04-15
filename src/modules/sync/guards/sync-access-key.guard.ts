@@ -6,7 +6,6 @@ import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
 import { Request } from 'express';
 
-import { SyncConfig } from '@/config/sync.config';
 import { SyncAccessKeyHeaderDto } from '@/modules/sync/dto/sync-access-key-header.dto';
 
 @Injectable()
@@ -39,7 +38,7 @@ export class SyncAccessKeyGuard implements CanActivate {
       throw new UnauthorizedException(message);
     }
 
-    const accessKeyHash = this.configService.getOrThrow<SyncConfig>('sync').accessKeyHash;
+    const accessKeyHash = this.configService.getOrThrow<string>('sync.accessKeyHash');
 
     if (!this.compareWithHash(accessKeyHash, header.key)) {
       throw new UnauthorizedException('Invalid sync access key');
