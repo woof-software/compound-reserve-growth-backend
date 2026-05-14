@@ -33,6 +33,7 @@ export class SnapshotRepository {
       .where('snapshot.oracleAddress = :address', { address: oracleAddress })
       .andWhere('snapshot.timestamp <= :time', { time })
       .orderBy('snapshot.timestamp', 'DESC')
+      .limit(1)
       .getOne();
   }
 }
