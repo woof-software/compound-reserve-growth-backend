@@ -1,31 +1,34 @@
 import { forwardRef, Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 
-import { AssetModule } from 'modules/asset/asset.module';
-import { SourceModule } from 'modules/source/source.module';
-import { ContractModule } from 'modules/contract/contract.module';
-import { PriceModule } from 'modules/price/price.module';
-import { RedisModule } from 'modules/redis/redis.module';
-import { Price } from 'modules/price/price.entity';
-
-import { Reserve, Incomes, Spends } from './entities';
-import { ReservesRepository } from './reserves-repository.service';
-import { HistoryService } from './history.service';
+import { ReserveEntity, IncomesEntity, SpendsEntity } from './entities';
 import { HistoryGetCommand } from './cli/history-get.command';
 import { StatsGetCommand } from './cli/stats-get.command';
 import { HistoryController } from './history.controller';
-import { HistoryGetCron } from './cron/history-get.cron';
-import { GetHistoryService } from './cron/history-get.service';
-import { IncomesRepository } from './incomes-repository.service';
-import { SpendsRepository } from './spends-repository.service';
+import { HistoryCollectionQueueService } from './queue/history-collection-queue.service';
+import { IncomesRepository } from './repositories/incomes.repository';
+import { ReservesRepository } from './repositories/reserves.repository';
+import { SpendsRepository } from './repositories/spends.repository';
+import { HistoryProcessingService } from './services/history-processing.service';
+import { HistoryService } from './services/history.service';
+
+import { RedisModule } from '@/infrastructure/redis/redis.module';
+import { AssetModule } from '@/modules/asset/asset.module';
+import { ContractModule } from '@/modules/contract/contract.module';
+import { IncentivesModule } from '@/modules/incentives/incentives.module';
+import { PriceModule } from '@/modules/price/price.module';
+import { RevenueModule } from '@/modules/revenue/revenue.module';
+import { SourceModule } from '@/modules/source/source.module';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Reserve, Incomes, Spends, Price]),
+    TypeOrmModule.forFeature([ReserveEntity, IncomesEntity, SpendsEntity]),
     SourceModule,
     AssetModule,
     forwardRef(() => ContractModule),
+    IncentivesModule,
     PriceModule,
+    RevenueModule,
     RedisModule,
   ],
   providers: [
@@ -35,15 +38,16 @@ import { SpendsRepository } from './spends-repository.service';
     HistoryService,
     HistoryGetCommand,
     StatsGetCommand,
-    HistoryGetCron,
-    GetHistoryService,
+    HistoryProcessingService,
+    HistoryCollectionQueueService,
   ],
   exports: [
     HistoryService,
     ReservesRepository,
     IncomesRepository,
     SpendsRepository,
-    GetHistoryService,
+    HistoryProcessingService,
+    HistoryCollectionQueueService,
   ],
   controllers: [HistoryController],
 })

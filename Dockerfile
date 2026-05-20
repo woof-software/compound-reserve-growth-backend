@@ -17,4 +17,4 @@ COPY --from=build --chown=node:node /app/tsconfig.json ./tsconfig.json
 
 USER node
 EXPOSE 3000
-CMD ["node", "dist/src/main"]
+CMD ["node", "dist/src/apps/api/main"]

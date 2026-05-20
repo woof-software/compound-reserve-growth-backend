@@ -2,53 +2,40 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 
-import { Source } from './source.entity';
-import { FindSourceDto } from './dto/find-source.dto';
-import { Algorithm } from 'common/enum/algorithm.enum';
+import { Algorithm } from '@/common/enum/algorithm.enum';
+
+import { SourceEntity } from './source.entity';
 
 @Injectable()
 export class SourceRepository {
   constructor(
-    @InjectRepository(Source)
-    private readonly sourceRepository: Repository<Source>,
+    @InjectRepository(SourceEntity)
+    private readonly sourceRepository: Repository<SourceEntity>,
   ) {}
 
-  async findById(id: number): Promise<Source> {
-    return this.sourceRepository.findOne({ where: { id }, relations: { asset: true } });
-  }
-
-  async findByAddress(address: string): Promise<Source> {
-    return this.sourceRepository.findOne({ where: { address } });
-  }
-  async findByAddressNetworkAndType(dto: FindSourceDto): Promise<Source> {
+  async findById(id: number): Promise<SourceEntity> {
     return this.sourceRepository.findOne({
-      where: { address: dto.address, network: dto.network, type: dto.type },
+      where: { id, deletedAt: null },
+      relations: { asset: true },
     });
   }
 
-  async list(): Promise<Source[]> {
+  async list(): Promise<SourceEntity[]> {
     return this.sourceRepository.find({
+      where: { deletedAt: null },
       relations: { asset: true },
       order: { id: 'ASC' },
     });
   }
 
-  async save(source: Source): Promise<Source> {
-    return this.sourceRepository.save(source);
-  }
-
-  async update(source: Source): Promise<Source> {
-    source.checkedAt = new Date();
-    return this.sourceRepository.save(source);
-  }
-
-  async listByAlgorithms(algorithms: Algorithm[]): Promise<Source[]> {
+  async listByAlgorithms(algorithms: Algorithm[]): Promise<SourceEntity[]> {
     const algorithmsArrayLiteral = `{${algorithms.join(',')}}`;
 
     return this.sourceRepository
       .createQueryBuilder('source')
       .leftJoinAndSelect('source.asset', 'asset')
-      .where('source.algorithm && :algorithms::text[]', {
+      .where('source.deletedAt IS NULL')
+      .andWhere('source.algorithm && :algorithms::text[]', {
         algorithms: algorithmsArrayLiteral,
       })
       .orderBy('source.id', 'ASC')

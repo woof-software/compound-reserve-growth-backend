@@ -1,9 +1,9 @@
 import { Logger } from '@nestjs/common';
 import { Command, CommandRunner } from 'nest-commander';
 
-import { EventService } from 'modules/event/event.service';
-import { Event } from 'modules/event/event.entity';
-import { events } from 'modules/event/constants/events';
+import { EventService } from '@/modules/event/event.service';
+import { Event } from '@/modules/event/event.entity';
+import { events } from '@/modules/event/constants/events';
 
 @Command({ name: 'event:fill', description: 'Fill event table' })
 export class EventFillCommand extends CommandRunner {

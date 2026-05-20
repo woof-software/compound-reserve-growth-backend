@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { ethers } from 'ethers';
 
-import { ResponseStatsAlgorithm } from 'modules/contract/interface';
+import { ResponseStatsAlgorithm } from '@/modules/contract/interface';
 
 import { dailyIncomeTokens, dailySpendUsd } from './math';
 
@@ -16,6 +16,14 @@ export class AlgorithmService {
     return contract.getReserves({ blockTag });
   }
 
+  public async cometCollect(
+    contract: ethers.Contract,
+    assetAddress: string,
+    blockTag: number,
+  ): Promise<bigint> {
+    return contract.getCollateralReserves(assetAddress, { blockTag });
+  }
+
   public async marketV2(contract: ethers.Contract, blockTag: number): Promise<bigint> {
     return contract.totalReserves({ blockTag });
   }
@@ -26,12 +34,27 @@ export class AlgorithmService {
     decimals: number,
     priceComp: number,
   ): Promise<ResponseStatsAlgorithm> {
-    const totalSupply: bigint = await contract.totalSupply({ blockTag });
-    const totalBorrow: bigint = await contract.totalBorrow({ blockTag });
-    const utilization: bigint = await contract.getUtilization({ blockTag });
-    const supplyRatePerSec: bigint = await contract.getSupplyRate(utilization, { blockTag });
-    const borrowRatePerSec: bigint = await contract.getBorrowRate(utilization, { blockTag });
-    const trackingIndexScale: bigint = await contract.trackingIndexScale({ blockTag });
+    const [
+      totalSupply,
+      totalBorrow,
+      utilization,
+      trackingIndexScale,
+      baseTrackingSupplySpeed,
+      baseTrackingBorrowSpeed,
+    ] = await Promise.all([
+      contract.totalSupply({ blockTag }) as Promise<bigint>,
+      contract.totalBorrow({ blockTag }) as Promise<bigint>,
+      contract.getUtilization({ blockTag }) as Promise<bigint>,
+      contract.trackingIndexScale({ blockTag }) as Promise<bigint>,
+      contract.baseTrackingSupplySpeed({ blockTag }) as Promise<bigint>,
+      contract.baseTrackingBorrowSpeed({ blockTag }) as Promise<bigint>,
+    ]);
+
+    const [supplyRatePerSec, borrowRatePerSec] = await Promise.all([
+      contract.getSupplyRate(utilization, { blockTag }) as Promise<bigint>,
+      contract.getBorrowRate(utilization, { blockTag }) as Promise<bigint>,
+    ]);
+
     const trackingIndexDecimals = scaleToDecimals(trackingIndexScale);
     const supplyApr = Number(
       ethers.formatUnits(supplyRatePerSec * BigInt(YEAR_IN_SECONDS) * 100n, MARKET_DECIMALS),
@@ -39,13 +62,6 @@ export class AlgorithmService {
     const borrowApr = Number(
       ethers.formatUnits(borrowRatePerSec * BigInt(YEAR_IN_SECONDS) * 100n, MARKET_DECIMALS),
     );
-
-    const baseTrackingSupplySpeed: bigint = await contract.baseTrackingSupplySpeed({
-      blockTag,
-    });
-    const baseTrackingBorrowSpeed: bigint = await contract.baseTrackingBorrowSpeed({
-      blockTag,
-    });
 
     const totalSupplyTokens = Number(ethers.formatUnits(totalSupply, decimals));
     const totalBorrowTokens = Number(ethers.formatUnits(totalBorrow, decimals));
@@ -68,11 +84,15 @@ export class AlgorithmService {
     blocksPerDay: number,
     decimals: number,
   ): Promise<ResponseStatsAlgorithm> {
-    const totalSupply: bigint = await contract.totalSupply({ blockTag });
-    const exchangeRate: bigint = await contract.exchangeRateStored({ blockTag });
-    const totalBorrow: bigint = await contract.totalBorrows({ blockTag });
-    const supplyRatePerBlock: bigint = await contract.supplyRatePerBlock({ blockTag });
-    const borrowRatePerBlock: bigint = await contract.borrowRatePerBlock({ blockTag });
+    const [totalSupply, exchangeRate, totalBorrow, supplyRatePerBlock, borrowRatePerBlock] =
+      await Promise.all([
+        contract.totalSupply({ blockTag }) as Promise<bigint>,
+        contract.exchangeRateStored({ blockTag }) as Promise<bigint>,
+        contract.totalBorrows({ blockTag }) as Promise<bigint>,
+        contract.supplyRatePerBlock({ blockTag }) as Promise<bigint>,
+        contract.borrowRatePerBlock({ blockTag }) as Promise<bigint>,
+      ]);
+
     const blocksPerYear = BigInt(blocksPerDay) * BigInt(YEAR_IN_DAYS);
     const supplyApr = Number(
       ethers.formatUnits(supplyRatePerBlock * blocksPerYear * 100n, MARKET_DECIMALS),

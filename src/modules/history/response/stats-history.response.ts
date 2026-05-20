@@ -1,6 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 
-import { StatsHistory } from 'modules/history/entities';
+import { StatsHistory } from '@/modules/history/entities';
 
 class IncomesStatsResponse {
   @ApiProperty({ example: 1, description: 'id - unique identifier for incomes stats' })

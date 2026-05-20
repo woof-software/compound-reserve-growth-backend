@@ -1,7 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
 
-import { Reserve } from 'modules/history/entities';
-import { SourceFullResponse } from 'modules/source/response/source-full.response';
+import { ReserveEntity } from '@/modules/history/entities';
+import { SourceFullResponse } from '@/modules/source/response/source-full.response';
 
 export class ReserveFullResponse {
   @ApiProperty({ example: 1 })
@@ -22,7 +22,7 @@ export class ReserveFullResponse {
   @ApiProperty({ type: SourceFullResponse })
   public source: SourceFullResponse;
 
-  constructor(reserve: Reserve) {
+  constructor(reserve: ReserveEntity) {
     this.id = reserve.id;
     this.quantity = reserve.quantity;
     this.price = reserve.price;

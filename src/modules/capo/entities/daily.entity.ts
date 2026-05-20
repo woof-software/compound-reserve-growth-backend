@@ -27,14 +27,17 @@ export class DailyAggregation {
   @Column('decimal', { precision: 78, scale: 0 })
   maxRatio: string;
 
-  @Column('decimal', { precision: 78, scale: 0 })
+  @Column('decimal', { precision: 78, scale: 8 })
   avgPrice: string;
 
-  @Column('decimal', { precision: 78, scale: 0 })
+  @Column('decimal', { precision: 78, scale: 8 })
   minPrice: string;
 
-  @Column('decimal', { precision: 78, scale: 0 })
+  @Column('decimal', { precision: 78, scale: 8 })
   maxPrice: string;
+
+  @Column('decimal', { precision: 78, scale: 8, nullable: true })
+  cap: string | null;
 
   @Column()
   cappedCount: number;
@@ -44,4 +47,7 @@ export class DailyAggregation {
 
   @CreateDateColumn()
   createdAt: Date;
+
+  @Column({ nullable: true })
+  assetId: number | null;
 }

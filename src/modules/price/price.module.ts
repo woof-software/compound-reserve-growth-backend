@@ -1,17 +1,35 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 
-import { RedisModule } from 'modules/redis/redis.module';
-
+import { CollateralPriceService } from './collateral-price.service';
+import { FeedPriceService } from './feed-price.service';
 import { PriceService } from './price.service';
 import { CoinGeckoModule } from './providers/coingecko/coingecko.module';
 import { Price } from './price.entity';
 import { PriceRepository } from './price.repository';
 import { PricePreloadCommand } from './cli/price-preload.command';
+import { QuotePriceService } from './quote-price.service';
+
+import { RedisModule } from 'infrastructure/redis/redis.module';
+import { BlockModule } from '@/common/chains/block/block.module';
+import { NetworkModule } from '@/common/chains/network/network.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Price]), RedisModule, CoinGeckoModule],
-  providers: [PriceService, PriceRepository, PricePreloadCommand],
+  imports: [
+    TypeOrmModule.forFeature([Price]),
+    RedisModule,
+    CoinGeckoModule,
+    NetworkModule,
+    BlockModule,
+  ],
+  providers: [
+    CollateralPriceService,
+    FeedPriceService,
+    PriceService,
+    PriceRepository,
+    PricePreloadCommand,
+    QuotePriceService,
+  ],
   exports: [PriceService, PriceRepository],
 })
 export class PriceModule {}

@@ -2,26 +2,31 @@ import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Inject, Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import type { Cache } from 'cache-manager';
 import type { Redis } from 'ioredis';
+import { EntityManager } from 'typeorm';
 
-import { REDIS_CLIENT } from 'modules/redis/redis.module';
-
+import { CollateralPriceService } from './collateral-price.service';
 import { PriceProviderInterface } from './interfaces/price-provider.interface';
 import { CachedPrice } from './interfaces/cached-price.interface';
 import { CoinGeckoProviderService } from './providers/coingecko/coingecko.service';
 import { STABLECOIN_PRICES } from './constants';
 import { Price } from './price.entity';
 import { PriceRepository } from './price.repository';
+import { CollateralHistoricalPriceArgs } from './type/collateral-historical-price-args.type';
+import { PriceAsset } from './type/price-asset.type';
 
-import { DAY_IN_MS, DAY_IN_SEC, HOUR_IN_SEC, SEC_IN_MS } from '@app/common/constants';
+import { REDIS_CLIENT } from 'infrastructure/redis/redis.module';
+import { DAY_IN_MS, DAY_IN_SEC, HOUR_IN_SEC, SEC_IN_MS } from '@/common/constants';
 
 @Injectable()
 export class PriceService implements OnModuleInit {
   private readonly logger = new Logger(PriceService.name);
   private readonly providers: Map<string, PriceProviderInterface> = new Map();
+  private readonly batchSize = 100;
 
   constructor(
     @Inject(CACHE_MANAGER) private cacheManager: Cache,
     @Inject(REDIS_CLIENT) private readonly redisClient: Redis,
+    private readonly collateralPriceService: CollateralPriceService,
     private readonly coinGeckoProvider: CoinGeckoProviderService,
     private readonly priceRepository: PriceRepository,
   ) {
@@ -47,26 +52,31 @@ export class PriceService implements OnModuleInit {
   }
 
   async getHistoricalPrice(
-    asset: { address: string; symbol: string; decimals: number },
+    asset: PriceAsset,
     date: Date,
+    manager?: EntityManager,
   ): Promise<number> {
-    // Check cache first
-    const cachedPrice = await this.getFromCache(asset.symbol, date);
-    if (cachedPrice) {
-      this.logger.debug(
-        `Price cache HIT: ${asset.symbol} @ ${date.toISOString().slice(0, 10)} = ${cachedPrice.price}`,
-      );
-      return cachedPrice.price;
+    const shouldUseCache = this.shouldUseCache(manager);
+
+    if (shouldUseCache) {
+      const cachedPrice = await this.getFromCache(asset.symbol, date);
+      if (cachedPrice) {
+        this.logger.debug(
+          `Price cache HIT: ${asset.symbol} @ ${date.toISOString().slice(0, 10)} = ${cachedPrice.price}`,
+        );
+        return cachedPrice.price;
+      }
     }
 
     // Check database
-    const dbPrice = await this.getFromDatabase(asset.symbol, date);
+    const dbPrice = await this.getFromDatabase(asset.symbol, date, manager);
     if (dbPrice) {
       this.logger.debug(
         `Price DB HIT: ${asset.symbol} @ ${date.toISOString().slice(0, 10)} = ${dbPrice.price}`,
       );
-      // Cache the DB result for faster future access
-      await this.setToCache(asset.symbol, date, dbPrice.price, 'database');
+      if (shouldUseCache) {
+        await this.setToCache(asset.symbol, date, dbPrice.price, 'database');
+      }
       return dbPrice.price;
     }
 
@@ -79,8 +89,7 @@ export class PriceService implements OnModuleInit {
         price = STABLECOIN_PRICES[asset.symbol];
         source = 'hardcoded';
       } else {
-        // Try providers in order of preference
-        const result = await this.fetchPriceFromProviders(asset, date);
+        const result = await this.fetchPriceFromProviders(asset, date, manager);
         if (result) {
           price = result.price;
           source = result.source;
@@ -94,12 +103,8 @@ export class PriceService implements OnModuleInit {
         );
       }
 
-      // Cache the result
-      await this.setToCache(asset.symbol, date, price, source);
-
-      // Save to database if it came from an external provider
-      if (source !== 'hardcoded' && source !== 'database') {
-        await this.saveToDatabase(asset.symbol, price, date);
+      if (shouldUseCache) {
+        await this.setToCache(asset.symbol, date, price, source);
       }
 
       return price;
@@ -111,9 +116,56 @@ export class PriceService implements OnModuleInit {
     }
   }
 
+  async getCollateralHistoricalPrice(
+    asset: PriceAsset,
+    request: Omit<CollateralHistoricalPriceArgs, 'assetAddress' | 'assetSymbol'>,
+    manager?: EntityManager,
+  ): Promise<number> {
+    const shouldUseCache = this.shouldUseCache(manager);
+
+    if (shouldUseCache) {
+      const cachedPrice = await this.getFromCache(asset.symbol, request.date);
+      if (cachedPrice) {
+        this.logger.debug(
+          `Collateral price cache HIT: ${asset.symbol} @ ${request.date.toISOString().slice(0, 10)} = ${cachedPrice.price}`,
+        );
+        return cachedPrice.price;
+      }
+    }
+
+    const dbPrice = await this.getFromDatabase(asset.symbol, request.date, manager);
+    if (dbPrice) {
+      this.logger.debug(
+        `Collateral price DB HIT: ${asset.symbol} @ ${request.date.toISOString().slice(0, 10)} = ${dbPrice.price}`,
+      );
+      if (shouldUseCache) {
+        await this.setToCache(asset.symbol, request.date, dbPrice.price, 'database');
+      }
+      return dbPrice.price;
+    }
+
+    const price = await this.collateralPriceService.getPrice({
+      ...request,
+      assetAddress: asset.address,
+      assetSymbol: asset.symbol,
+    });
+
+    await this.saveToDatabase(asset.symbol, price, request.date, manager);
+    if (shouldUseCache) {
+      await this.setToCache(asset.symbol, request.date, price, 'collateral_feed');
+    }
+
+    this.logger.log(
+      `Collateral price saved from on-chain feed for ${asset.symbol} @ ${request.date.toISOString().slice(0, 10)} = ${price}`,
+    );
+
+    return price;
+  }
+
   private async fetchPriceFromProviders(
-    asset: { address: string; symbol: string; decimals: number },
+    asset: PriceAsset,
     date: Date,
+    manager?: EntityManager,
   ): Promise<{ price: number; source: string } | null> {
     for (const [providerName, provider] of this.providers) {
       try {
@@ -125,13 +177,18 @@ export class PriceService implements OnModuleInit {
           continue;
         }
 
-        const result = await this.getExactOrNearestPrice(provider, coinId, asset.symbol, date);
+        const result = await this.getExactOrNearestPrice(
+          provider,
+          coinId,
+          asset.symbol,
+          date,
+          manager,
+        );
         if (result) {
           return { price: result.price, source: result.source };
         }
       } catch (error) {
         this.logger.warn(`Provider ${providerName} failed for ${asset.symbol}: ${error.message}`);
-        continue;
       }
     }
 
@@ -148,6 +205,7 @@ export class PriceService implements OnModuleInit {
     coinId: string,
     symbol: string,
     date: Date,
+    manager?: EntityManager,
   ): Promise<{ price: number; source: string } | null> {
     const providerName = provider.getProviderName();
     const dateString = date.toISOString().slice(0, 10);
@@ -158,18 +216,10 @@ export class PriceService implements OnModuleInit {
 
     const isOlderThanFiveYears = date < fiveYearsAgo;
 
-    // Check if we need to preload historical data
-    const preloadKey = `preload_status:${coinId}`;
-    const preloadStatus = await this.getPreloadStatus(preloadKey);
-
-    if (!preloadStatus.loaded) {
-      this.logger.log(`Preloading historical data for ${coinId} from ${providerName}`);
-      await this.preloadHistoricalPrices(provider, coinId, symbol);
-      await this.setPreloadStatus(preloadKey, true);
-    }
+    await this.ensureHistoricalPricesPreloaded(provider, coinId, symbol);
 
     // Check database first for historical prices
-    const dbPrice = await this.getFromDatabase(symbol, date);
+    const dbPrice = await this.getFromDatabase(symbol, date, manager);
     if (dbPrice) {
       return { price: dbPrice.price, source: 'database' };
     }
@@ -180,7 +230,7 @@ export class PriceService implements OnModuleInit {
         `Date ${dateString} is older than 5 years, looking for earliest available price`,
       );
 
-      const earliestPrice = await this.findEarliestDatabasePrice(symbol);
+      const earliestPrice = await this.findEarliestDatabasePrice(symbol, manager);
       if (earliestPrice) {
         return { price: earliestPrice.price, source: 'database_fallback' };
       }
@@ -189,7 +239,7 @@ export class PriceService implements OnModuleInit {
       try {
         const fallbackPrice = await provider.fetchOldestAvailablePrice(coinId);
         if (fallbackPrice > 0) {
-          await this.saveToDatabase(symbol, fallbackPrice, date);
+          await this.saveToDatabase(symbol, fallbackPrice, date, manager);
           return { price: fallbackPrice, source: `${providerName}_fallback` };
         }
       } catch (error) {
@@ -200,7 +250,7 @@ export class PriceService implements OnModuleInit {
       try {
         const exactPrice = await provider.getHistoricalPrice(coinId, date);
         if (exactPrice > 0) {
-          await this.saveToDatabase(symbol, exactPrice, date);
+          await this.saveToDatabase(symbol, exactPrice, date, manager);
           return { price: exactPrice, source: providerName };
         }
       } catch (error) {
@@ -208,7 +258,7 @@ export class PriceService implements OnModuleInit {
       }
 
       // Find nearest available price in database
-      const nearestPrice = await this.findNearestDatabasePrice(symbol, date);
+      const nearestPrice = await this.findNearestDatabasePrice(symbol, date, manager);
       if (nearestPrice) {
         return { price: nearestPrice.price, source: 'database_nearest' };
       }
@@ -227,118 +277,140 @@ export class PriceService implements OnModuleInit {
     provider: PriceProviderInterface,
     coinId: string,
     symbol: string,
-  ): Promise<void> {
-    try {
-      if (!(provider instanceof CoinGeckoProviderService)) {
-        this.logger.warn(`Preloading not supported for provider: ${provider.getProviderName()}`);
-        return;
-      }
-
-      const apiType = provider.getApiType();
-      const maxDaysBack = apiType === 'pro' ? 6 * 365 : 365; // 6 years for pro, 1 year for demo/free
-
-      this.logger.log(
-        `Preloading ${maxDaysBack} days of data for ${coinId} (API type: ${apiType})`,
-      );
-
-      const prices = await provider.preloadPrices(coinId);
-
-      if (!Array.isArray(prices) || prices.length === 0) {
-        this.logger.warn(`No price data returned for ${coinId}`);
-        return;
-      }
-
-      // Check which dates we already have in the database to avoid duplicates
-      const existingPrices = await this.priceRepository.findBySymbol(symbol);
-      const existingDates = new Set(existingPrices.map((p) => p.date.toISOString().slice(0, 10)));
-
-      const priceBatch: Price[] = [];
-      let earliestDate: string | null = null;
-      let latestDate: string | null = null;
-
-      for (const [timestamp, price] of prices) {
-        const date = new Date(timestamp);
-        date.setUTCHours(0, 0, 0, 0);
-        const dateStr = date.toISOString().slice(0, 10);
-
-        // Skip if we already have this date
-        if (existingDates.has(dateStr)) {
-          continue;
-        }
-
-        if (!earliestDate || dateStr < earliestDate) {
-          earliestDate = dateStr;
-        }
-        if (!latestDate || dateStr > latestDate) {
-          latestDate = dateStr;
-        }
-
-        const priceEntity = new Price(symbol, price, date);
-        priceBatch.push(priceEntity);
-      }
-
-      // Save in batches for better performance
-      if (priceBatch.length > 0) {
-        const batchSize = 100;
-        let savedCount = 0;
-
-        for (let i = 0; i < priceBatch.length; i += batchSize) {
-          const batch = priceBatch.slice(i, i + batchSize);
-          await this.saveBatchToDatabase(batch);
-          savedCount += batch.length;
-
-          // Small delay between batches to avoid overwhelming the database
-          if (i + batchSize < priceBatch.length) {
-            await new Promise((resolve) => setTimeout(resolve, 100));
-          }
-        }
-
-        this.logger.log(`Preloaded and saved ${savedCount} new price records for ${symbol}`);
-
-        if (earliestDate && latestDate) {
-          this.logger.log(`Date range: ${earliestDate} to ${latestDate}`);
-        }
-      } else {
-        this.logger.log(`All price data for ${symbol} already exists in database`);
-      }
-    } catch (error) {
-      this.logger.warn(`Failed to preload historical prices for ${coinId}: ${error.message}`);
+  ): Promise<boolean> {
+    if (!(provider instanceof CoinGeckoProviderService)) {
+      this.logger.warn(`Preloading not supported for provider: ${provider.getProviderName()}`);
+      return false;
     }
+
+    const apiType = provider.getApiType();
+    const maxDaysBack = apiType === 'pro' ? 6 * 365 : 365; // 6 years for pro, 1 year for demo/free
+
+    this.logger.log(`Preloading ${maxDaysBack} days of data for ${coinId} (API type: ${apiType})`);
+
+    const prices = await provider.preloadPrices(coinId);
+
+    if (!Array.isArray(prices) || prices.length === 0) {
+      this.logger.warn(`No price data returned for ${coinId}`);
+      return false;
+    }
+
+    let rangeStart: Date | null = null;
+    let rangeEnd: Date | null = null;
+    let earliestDate: string | null = null;
+    let latestDate: string | null = null;
+
+    for (const [timestamp] of prices) {
+      const date = new Date(timestamp);
+      date.setUTCHours(0, 0, 0, 0);
+      const dateStr = date.toISOString().slice(0, 10);
+
+      if (rangeStart === null || date < rangeStart) {
+        rangeStart = date;
+      }
+      if (rangeEnd === null || date > rangeEnd) {
+        rangeEnd = date;
+      }
+      if (!earliestDate || dateStr < earliestDate) {
+        earliestDate = dateStr;
+      }
+      if (!latestDate || dateStr > latestDate) {
+        latestDate = dateStr;
+      }
+    }
+
+    const existingDateKeys =
+      rangeStart && rangeEnd
+        ? new Set(
+            await this.priceRepository.findDateKeysBySymbolInDateRange(
+              symbol,
+              rangeStart,
+              rangeEnd,
+            ),
+          )
+        : new Set<string>();
+    const seenDateKeys = new Set<string>();
+    const pendingBatch: Price[] = [];
+    let savedCount = 0;
+
+    for (const [timestamp, price] of prices) {
+      const date = new Date(timestamp);
+      date.setUTCHours(0, 0, 0, 0);
+      const dateStr = date.toISOString().slice(0, 10);
+
+      if (existingDateKeys.has(dateStr) || seenDateKeys.has(dateStr)) {
+        continue;
+      }
+
+      seenDateKeys.add(dateStr);
+      pendingBatch.push(new Price(symbol, price, date));
+
+      if (pendingBatch.length >= this.batchSize) {
+        savedCount += await this.saveBatchToDatabase(pendingBatch);
+        pendingBatch.length = 0;
+      }
+    }
+
+    if (pendingBatch.length > 0) {
+      savedCount += await this.saveBatchToDatabase(pendingBatch);
+    }
+
+    if (savedCount > 0) {
+      this.logger.log(`Preloaded and saved ${savedCount} new price records for ${symbol}`);
+    } else {
+      this.logger.log(`All price data for ${symbol} already exists in database`);
+    }
+
+    if (earliestDate && latestDate) {
+      this.logger.log(`Date range: ${earliestDate} to ${latestDate}`);
+    }
+
+    return true;
   }
 
   // Database operations
-  private async getFromDatabase(symbol: string, date: Date): Promise<Price | null> {
+  private async getFromDatabase(
+    symbol: string,
+    date: Date,
+    manager?: EntityManager,
+  ): Promise<Price | null> {
     try {
-      // Normalize date to start of day for consistent querying
       const normalizedDate = new Date(date);
       normalizedDate.setUTCHours(0, 0, 0, 0);
 
-      return await this.priceRepository.findBySymbolAndDate(symbol, normalizedDate);
+      return await this.priceRepository.findBySymbolAndDate(symbol, normalizedDate, manager);
     } catch (error) {
       this.logger.error(`Database query error for ${symbol}: ${error.message}`);
       return null;
     }
   }
 
-  private async saveToDatabase(symbol: string, price: number, date: Date): Promise<void> {
+  private async saveToDatabase(
+    symbol: string,
+    price: number,
+    date: Date,
+    manager?: EntityManager,
+  ): Promise<void> {
     try {
-      // Normalize date to start of day for consistency
       const normalizedDate = new Date(date);
       normalizedDate.setUTCHours(0, 0, 0, 0);
 
       const priceEntity = new Price(symbol, price, normalizedDate);
-      await this.priceRepository.saveToDatabase(priceEntity);
+      await this.priceRepository.saveToDatabase(priceEntity, manager);
       this.logger.debug(
         `Saved price to DB: ${symbol} @ ${normalizedDate.toISOString().slice(0, 10)} = ${price}`,
       );
     } catch (error) {
       this.logger.error(`Failed to save price to database: ${error.message}`);
+      throw error;
     }
   }
 
-  private async saveBatchToDatabase(prices: Price[]): Promise<void> {
+  private async saveBatchToDatabase(prices: Price[]): Promise<number> {
     try {
-      if (prices.length === 0) return;
+      if (prices.length === 0) {
+        return 0;
+      }
 
       // Normalize all dates to start of day
       const normalizedPrices = prices.map((price) => {
@@ -347,25 +419,34 @@ export class PriceService implements OnModuleInit {
         return new Price(price.symbol, price.price, normalizedDate);
       });
 
-      await this.priceRepository.saveBatch(normalizedPrices);
-      this.logger.debug(`Batch saved ${prices.length} prices to database`);
+      const savedPrices = await this.priceRepository.saveBatch(normalizedPrices);
+      this.logger.debug(`Batch saved ${savedPrices.length} prices to database`);
+      return savedPrices.length;
     } catch (error) {
       this.logger.error(`Failed to save price batch to database: ${error.message}`);
+      throw error;
     }
   }
 
-  private async findEarliestDatabasePrice(symbol: string): Promise<Price | null> {
+  private async findEarliestDatabasePrice(
+    symbol: string,
+    manager?: EntityManager,
+  ): Promise<Price | null> {
     try {
-      return await this.priceRepository.findEarliestBySymbol(symbol);
+      return await this.priceRepository.findEarliestBySymbol(symbol, manager);
     } catch (error) {
       this.logger.error(`Error finding earliest DB price for ${symbol}: ${error.message}`);
       return null;
     }
   }
 
-  private async findNearestDatabasePrice(symbol: string, targetDate: Date): Promise<Price | null> {
+  private async findNearestDatabasePrice(
+    symbol: string,
+    targetDate: Date,
+    manager?: EntityManager,
+  ): Promise<Price | null> {
     try {
-      return await this.priceRepository.findNearestBySymbolAndDate(symbol, targetDate, 30);
+      return await this.priceRepository.findNearestBySymbolAndDate(symbol, targetDate, 30, manager);
     } catch (error) {
       this.logger.error(`Error finding nearest DB price for ${symbol}: ${error.message}`);
       return null;
@@ -373,21 +454,53 @@ export class PriceService implements OnModuleInit {
   }
 
   // Preload status management
-  private async getPreloadStatus(key: string): Promise<{ loaded: boolean }> {
+  private async getPreloadStatus(key: string): Promise<{ loaded: boolean; failed: boolean }> {
     try {
       const cached = await this.getCacheValue(key);
-      return { loaded: cached === 'true' };
+      if (cached === 'loaded' || cached === 'true') {
+        return { loaded: true, failed: false };
+      }
+
+      if (cached === 'failed') {
+        return { loaded: false, failed: true };
+      }
+
+      return { loaded: false, failed: false };
     } catch (error) {
-      return { loaded: false };
+      return { loaded: false, failed: false };
     }
   }
 
-  private async setPreloadStatus(key: string, loaded: boolean): Promise<void> {
+  private async setPreloadStatus(key: string, status: 'loaded' | 'failed'): Promise<void> {
     try {
-      const ttl = 7 * DAY_IN_SEC; // Cache for 7 days
-      await this.setCacheValue(key, loaded.toString(), ttl);
+      const ttl = status === 'loaded' ? 7 * DAY_IN_SEC : HOUR_IN_SEC;
+      await this.setCacheValue(key, status, ttl);
     } catch (error) {
       this.logger.warn(`Failed to set preload status: ${error.message}`);
+    }
+  }
+
+  private async ensureHistoricalPricesPreloaded(
+    provider: PriceProviderInterface,
+    coinId: string,
+    symbol: string,
+  ): Promise<void> {
+    const preloadKey = `preload_status:${coinId}`;
+    const preloadStatus = await this.getPreloadStatus(preloadKey);
+
+    if (preloadStatus.loaded || preloadStatus.failed) {
+      return;
+    }
+
+    this.logger.log(`Preloading historical data for ${coinId} from ${provider.getProviderName()}`);
+
+    try {
+      const preloadSucceeded = await this.preloadHistoricalPrices(provider, coinId, symbol);
+      await this.setPreloadStatus(preloadKey, preloadSucceeded ? 'loaded' : 'failed');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.warn(`Failed to preload historical prices for ${coinId}: ${message}`);
+      await this.setPreloadStatus(preloadKey, 'failed');
     }
   }
 
@@ -1030,5 +1143,9 @@ export class PriceService implements OnModuleInit {
         symbolsWithFullHistory: {},
       };
     }
+  }
+
+  private shouldUseCache(manager?: EntityManager): boolean {
+    return !manager;
   }
 }

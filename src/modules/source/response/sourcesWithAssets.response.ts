@@ -1,8 +1,8 @@
 import { ApiProperty } from '@nestjs/swagger';
 
-import { AssetResponse } from 'modules/asset/response/asset.response';
-
 import { SourceResponse } from './source.response';
+
+import { AssetResponse } from '@/modules/asset/response/asset.response';
 
 export class SourcesWithAssetsResponse {
   @ApiProperty({ type: [SourceResponse] })

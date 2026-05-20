@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
-import { PriceProviderInterface } from 'modules/price/interfaces/price-provider.interface';
+import { PriceProviderInterface } from '@/modules/price/interfaces/price-provider.interface';
 
 import { COINGECKO_MAPPINGS } from './coingecko-mappings';
 

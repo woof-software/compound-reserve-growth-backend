@@ -1,0 +1,121 @@
+import { Module } from '@nestjs/common';
+import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
+import { ConfigModule, ConfigService } from '@nestjs/config';
+import { MailerModule } from '@nestjs-modules/mailer';
+import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
+import { CacheModule } from '@nestjs/cache-manager';
+import { redisStore } from 'cache-manager-ioredis-yet';
+import Redis from 'ioredis';
+
+import { AppController } from './app.controller';
+
+import { ContractModule } from '@/modules/contract/contract.module';
+import { GithubModule } from '@/modules/github/github.module';
+import { AssetModule } from '@/modules/asset/asset.module';
+import { SourceModule } from '@/modules/source/source.module';
+import { HistoryModule } from '@/modules/history/history.module';
+import { TreasuryModule } from '@/modules/treasury/treasury.module';
+import { RevenueModule } from '@/modules/revenue/revenue.module';
+import { PriceModule } from '@/modules/price/price.module';
+import { RunwayModule } from '@/modules/runway/runway.module';
+import { MailModule } from '@/modules/mail/mail.module';
+import { EventModule } from '@/modules/event/event.module';
+import { CoinGeckoModule } from '@/modules/price/providers/coingecko/coingecko.module';
+import { CapoModule } from '@/modules/capo/capo.module';
+import { SyncModule } from '@/modules/sync/sync.module';
+import { getAdminModule } from '@/modules/admin';
+import { NetworkModule } from '@/common/chains/network/network.module';
+import { RedisModule, REDIS_CLIENT } from 'infrastructure/redis/redis.module';
+import appConfig from '@/config/app';
+import databaseConfig from '@/config/database';
+import networksConfig from '@/config/networks.config';
+import redis from '@/config/redis';
+import google from '@/config/google';
+import admin from '@/config/admin';
+import contractConfig from '@/config/contract';
+import reserveSourcesConfig from '@/config/reserve-sources.config';
+import blockTimingConfig from '@/config/block-timing.config';
+import syncConfig from '@/config/sync.config';
+import { DatabaseModule } from 'database/database.module';
+import { BackgroundWorkerModule } from 'infrastructure/process/background-worker.module';
+import { Logger } from 'infrastructure/logger';
+import { ExceptionInterceptor } from 'infrastructure/http/interceptors/exception.interceptor';
+
+@Module({
+  imports: [
+    ConfigModule.forRoot({
+      isGlobal: true,
+      load: [
+        appConfig,
+        databaseConfig,
+        networksConfig,
+        redis,
+        google,
+        admin,
+        contractConfig,
+        reserveSourcesConfig,
+        blockTimingConfig,
+        syncConfig,
+      ],
+    }),
+    ThrottlerModule.forRoot({
+      throttlers: [
+        {
+          ttl: 1000,
+          limit: 10,
+        },
+      ],
+    }),
+    CacheModule.registerAsync({
+      isGlobal: true,
+      imports: [ConfigModule, RedisModule],
+      inject: [ConfigService, REDIS_CLIENT],
+      useFactory: async (cfg: ConfigService, client: Redis) => ({
+        store: redisStore,
+        redisInstance: client,
+        ttl: cfg.get<number>('redis.ttl'),
+      }),
+    }),
+    MailerModule.forRoot({
+      transport: {
+        host: 'in-v3.mailjet.com',
+        port: 587,
+        auth: {
+          user: process.env.MAILJET_USER,
+          pass: process.env.MAILJET_PASS,
+        },
+      },
+    }),
+    ...getAdminModule(),
+    DatabaseModule,
+    GithubModule,
+    NetworkModule,
+    ContractModule,
+    SourceModule,
+    AssetModule,
+    HistoryModule,
+    BackgroundWorkerModule,
+    TreasuryModule,
+    RevenueModule,
+    CoinGeckoModule,
+    PriceModule,
+    RunwayModule,
+    MailModule,
+    EventModule,
+    CapoModule,
+    SyncModule,
+  ],
+  controllers: [AppController],
+  providers: [
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: ExceptionInterceptor,
+    },
+    {
+      provide: APP_GUARD,
+      useClass: ThrottlerGuard,
+    },
+    Logger,
+  ],
+})
+export class ApiAppModule {}

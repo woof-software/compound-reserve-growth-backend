@@ -1,9 +1,18 @@
-import { Column, Entity, ManyToOne, PrimaryGeneratedColumn } from 'typeorm';
+import {
+  Column,
+  Entity,
+  Index,
+  ManyToOne,
+  PrimaryGeneratedColumn,
+  UpdateDateColumn,
+} from 'typeorm';
 
-import { Source } from 'modules/source/source.entity';
+import { SourceEntity } from '@/modules/source/source.entity';
 
 @Entity({ name: 'reserves' })
-export class Reserve {
+@Index('UQ_reserves_sourceId_date', ['source', 'date'], { unique: true })
+@Index('IDX_reserves_date_source_id', ['date', 'source', 'id'])
+export class ReserveEntity {
   @PrimaryGeneratedColumn()
   public id: number;
 
@@ -25,11 +34,14 @@ export class Reserve {
   @Column()
   public createdAt: Date;
 
-  @ManyToOne(() => Source, (source) => source.reserves)
-  public source: Source;
+  @UpdateDateColumn()
+  public updatedAt: Date;
+
+  @ManyToOne(() => SourceEntity, (source) => source.reserves)
+  public source: SourceEntity;
 
   constructor(
-    source: Source,
+    source: SourceEntity,
     blockNumber: number,
     quantity: string,
     price: number,

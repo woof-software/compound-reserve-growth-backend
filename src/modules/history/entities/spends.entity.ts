@@ -1,9 +1,11 @@
-import { Column, Entity, ManyToOne, PrimaryGeneratedColumn } from 'typeorm';
+import { Column, Entity, Index, ManyToOne, PrimaryGeneratedColumn } from 'typeorm';
 
-import { Source } from 'modules/source/source.entity';
+import { SourceEntity } from '@/modules/source/source.entity';
 
 @Entity({ name: 'spends' })
-export class Spends {
+@Index('UQ_spends_sourceId_date', ['source', 'date'], { unique: true })
+@Index('IDX_spends_date_source_id', ['date', 'source', 'id'])
+export class SpendsEntity {
   @PrimaryGeneratedColumn()
   public id: number;
 
@@ -34,11 +36,11 @@ export class Spends {
   @Column()
   public createdAt: Date;
 
-  @ManyToOne(() => Source, (source) => source.spends)
-  public source: Source;
+  @ManyToOne(() => SourceEntity, (source) => source.spends)
+  public source: SourceEntity;
 
   constructor(
-    source: Source,
+    source: SourceEntity,
     blockNumber: number,
     quantitySupply: string,
     quantityBorrow: string,
