@@ -5,7 +5,6 @@ import { IncentiveEntity } from '@/modules/incentives/incentive.entity';
 import { RevenueEntity } from '@/modules/revenue/revenue.entity';
 import { TreasuryEntity } from '@/modules/treasury/treasury.entity';
 import { AssetEntity } from '@/modules/asset/asset.entity';
-
 import { Source } from '@/common/types/source';
 
 @Entity({ name: 'source' })
