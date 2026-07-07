@@ -8,7 +8,6 @@ import type {
   CometContract,
   CometContractReaders,
 } from '@/modules/collateral/types/collateral.types';
-
 import { BlockService } from '@/common/chains/block/block.service';
 import { ProviderFactory } from '@/common/chains/network/provider.factory';
 
