@@ -43,9 +43,7 @@ export default registerAs('networks', (): NetworkConfig[] => [
   {
     network: 'mantle',
     chainId: 5000,
-    url:
-      process.env.RPC_MANTLE ||
-      `https://yolo-side-wildflower.mantle-mainnet.quiknode.pro/${process.env.MANTLE_QUICKNODE_KEY}/`,
+    url: process.env.RPC_MANTLE,
   },
   {
     network: 'unichain',
@@ -64,7 +62,7 @@ export default registerAs('networks', (): NetworkConfig[] => [
   {
     network: 'arbitrum',
     chainId: 42161,
-    url: process.env.RPC_ARBITRUM || `https://rpc.ankr.com/arbitrum/${process.env.ANKR_KEY}`,
+    url: process.env.RPC_ARBITRUM,
     quoteUsdFeeds: {
       ETH: '0x639Fe6ab55C921f74e7fac1ee960C0B6293ba612',
     },
@@ -72,7 +70,7 @@ export default registerAs('networks', (): NetworkConfig[] => [
   {
     network: 'avalanche',
     chainId: 43114,
-    url: 'https://api.avax.network/ext/bc/C/rpc',
+    url: process.env.RPC_AVALANCHE || 'https://api.avax.network/ext/bc/C/rpc',
     batchMaxCount: 3,
   },
   {
@@ -84,14 +82,12 @@ export default registerAs('networks', (): NetworkConfig[] => [
   {
     network: 'scroll',
     chainId: 534352,
-    url: `https://scroll-rpc.publicnode.com`,
+    url: process.env.RPC_SCROLL || `https://scroll-rpc.publicnode.com`,
   },
   {
     network: 'linea',
     chainId: 59144,
-    url:
-      process.env.RPC_LINEA ||
-      `https://omniscient-hardworking-gas.linea-mainnet.quiknode.pro/${process.env.LINEA_QUICKNODE_KEY}/`,
+    url: process.env.RPC_LINEA,
     quoteUsdFeeds: {
       ETH: '0x3c6Cd9Cc7c7a4c2Cf5a82734CD249D7D593354dA',
     },
