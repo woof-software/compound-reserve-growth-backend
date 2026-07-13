@@ -49,17 +49,25 @@ export class ContractService implements OnModuleInit {
   private readonly scrollPeriods = [
     {
       startBlock: 0,
-      endBlock: 24965736,
-      avgBlockTime: 3,
-      blocksPerDay: 28800,
-      description: 'Classic',
+      endBlock: 17499999,
+      avgBlockTime: 3.2,
+      blocksPerDay: 27000,
+      description: 'Classic (~3s blocks, Oct 2023 - Jul 2025)',
     },
     {
-      startBlock: 24965737,
-      endBlock: Infinity,
-      avgBlockTime: 1,
-      blocksPerDay: 86400,
-      description: 'Upgrade',
+      startBlock: 17500000,
+      endBlock: 33199999,
+      avgBlockTime: 1.4,
+      blocksPerDay: 60000,
+      description: 'Fast (~1-1.7s blocks, Jul 2025 - Apr 2026)',
+    },
+    {
+      // Rate has been degrading gradually since Apr 2026; tail values measured 2026-07.
+      startBlock: 33200000,
+      endBlock: Number.POSITIVE_INFINITY,
+      avgBlockTime: 11,
+      blocksPerDay: 7850,
+      description: 'Slowdown (measured 2026-07)',
     },
   ];
 
