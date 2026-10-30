@@ -21,7 +21,7 @@ export default registerAs('networks', (): NetworkConfig[] => [
   {
     network: 'ronin',
     chainId: 2020,
-    url: 'https://ronin.drpc.org',
+    url: process.env.RPC_RONIN || 'https://api.roninchain.com/rpc',
     batchMaxCount: 3,
     quoteUsdFeeds: {
       RON: '0x0B6074F21488B95945989E513EFEA070096d931D',
